@@ -1,0 +1,15 @@
+{
+  "name": "smarty91-vip",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host 0.0.0.0",
+    "build": "vite build",
+    "lint": "vite build",
+    "preview": "vite preview --port 3000 --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.1.0"
+  }
+}

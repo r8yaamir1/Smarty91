@@ -1,0 +1,1070 @@
+/* ==========================================================
+   SMARTY91 - MILLION DOLLAR VIP LUXURY RED THEME
+   High-End Casino & Prediction Experience
+   ========================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --smarty-primary: #E51837;
+  --smarty-primary-dark: #B80A22;
+  --smarty-primary-deep: #800414;
+  --smarty-gold: #FFD700;
+  --smarty-gold-light: #FFF099;
+  --smarty-gold-gradient: linear-gradient(135deg, #FFE082 0%, #FFD700 45%, #FFA000 100%);
+  --smarty-ruby-gradient: linear-gradient(135deg, #FF2E4D 0%, #E51837 40%, #B80A22 100%);
+  --smarty-dark-card: #14151E;
+  --smarty-dark-card-border: rgba(255, 215, 0, 0.22);
+}
+
+/* Background canvas: Deep Luxury Casino Velvet & Obsidian */
+html {
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  background: #11141E !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body {
+  width: 100% !important;
+  max-width: 100vw !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #11141E !important;
+  font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  color: #111625;
+  overflow-x: hidden !important;
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  overscroll-behavior-x: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  position: relative !important;
+}
+
+#app {
+  background: #F4F5FA !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  min-height: 100vh !important;
+  margin: 0 auto !important;
+  overflow-x: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+@media screen and (max-width: 500px) {
+  #app {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media screen and (min-width: 501px) {
+  body {
+    background: radial-gradient(circle at 50% 10%, #2A0810 0%, #13141B 50%, #0A0B0F 100%) !important;
+  }
+  #app {
+    margin-top: 15px;
+    margin-bottom: 25px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 215, 0, 0.15);
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(229, 24, 55, 0.25) !important;
+  }
+}
+
+/* ----------------------------------------------------------
+   NAVBAR & SMARTY91 BRANDING
+   ---------------------------------------------------------- */
+.navbar-fixed[data-v-12a80a3e],
+.navbar.main .navbar-fixed[data-v-12a80a3e] {
+  background: linear-gradient(135deg, #E51837 0%, #D31027 45%, #9E0619 100%) !important;
+  box-shadow: 0 4px 20px rgba(184, 10, 34, 0.4) !important;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+  height: 1.35rem !important;
+}
+
+.navbar__content[data-v-12a80a3e] {
+  height: 1.35rem !important;
+}
+
+.navbar__content-left .van-icon[data-v-12a80a3e],
+.navbar.main .navbar-fixed .navbar__content-left .van-icon[data-v-12a80a3e] {
+  color: #FFFFFF !important;
+  font-size: 0.56rem !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Custom Smarty91 Luxury Logo in Center */
+.navbar__content-center .headLogo[data-v-12a80a3e],
+.WinGo__C-head-logo[data-v-5d71c3fd] {
+  background-image: none !important;
+  width: auto !important;
+  min-width: 3.6rem !important;
+  height: 0.95rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  font-family: 'Cinzel', 'Outfit', serif !important;
+}
+
+.navbar__content-center .headLogo[data-v-12a80a3e]::before,
+.WinGo__C-head-logo[data-v-5d71c3fd]::before {
+  content: '👑 SMARTY';
+  font-size: 0.46rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 40%, #FFD700 80%, #D4AF37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  margin-right: 0.12rem;
+}
+
+.navbar__content-center .headLogo[data-v-12a80a3e]::after,
+.WinGo__C-head-logo[data-v-5d71c3fd]::after {
+  content: '91';
+  font-size: 0.42rem;
+  font-weight: 900;
+  font-family: 'Outfit', sans-serif;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #FF4B63 0%, #B80A22 100%);
+  padding: 0.02rem 0.16rem;
+  border-radius: 0.16rem;
+  border: 1px solid #FFD700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.02em;
+}
+
+/* Head sound/service icons */
+.WinGo__C-head-more .disableVoice {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ----------------------------------------------------------
+   WALLET CARD - MILLION DOLLAR HIGH ROLLER VIP
+   ---------------------------------------------------------- */
+.Wallet__C[data-v-7dd1adab]:before {
+  background: linear-gradient(180deg, #E51837 0%, #B80A22 70%, #900516 100%) !important;
+  height: 6.8rem !important;
+  border-radius: 0 0 1.2rem 1.2rem !important;
+  box-shadow: inset 0 -4px 15px rgba(0, 0, 0, 0.25);
+}
+
+.Wallet__C-balance[data-v-7dd1adab] {
+  background-color: #141622 !important;
+  background-image: radial-gradient(circle at 90% 20%, rgba(229, 24, 55, 0.35) 0%, transparent 60%),
+                    radial-gradient(circle at 10% 80%, rgba(255, 215, 0, 0.12) 0%, transparent 50%) !important;
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+  border-radius: 0.48rem !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 0 20px rgba(229, 24, 55, 0.2) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.Wallet__C-balance-l1[data-v-7dd1adab] {
+  font-size: 0.64rem !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 800 !important;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF4B8 50%, #FFD700 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+  letter-spacing: 0.02em;
+  padding-top: 0.1rem;
+}
+
+.Wallet__C-balance-l2[data-v-7dd1adab] {
+  color: #A0A5B8 !important;
+  font-size: 0.32rem !important;
+  font-weight: 600;
+}
+
+.Wallet__C-balance-l2 .svg-icon {
+  fill: #FFD700 !important;
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.5));
+}
+
+/* Action Buttons inside Wallet */
+.wallet-action-row {
+  display: flex !important;
+  gap: 0.28rem !important;
+  margin-top: 0.32rem !important;
+  width: 100% !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  z-index: 2;
+  position: relative;
+}
+
+.wallet-action-btn {
+  flex: 1 !important;
+  height: 0.95rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.16rem !important;
+  border-radius: 5px !important;
+  font-size: 0.35rem !important;
+  font-weight: 800 !important;
+  font-family: 'Outfit', sans-serif !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: none !important;
+  outline: none !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+.wallet-btn-icon {
+  width: 0.42rem !important;
+  height: 0.42rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Shiny Green Deposit Button */
+.wallet-deposit-btn {
+  background: linear-gradient(180deg, #00FF7F 0%, #00E676 40%, #00C853 75%, #009624 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.wallet-deposit-btn:active {
+  transform: scale(0.97) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Shiny Red Withdraw Button */
+.wallet-withdraw-btn {
+  background: linear-gradient(180deg, #FF5252 0%, #FF1744 40%, #D50000 75%, #8B0000 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.wallet-withdraw-btn:active {
+  transform: scale(0.97) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ----------------------------------------------------------
+   NOTICE TICKER
+   ---------------------------------------------------------- */
+.noticeBar__container.lottery-notice {
+  background: #FFFFFF !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid rgba(229, 24, 55, 0.15) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+  height: 1.04rem !important;
+  padding: 0 0.26667rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin: 0.32rem auto !important;
+  width: calc(100% - 0.64rem) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.icon-noticeBarSpeaker {
+  fill: #E51837 !important;
+  width: 0.44rem !important;
+  height: 0.44rem !important;
+  flex-shrink: 0 !important;
+  margin-right: 0.16rem !important;
+}
+
+.noticeBar__container.lottery-notice .noticeBar__container-body {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: hidden !important;
+  margin: 0 0.16rem 0 0 !important;
+}
+
+.noticeBar__container.lottery-notice .noticeBar__container-body-text {
+  font-size: 0.3rem !important;
+  color: var(--text_color_L2, #666666) !important;
+  white-space: nowrap !important;
+  line-height: 1.04rem !important;
+  animation: marquee 12s linear infinite !important;
+}
+
+/* ----------------------------------------------------------
+   GAME MODE TABS (Win Go 30s, 1Min, 3Min, 5Min)
+   ---------------------------------------------------------- */
+.WinGo__C-gameList {
+  width: calc(100% - 0.64rem) !important;
+  margin: 0.28rem auto 0 !important;
+  display: flex !important;
+  gap: 0.14rem !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: 2.24rem !important;
+  box-sizing: border-box !important;
+}
+
+.WinGo__C-gameList-item {
+  flex: 1 1 0 !important;
+  width: calc((100% - 0.42rem) / 4) !important;
+  height: 100% !important;
+  background: #FFFFFF !important;
+  border: 1px solid #EAECEF !important;
+  border-radius: 0.26667rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.25s ease !important;
+  cursor: pointer !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.WinGo__C-gameList-item > div {
+  height: 100% !important;
+  line-height: 0.42rem !important;
+  font-size: 0.33rem !important;
+  margin: auto !important;
+  color: var(--text_color_L2, #76809b) !important;
+  padding-top: 1.32rem !important;
+  background-image: url(../assets/png/time-5d4e96a3.png) !important;
+  background-size: 1.1rem !important;
+  background-position: center 0.16rem !important;
+  background-repeat: no-repeat !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+}
+
+.WinGo__C-gameList-item.active {
+  background: linear-gradient(135deg, #FF2E4D 0%, #E51837 50%, #B80A22 100%) !important;
+  border: 1px solid #FFD700 !important;
+  box-shadow: 0 4px 14px rgba(229, 24, 55, 0.35) !important;
+}
+
+.WinGo__C-gameList-item.active > div {
+  color: #FFFFFF !important;
+  background-image: url(../assets/png/time_a-3460e16a.png) !important;
+  font-weight: 700 !important;
+}
+
+/* ----------------------------------------------------------
+   TIME LEFT & DRAW BOARD
+   ---------------------------------------------------------- */
+.TimeLeft__C {
+  background: #FFFFFF !important;
+  border-radius: 0.48rem !important;
+  border: 1px solid rgba(229, 24, 55, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+}
+
+.TimeLeft__C-rule {
+  border: 1px solid #E51837 !important;
+  color: #E51837 !important;
+  border-radius: 0.3rem !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.TimeLeft__C-rule:active {
+  transform: scale(0.96);
+}
+
+.TimeLeft__C-id {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 700 !important;
+  color: #111625 !important;
+}
+
+/* 5 Winning Lottery Balls Under 'How to Play' */
+.TimeLeft__C-num {
+  position: absolute !important;
+  height: 0.72rem !important;
+  display: flex !important;
+  align-items: center !important;
+  left: 0.29333rem !important;
+  bottom: 0.30667rem !important;
+  gap: 0.12rem !important;
+  z-index: 2;
+}
+
+.TimeLeft__C-num > div {
+  width: 0.7rem !important;
+  height: 0.7rem !important;
+  background-size: 100% 100% !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  border-radius: 50% !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22) !important;
+  display: inline-block !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  user-select: none !important;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.TimeLeft__C-num > div:hover {
+  transform: scale(1.15);
+}
+
+.TimeLeft__C-num > div.n0 { background-image: url(../assets/png/n0-30bd92d1.png) !important; }
+.TimeLeft__C-num > div.n1 { background-image: url(../assets/png/n1-dfccbff5.png) !important; }
+.TimeLeft__C-num > div.n2 { background-image: url(../assets/png/n2-c2913607.png) !important; }
+.TimeLeft__C-num > div.n3 { background-image: url(../assets/png/n3-f92c313f.png) !important; }
+.TimeLeft__C-num > div.n4 { background-image: url(../assets/png/n4-cb84933b.png) !important; }
+.TimeLeft__C-num > div.n5 { background-image: url(../assets/png/n5-49d0e9c5.png) !important; }
+.TimeLeft__C-num > div.n6 { background-image: url(../assets/png/n6-a56e0b9a.png) !important; }
+.TimeLeft__C-num > div.n7 { background-image: url(../assets/png/n7-5961a17f.png) !important; }
+.TimeLeft__C-num > div.n8 { background-image: url(../assets/png/n8-d4d951a4.png) !important; }
+.TimeLeft__C-num > div.n9 { background-image: url(../assets/png/n9-a20f6f42.png) !important; }
+
+/* Countdown Digital Stopwatch Clock */
+.TimeLeft__C-time {
+  height: 0.8rem !important;
+  position: absolute !important;
+  bottom: 1.01333rem !important;
+  right: 0.34667rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.08rem !important;
+}
+
+.TimeLeft__C-time > div {
+  background: linear-gradient(180deg, #1D202D 0%, #0F1118 100%) !important;
+  color: #FFD700 !important;
+  font-family: 'Outfit', monospace !important;
+  font-weight: 800 !important;
+  border-radius: 0.16rem !important;
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+  min-width: 0.48rem !important;
+  height: 0.72rem !important;
+  line-height: 0.72rem !important;
+  text-align: center !important;
+  font-size: 0.44rem !important;
+  padding: 0 0.08rem !important;
+}
+
+.TimeLeft__C-time > div:nth-child(3) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #111625 !important;
+  font-weight: 900 !important;
+  min-width: 0.15rem !important;
+  padding: 0 !important;
+}
+
+/* ----------------------------------------------------------
+   COLOR BETTING BUTTONS (GREEN, VIOLET, RED)
+   ---------------------------------------------------------- */
+.Betting__C-head-g {
+  background: linear-gradient(135deg, #00D060 0%, #00B050 50%, #00873D 100%) !important;
+  box-shadow: 0 6px 16px rgba(0, 176, 80, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.3rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.03em;
+  transition: transform 0.15s ease;
+}
+
+.Betting__C-head-p {
+  background: linear-gradient(135deg, #B344DE 0%, #9C27B0 50%, #7B1FA2 100%) !important;
+  box-shadow: 0 6px 16px rgba(156, 39, 176, 0.38), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0.3rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.03em;
+  transition: transform 0.15s ease;
+}
+
+.Betting__C-head-r {
+  background: linear-gradient(135deg, #FF3856 0%, #E51837 50%, #B80A22 100%) !important;
+  box-shadow: 0 6px 16px rgba(229, 24, 55, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid #FFD700 !important;
+  border-radius: 0.3rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.03em;
+  transition: transform 0.15s ease;
+}
+
+.Betting__C-head-g:active,
+.Betting__C-head-p:active,
+.Betting__C-head-r:active {
+  transform: scale(0.96);
+}
+
+/* ----------------------------------------------------------
+   NUMBER BALLS & MULTIPLIER CHIPS
+   ---------------------------------------------------------- */
+.Betting__C-numC {
+  background: #F8F9FD !important;
+  border-radius: 0.4rem !important;
+  border: 1px solid #E5E7EB !important;
+}
+
+.Betting__C-numC-item {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.Betting__C-numC-item:active {
+  transform: scale(1.12);
+  filter: brightness(1.2);
+}
+
+/* Quick Multipliers (X1, X5, X10, X20, X50, X100) */
+.Betting__C-multiple-item {
+  background: #FFFFFF !important;
+  border: 1px solid #DDE1E8 !important;
+  border-radius: 0.2rem !important;
+  font-weight: 700 !important;
+  color: #4B5563 !important;
+  transition: all 0.2s ease;
+}
+
+.Betting__C-multiple-item.active {
+  background: linear-gradient(135deg, #FF2E4D 0%, #E51837 100%) !important;
+  color: #FFFFFF !important;
+  border-color: #FFD700 !important;
+  box-shadow: 0 4px 12px rgba(229, 24, 55, 0.35) !important;
+}
+
+/* Big / Small action pills */
+.Betting__C-foot-b {
+  background: linear-gradient(135deg, #FFA000 0%, #FF8F00 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 14px rgba(255, 160, 0, 0.35) !important;
+  border-radius: 0.4rem 0 0 0.4rem !important;
+}
+
+.Betting__C-foot-s {
+  background: linear-gradient(135deg, #3F51B5 0%, #303F9F 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 14px rgba(63, 81, 181, 0.35) !important;
+  border-radius: 0 0.4rem 0.4rem 0 !important;
+}
+
+/* ----------------------------------------------------------
+   BETTING POPUP MODAL (Bottom Sheet)
+   ---------------------------------------------------------- */
+.Betting__Popup[data-v-7f36fe93] {
+  border-radius: 0.64rem 0.64rem 0 0 !important;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3) !important;
+  border-top: 2px solid #FFD700;
+}
+
+.Betting__Popup-head[data-v-7f36fe93] {
+  background: linear-gradient(135deg, #E51837 0%, #B80A22 100%) !important;
+  color: #FFFFFF !important;
+  border-radius: 0.64rem 0.64rem 0 0 !important;
+}
+
+.Betting__Popup-head-selectName[data-v-7f36fe93] {
+  font-weight: 800 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.Betting__Popup-foot-s[data-v-7f36fe93] {
+  background: linear-gradient(135deg, #FF2E4D 0%, #E51837 50%, #B80A22 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid #FFD700 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 18px rgba(229, 24, 55, 0.45) !important;
+  border-radius: 0.5rem !important;
+}
+
+/* ----------------------------------------------------------
+   GAME RECORDS & WINNING HISTORY
+   ---------------------------------------------------------- */
+.GameRecord__C[data-v-9215aba8] {
+  background: #FFFFFF !important;
+  border-radius: 0.48rem !important;
+  border: 1px solid rgba(229, 24, 55, 0.1) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+.GameRecord__C-nav .nav-item.active {
+  color: #E51837 !important;
+  font-weight: 800 !important;
+  border-bottom: 2px solid #E51837 !important;
+}
+
+.GameRecord__C-head {
+  background: #F8F9FD !important;
+  color: #6B7280 !important;
+  font-weight: 700 !important;
+}
+
+/* ----------------------------------------------------------
+   WINNING DIALOG / CONGRATULATIONS CELEBRATION
+   ---------------------------------------------------------- */
+.WinningTip__C-body {
+  border-radius: 0.5rem !important;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4) !important;
+}
+
+.bonus {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 900 !important;
+  color: #FFD700 !important;
+  text-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+}
+
+/* ----------------------------------------------------------
+   SMOOTH TRANSITIONS & SCROLLBAR
+   ---------------------------------------------------------- */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E51837;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ----------------------------------------------------------
+   MY GAME RECORD LIST (ACCORDION & RESULT ICONS)
+   ---------------------------------------------------------- */
+.MyGameRecordList__C {
+  padding: 0 0.32rem 0.4rem !important;
+}
+
+.MyGameRecordList__C-item-wrapper {
+  background: var(--darkBg, #FFFFFF) !important;
+  border-radius: 0.26667rem !important;
+  margin-bottom: 0.24rem !important;
+  padding: 0 0.26667rem !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  overflow: hidden !important;
+  transition: all 0.2s ease !important;
+}
+
+.MyGameRecordList__C-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 1.5rem !important;
+  height: auto !important;
+  padding: 0.24rem 0 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.MyGameRecordList__C-item-l {
+  width: 0.96rem !important;
+  min-width: 0.96rem !important;
+  max-width: 0.96rem !important;
+  height: 0.96rem !important;
+  border-radius: 0.2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.28rem !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  margin-right: 0.24rem !important;
+  flex-shrink: 0 !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  padding: 0 0.04rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.MyGameRecordList__C-item-l[class*="-0"],
+.MyGameRecordList__C-item-l[class*="-1"],
+.MyGameRecordList__C-item-l[class*="-2"],
+.MyGameRecordList__C-item-l[class*="-3"],
+.MyGameRecordList__C-item-l[class*="-4"],
+.MyGameRecordList__C-item-l[class*="-5"],
+.MyGameRecordList__C-item-l[class*="-6"],
+.MyGameRecordList__C-item-l[class*="-7"],
+.MyGameRecordList__C-item-l[class*="-8"],
+.MyGameRecordList__C-item-l[class*="-9"] {
+  font-size: 0.52rem !important;
+  font-weight: 800 !important;
+}
+
+.MyGameRecordList__C-item-m {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+.MyGameRecordList__C-item-m-top {
+  font-size: 0.36rem !important;
+  font-weight: 700 !important;
+  color: var(--text_color_L1, #1e2637) !important;
+  line-height: 1.2 !important;
+  margin-bottom: 0.08rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.MyGameRecordList__C-item-m-bottom {
+  font-size: 0.28rem !important;
+  color: var(--text_color_L2, #76809b) !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+.MyGameRecordList__C-item-r {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  margin-left: 0.16rem !important;
+}
+
+.MyGameRecordList__C-item-r div {
+  font-size: 0.28rem !important;
+  font-weight: 700 !important;
+  height: 0.48rem !important;
+  line-height: 0.44rem !important;
+  padding: 0 0.32rem !important;
+  border-radius: 0.12rem !important;
+  border: 1px solid var(--norm_red-color, #E51837) !important;
+  color: var(--norm_red-color, #E51837) !important;
+  margin-bottom: 0.08rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.MyGameRecordList__C-item-r.success div {
+  border-color: var(--norm_green-color, #00B977) !important;
+  color: var(--norm_green-color, #00B977) !important;
+}
+
+.MyGameRecordList__C-item-r span {
+  font-size: 0.32rem !important;
+  font-weight: 700 !important;
+  color: var(--norm_red-color, #E51837) !important;
+  white-space: nowrap !important;
+}
+
+.MyGameRecordList__C-item-r.success span {
+  color: var(--norm_green-color, #00B977) !important;
+}
+
+.MyGameRecordList__C-detail {
+  padding: 0.24rem 0 0.32rem !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.MyGameRecordList__C-detail-text {
+  font-size: 0.38rem !important;
+  font-weight: 700 !important;
+  color: var(--text_color_L1, #1e2637) !important;
+  margin-bottom: 0.2rem !important;
+}
+
+.MyGameRecordList__C-detail-line {
+  background: var(--bg_color_L3, #F5F6FA) !important;
+  border-radius: 0.16rem !important;
+  padding: 0.16rem 0.24rem !important;
+  margin-bottom: 0.16rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 0.3rem !important;
+  line-height: 1.4 !important;
+}
+
+/* ----------------------------------------------------------
+   3-SECOND SPIN ANIMATION & RANDOM SELECTION
+   ---------------------------------------------------------- */
+@keyframes randomBallPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.18); filter: brightness(1.4); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+.random-pulse {
+  animation: randomBallPulse 0.6s ease-in-out !important;
+  z-index: 10 !important;
+}
+
+.spin-active-ball {
+  transform: scale(1.18) !important;
+  filter: brightness(1.4) drop-shadow(0 0 12px rgba(255, 215, 0, 0.95)) !important;
+  box-shadow: 0 0 16px #FFD700, inset 0 0 8px #FFF !important;
+  border-radius: 50% !important;
+  z-index: 15 !important;
+  transition: transform 0.05s ease, filter 0.05s ease !important;
+}
+
+.spin-winner-ball {
+  transform: scale(1.3) !important;
+  filter: brightness(1.5) drop-shadow(0 0 20px rgba(0, 230, 118, 0.95)) !important;
+  box-shadow: 0 0 24px #00E676, inset 0 0 10px #FFF !important;
+  border-radius: 50% !important;
+  z-index: 20 !important;
+}
+
+.Betting__C-multiple-l.spinning {
+  opacity: 0.8 !important;
+  transform: scale(0.96) !important;
+  background: linear-gradient(135deg, #FFE082 0%, #FFD700 100%) !important;
+  color: #5D3E00 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.6) !important;
+}
+
+/* ----------------------------------------------------------
+   BETTING POPUP DYNAMIC UI & BADGES
+   ---------------------------------------------------------- */
+.Betting__Popup-head-select {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.1rem !important;
+  font-size: 0.36rem !important;
+}
+
+.select-label {
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-weight: 500 !important;
+}
+
+.select-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.04rem 0.24rem !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 0.2rem !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 0.34rem !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* ----------------------------------------------------------
+   HEADER VOICE & AUDIO TOGGLE
+   ---------------------------------------------------------- */
+.WinGo__C-head-more .voice-btn,
+.WinGo__C-head-more > div:last-child {
+  position: relative !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, opacity 0.15s ease !important;
+}
+
+.WinGo__C-head-more .voice-btn:active,
+.WinGo__C-head-more > div:last-child:active {
+  transform: scale(0.9) !important;
+}
+
+.WinGo__C-head-more .voice-btn.disableVoice::after,
+.WinGo__C-head-more > div:last-child.disableVoice::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 10% !important;
+  width: 80% !important;
+  height: 2px !important;
+  background-color: #FF2E4D !important;
+  transform: rotate(-45deg) !important;
+  transform-origin: center !important;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ----------------------------------------------------------
+   HOW TO PLAY RULES MODAL ENHANCEMENTS
+   ---------------------------------------------------------- */
+.TimeLeft__C-PreSale {
+  width: 90% !important;
+  max-width: 440px !important;
+  max-height: 82vh !important;
+  border-radius: 0.32rem !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35) !important;
+  overflow: hidden !important;
+  flex-direction: column !important;
+}
+
+.TimeLeft__C-PreSale[style*="display: none"],
+.van-popup[style*="display: none"],
+.van-overlay[style*="display: none"] {
+  display: none !important;
+}
+
+.TimeLeft__C-PreSale:not([style*="display: none"]) {
+  display: flex !important;
+}
+
+.TimeLeft__C-PreSale-head {
+  padding: 0.35rem 0.3rem !important;
+  font-size: 0.42rem !important;
+  font-weight: 800 !important;
+  color: #FFFFFF !important;
+  text-align: center !important;
+  background: linear-gradient(135deg, #E51837 0%, #B80A22 100%) !important;
+  letter-spacing: 0.03em !important;
+  flex-shrink: 0 !important;
+}
+
+.TimeLeft__C-PreSale-body {
+  padding: 0.35rem 0.35rem !important;
+  overflow-y: auto !important;
+  max-height: 56vh !important;
+  color: #2D3748 !important;
+  font-size: 0.3rem !important;
+  line-height: 1.55 !important;
+}
+
+.rule-section {
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 0.16rem !important;
+  padding: 0.22rem 0.26rem !important;
+  margin-bottom: 0.22rem !important;
+}
+
+.rule-section:last-child {
+  margin-bottom: 0 !important;
+}
+
+.rule-title {
+  font-weight: 800 !important;
+  color: #1E293B !important;
+  font-size: 0.32rem !important;
+  margin-bottom: 0.12rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.1rem !important;
+}
+
+.rule-section p {
+  margin: 0.08rem 0 !important;
+  color: #475569 !important;
+  font-size: 0.28rem !important;
+  line-height: 1.5 !important;
+}
+
+.rule-section code {
+  background: #EDF2F7 !important;
+  padding: 0.04rem 0.12rem !important;
+  border-radius: 0.08rem !important;
+  font-family: monospace !important;
+  font-size: 0.26rem !important;
+  color: #C53030 !important;
+}
+
+.TimeLeft__C-PreSale-foot {
+  padding: 0.25rem 0.35rem 0.35rem !important;
+  background: #FFFFFF !important;
+  flex-shrink: 0 !important;
+}
+
+.TimeLeft__C-PreSale-foot-btn {
+  background: linear-gradient(135deg, #E51837 0%, #B80A22 100%) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  font-size: 0.36rem !important;
+  height: 0.88rem !important;
+  line-height: 0.88rem !important;
+  border-radius: 0.44rem !important;
+  text-align: center !important;
+  box-shadow: 0 4px 15px rgba(229, 24, 55, 0.35) !important;
+  cursor: pointer !important;
+  transition: transform 0.1s ease, filter 0.1s ease !important;
+}
+
+.TimeLeft__C-PreSale-foot-btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* ----------------------------------------------------------
+   SMARTY CUSTOM TOAST
+   ---------------------------------------------------------- */
+.smarty-custom-toast {
+  position: fixed !important;
+  top: 18px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-20px) !important;
+  background: rgba(18, 20, 29, 0.94) !important;
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  color: #FFFFFF !important;
+  padding: 0.16rem 0.4rem !important;
+  border-radius: 0.4rem !important;
+  font-size: 0.32rem !important;
+  font-weight: 600 !important;
+  z-index: 999999 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), visibility 0.25s ease !important;
+  max-width: 90vw !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.smarty-custom-toast.active {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+.smarty-custom-toast .toast-content {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.14rem !important;
+}
+
+.smarty-custom-toast.success .toast-icon {
+  color: #00E676 !important;
+}
+
+.smarty-custom-toast.warn .toast-icon,
+.smarty-custom-toast.error .toast-icon {
+  color: #FF5252 !important;
+}

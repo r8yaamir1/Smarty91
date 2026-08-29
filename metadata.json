@@ -1,0 +1,8 @@
+{
+  "name": "Smarty91",
+  "description": "Smarty91 - Luxury VIP Color & Number Prediction Game",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
