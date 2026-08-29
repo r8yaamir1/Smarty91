@@ -6,7 +6,7 @@ import {
     InsufficientBalance, selectedNum,
     bettingOn_red, bettingOn_violet, bettingOn_green
 } from './elements.js';
-import { placeBet, initSubtabs } from './gameEngine.js';
+import { placeBet, initSubtabs, renderMyHistory } from './gameEngine.js';
 import { getCurrentGameType, getCurrentIssueNumber, switchGameMode, isBettingLocked, getRemainingSeconds } from './gameRecord.js';
 import { initWinDialogEvents } from './updateWin.js';
 import { showToast } from './wallet.js';
@@ -452,6 +452,7 @@ export function handleBettingOverlay_clicks() {
             showToast('Bet placed successfully!', 'success');
         }
 
+        renderMyHistory();
         closeBettingPopup();
     });
 

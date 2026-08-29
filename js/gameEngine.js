@@ -1,7 +1,8 @@
-// gameEngine.js - Core Lottery Engine, Statistics, Trends & Bet Ledger
+// gameEngine.js - Multi-Mode Lottery Engine, Statistics, Trends & Bet Ledger
 
 import { getBalance, addBalance, deductBalance, formatCurrency, showToast } from './wallet.js';
 import { playWinChime } from './audio.js';
+import { normalizeMode, getGameInterval, generateOfflinePeriodData, calculateTotalPeriods, formatIssueNumber, MODE_DISPLAY_NAMES } from './offlineTimer.js';
 
 // Number property lookup
 export const NUMBER_PROPERTIES = {
@@ -17,49 +18,170 @@ export const NUMBER_PROPERTIES = {
     9: { num: 9, color: 'green', primaryColor: 'green', secondaryColor: null, isBig: true, colorName: 'Green' },
 };
 
-// Initial seeded history for rich display
-function generateSeedHistory(count = 50) {
+export const SUPPORTED_MODES = ["30s", "1m", "3m", "5m"];
+const ITEMS_PER_PAGE = 10;
+const STORAGE_KEY_STATE = 'smarty91_multi_game_state';
+
+// Generate realistic deterministic seed history for a given mode
+function generateModeSeedHistory(mode, count = 50) {
     const history = [];
-    const now = new Date();
-    const basePeriod = parseInt(now.toISOString().slice(0, 10).replace(/-/g, '') + '100052400', 10);
+    const interval = getGameInterval(mode);
+    const now = Date.now();
 
     for (let i = 0; i < count; i++) {
-        const periodId = (basePeriod - i).toString();
+        const itemTime = new Date(now - ((i + 1) * interval));
+        const totalPeriods = calculateTotalPeriods(itemTime, interval);
+        const periodId = formatIssueNumber(itemTime, totalPeriods);
         const num = Math.floor(Math.random() * 10);
         const prop = NUMBER_PROPERTIES[num];
+
         history.push({
+            mode,
             periodId,
             number: num,
             isBig: prop.isBig,
             primaryColor: prop.primaryColor,
             secondaryColor: prop.secondaryColor,
             colorName: prop.colorName,
-            timestamp: Date.now() - (i * 30000)
+            timestamp: itemTime.getTime()
         });
     }
     return history;
 }
 
-let gameHistory = generateSeedHistory(50);
-let userBets = JSON.parse(localStorage.getItem('smarty91_user_bets') || '[]');
-let activeRoundBets = []; // Bets placed in the current ongoing round
+// Create independent initial state for a single mode
+function createModeState(mode) {
+    const periodData = generateOfflinePeriodData(mode);
+    const seedHistory = generateModeSeedHistory(mode, 50);
+    const initialTokens = seedHistory.slice(0, 5).map(h => h.number);
 
-let historyPage = 1;
-let chartPage = 1;
-let myHistoryPage = 1;
-const ITEMS_PER_PAGE = 10;
-
-// Save user bets to localStorage
-function saveUserBets() {
-    localStorage.setItem('smarty91_user_bets', JSON.stringify(userBets.slice(0, 100)));
+    return {
+        mode,
+        displayName: MODE_DISPLAY_NAMES[mode] || `Smarty91 ${mode}`,
+        interval: getGameInterval(mode),
+        currentIssueNumber: periodData.issueNumber,
+        currentEndTimeMs: periodData.endTimeMs,
+        remainingSeconds: periodData.remainingSeconds,
+        isLockoutActive: false,
+        lastTickSecond: -1,
+        tokens: initialTokens.length === 5 ? initialTokens : [1, 5, 8, 3, 0],
+        history: seedHistory,
+        activeBets: [],
+        userBets: [],
+        historyPage: 1,
+        chartPage: 1,
+        myHistoryPage: 1,
+        latestResult: seedHistory[0] || null,
+        settledRounds: new Set()
+    };
 }
 
-// Generate draw result
-export function drawNextResult(periodId) {
+// ----------------- MULTI-MODE STATE STORE -----------------
+
+export const gameModes = {
+    "30s": createModeState("30s"),
+    "1m": createModeState("1m"),
+    "3m": createModeState("3m"),
+    "5m": createModeState("5m")
+};
+
+let activeModeKey = "30s";
+
+// Load persisted state and migrate legacy single-mode storage safely
+export function loadPersistedState() {
+    try {
+        const storedMulti = localStorage.getItem(STORAGE_KEY_STATE);
+        if (storedMulti) {
+            const parsed = JSON.parse(storedMulti);
+            SUPPORTED_MODES.forEach(mode => {
+                if (parsed[mode]) {
+                    if (Array.isArray(parsed[mode].history) && parsed[mode].history.length > 0) {
+                        gameModes[mode].history = parsed[mode].history;
+                        gameModes[mode].latestResult = parsed[mode].history[0] || null;
+                    }
+                    if (Array.isArray(parsed[mode].userBets)) {
+                        gameModes[mode].userBets = parsed[mode].userBets;
+                    }
+                    if (Array.isArray(parsed[mode].tokens) && parsed[mode].tokens.length > 0) {
+                        gameModes[mode].tokens = parsed[mode].tokens.slice(0, 5);
+                    }
+                }
+            });
+        }
+
+        // Migrate legacy single-mode bets from smarty91_user_bets if present
+        const legacyBetsRaw = localStorage.getItem('smarty91_user_bets');
+        if (legacyBetsRaw) {
+            const legacyBets = JSON.parse(legacyBetsRaw);
+            if (Array.isArray(legacyBets) && legacyBets.length > 0) {
+                legacyBets.forEach(bet => {
+                    const mode = normalizeMode(bet.mode || bet.gameType || "30s");
+                    if (gameModes[mode] && !gameModes[mode].userBets.some(b => b.id === bet.id)) {
+                        gameModes[mode].userBets.push({
+                            ...bet,
+                            mode
+                        });
+                    }
+                });
+                // Remove legacy flat key after successful migration to prevent duplicate confusion
+                localStorage.removeItem('smarty91_user_bets');
+                saveMultiModeState();
+            }
+        }
+    } catch (err) {
+        console.warn('Could not load stored game state, using defaults', err);
+    }
+}
+
+export function saveMultiModeState() {
+    try {
+        const serializeData = {};
+        SUPPORTED_MODES.forEach(mode => {
+            serializeData[mode] = {
+                history: gameModes[mode].history.slice(0, 100),
+                userBets: gameModes[mode].userBets.slice(0, 100),
+                tokens: gameModes[mode].tokens.slice(0, 5)
+            };
+        });
+        localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(serializeData));
+    } catch (err) {
+        console.warn('Could not save multi mode state to localStorage', err);
+    }
+}
+
+// ----------------- ACCESSORS -----------------
+
+export function getActiveModeKey() {
+    return activeModeKey;
+}
+
+export function getActiveModeState() {
+    return gameModes[activeModeKey];
+}
+
+export function getModeState(modeInput) {
+    const mode = normalizeMode(modeInput);
+    return gameModes[mode] || gameModes["30s"];
+}
+
+export function setActiveModeKey(modeInput) {
+    const mode = normalizeMode(modeInput);
+    if (gameModes[mode]) {
+        activeModeKey = mode;
+    }
+    return activeModeKey;
+}
+
+// ----------------- RESULT GENERATION & SETTLEMENT PER MODE -----------------
+
+export function drawNextResult(modeInput, periodId) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
     const num = Math.floor(Math.random() * 10);
     const prop = NUMBER_PROPERTIES[num];
 
     const result = {
+        mode,
         periodId,
         number: num,
         isBig: prop.isBig,
@@ -69,26 +191,39 @@ export function drawNextResult(periodId) {
         timestamp: Date.now()
     };
 
-    // Prepend to history
-    gameHistory.unshift(result);
-    if (gameHistory.length > 200) gameHistory.pop();
+    // Prepend exclusively to this mode's history
+    state.history.unshift(result);
+    if (state.history.length > 200) state.history.pop();
+    state.latestResult = result;
 
+    // Update this mode's winning tokens
+    state.tokens.unshift(num);
+    if (state.tokens.length > 5) state.tokens.pop();
+
+    saveMultiModeState();
     return result;
 }
 
-export function getLatestResults(limit = 10) {
-    return gameHistory.slice(0, limit);
-}
+export function evaluateModeBets(modeInput, result) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
 
-// Evaluate active bets against result
-export function evaluateBets(result) {
-    if (activeRoundBets.length === 0) return null;
+    if (!state.activeBets || state.activeBets.length === 0) {
+        return null;
+    }
+
+    // Filter active bets matching mode and period
+    const betsToEvaluate = state.activeBets.filter(b => b.mode === mode && b.periodId === result.periodId);
+    if (betsToEvaluate.length === 0) {
+        return null;
+    }
 
     let totalWon = 0;
     let totalBet = 0;
     let lastBetDetails = null;
+    const evaluatedList = [];
 
-    activeRoundBets.forEach(bet => {
+    betsToEvaluate.forEach(bet => {
         totalBet += bet.betAmount;
         const contractAmount = bet.contractAmount; // betAmount * 0.98
         let multiplier = 0;
@@ -117,6 +252,7 @@ export function evaluateBets(result) {
 
         const evaluatedBet = {
             ...bet,
+            mode,
             resultNumber: result.number,
             resultColor: result.colorName,
             resultBig: result.isBig,
@@ -126,11 +262,14 @@ export function evaluateBets(result) {
             evaluatedAt: Date.now()
         };
 
-        userBets.unshift(evaluatedBet);
+        state.userBets.unshift(evaluatedBet);
+        evaluatedList.push(evaluatedBet);
         lastBetDetails = evaluatedBet;
     });
 
-    saveUserBets();
+    // Remove evaluated bets from active bets
+    state.activeBets = state.activeBets.filter(b => !(b.mode === mode && b.periodId === result.periodId));
+    saveMultiModeState();
 
     if (totalWon > 0) {
         addBalance(totalWon);
@@ -138,23 +277,24 @@ export function evaluateBets(result) {
     }
 
     const evaluationSummary = {
+        mode,
         isWin: totalWon > 0,
         totalBet,
         totalWon,
         netProfit: totalWon - totalBet,
         result,
-        lastBet: lastBetDetails
+        lastBet: lastBetDetails,
+        evaluatedBets: evaluatedList
     };
-
-    activeRoundBets = []; // Reset active bets
-    renderMyHistory();
 
     return evaluationSummary;
 }
 
-// Place a bet in the current round
+// Place a bet in the specified (or active) mode
 export function placeBet(betData) {
-    // betData: { periodId, gameType, type, selection, selectionLabel, betAmount, quantity, balanceUnit }
+    const targetMode = normalizeMode(betData.mode || betData.gameType || activeModeKey);
+    const modeState = gameModes[targetMode];
+
     const totalAmount = betData.betAmount;
     if (totalAmount <= 0) return { success: false, message: 'Invalid bet amount' };
 
@@ -172,22 +312,32 @@ export function placeBet(betData) {
     const fee = parseFloat((totalAmount * 0.02).toFixed(2));
 
     const betRecord = {
-        id: 'BET' + Date.now().toString().slice(-8),
-        ...betData,
+        id: 'BET' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100),
+        mode: targetMode,
+        gameType: modeState.displayName,
+        periodId: modeState.currentIssueNumber,
+        type: betData.type,
+        selection: betData.selection,
+        selectionLabel: betData.selectionLabel,
+        betAmount: totalAmount,
         contractAmount,
         fee,
+        quantity: betData.quantity || 1,
+        balanceUnit: betData.balanceUnit || 1,
         placedAt: Date.now(),
         status: 'pending'
     };
 
-    activeRoundBets.push(betRecord);
+    modeState.activeBets.push(betRecord);
     return { success: true, bet: betRecord };
 }
 
-// ----------------- SUBTAB RENDERING -----------------
+// ----------------- SUBTAB RENDERING (PER ACTIVE MODE) -----------------
 
-// 1. Render Game History Table
-export function renderGameHistory() {
+// 1. Render Game History Table for Active Mode
+export function renderGameHistory(modeInput = activeModeKey) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
     const container = document.querySelector('.GameRecord__C-body');
     const pageDisplay = document.querySelector('.GameRecord__C-foot-page');
     const prevBtn = document.querySelector('.GameRecord__C-foot-previous');
@@ -195,12 +345,12 @@ export function renderGameHistory() {
 
     if (!container) return;
 
-    const totalPages = Math.ceil(gameHistory.length / ITEMS_PER_PAGE) || 1;
-    if (historyPage > totalPages) historyPage = totalPages;
-    if (historyPage < 1) historyPage = 1;
+    const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE) || 1;
+    if (state.historyPage > totalPages) state.historyPage = totalPages;
+    if (state.historyPage < 1) state.historyPage = 1;
 
-    const startIndex = (historyPage - 1) * ITEMS_PER_PAGE;
-    const items = gameHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const startIndex = (state.historyPage - 1) * ITEMS_PER_PAGE;
+    const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     container.innerHTML = '';
 
@@ -247,17 +397,19 @@ export function renderGameHistory() {
         container.appendChild(row);
     });
 
-    if (pageDisplay) pageDisplay.textContent = `${historyPage}/${totalPages}`;
-    if (prevBtn) prevBtn.classList.toggle('disabled', historyPage <= 1);
-    if (nextBtn) nextBtn.classList.toggle('disabled', historyPage >= totalPages);
+    if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
+    if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
+    if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
 }
 
-// 2. Render Chart Trend View
-export function renderChartTrend() {
+// 2. Render Chart Trend View for Active Mode
+export function renderChartTrend(modeInput = activeModeKey) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
     const chartView = document.getElementById('chart-view');
     if (!chartView) return;
 
-    // Calculate statistics for digits 0-9
+    // Calculate statistics for digits 0-9 strictly for this mode
     const stats = Array.from({ length: 10 }, (_, i) => ({
         num: i,
         count: 0,
@@ -268,7 +420,7 @@ export function renderChartTrend() {
     }));
 
     let foundFirst = Array(10).fill(false);
-    gameHistory.forEach((item, idx) => {
+    state.history.forEach((item, idx) => {
         stats[item.number].count++;
         if (!foundFirst[item.number]) {
             stats[item.number].missing = idx;
@@ -277,11 +429,11 @@ export function renderChartTrend() {
     });
 
     for (let n = 0; n < 10; n++) {
-        stats[n].avgMissing = stats[n].count > 0 ? Math.round(gameHistory.length / stats[n].count) : gameHistory.length;
+        stats[n].avgMissing = stats[n].count > 0 ? Math.round(state.history.length / stats[n].count) : state.history.length;
         let cur = 0;
         let max = 0;
-        for (let k = 0; k < gameHistory.length; k++) {
-            if (gameHistory[k].number === n) {
+        for (let k = 0; k < state.history.length; k++) {
+            if (state.history[k].number === n) {
                 cur++;
                 if (cur > max) max = cur;
             } else {
@@ -291,12 +443,12 @@ export function renderChartTrend() {
         stats[n].maxStreak = max > 0 ? max : (stats[n].count > 0 ? 1 : 0);
     }
 
-    const totalPages = Math.ceil(gameHistory.length / ITEMS_PER_PAGE) || 1;
-    if (chartPage > totalPages) chartPage = totalPages;
-    if (chartPage < 1) chartPage = 1;
+    const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE) || 1;
+    if (state.chartPage > totalPages) state.chartPage = totalPages;
+    if (state.chartPage < 1) state.chartPage = 1;
 
-    const startIndex = (chartPage - 1) * ITEMS_PER_PAGE;
-    const items = gameHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const startIndex = (state.chartPage - 1) * ITEMS_PER_PAGE;
+    const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     let rowsHtml = '';
     items.forEach(item => {
@@ -365,25 +517,25 @@ export function renderChartTrend() {
                 ${rowsHtml}
             </div>
             <div class="Trend__C-foot" data-v-9d93d892="">
-                <div class="Trend__C-foot-previous ${chartPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
+                <div class="Trend__C-foot-previous ${state.chartPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
                     <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-left"></use></svg>
                 </div>
-                <div class="Trend__C-foot-page" data-v-9d93d892="">${chartPage}/${totalPages}</div>
-                <div class="Trend__C-foot-next ${chartPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
+                <div class="Trend__C-foot-page" data-v-9d93d892="">${state.chartPage}/${totalPages}</div>
+                <div class="Trend__C-foot-next ${state.chartPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
                     <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-right"></use></svg>
                 </div>
             </div>
         </div>
     `;
 
-    // Bind pagination
+    // Bind pagination for Chart Trend
     const prevBtn = chartView.querySelector('.Trend__C-foot-previous');
     const nextBtn = chartView.querySelector('.Trend__C-foot-next');
     if (prevBtn) {
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (chartPage > 1) {
-                chartPage--;
+            if (state.chartPage > 1) {
+                state.chartPage--;
                 renderChartTrend();
             }
         });
@@ -391,44 +543,46 @@ export function renderChartTrend() {
     if (nextBtn) {
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (chartPage < totalPages) {
-                chartPage++;
+            if (state.chartPage < totalPages) {
+                state.chartPage++;
                 renderChartTrend();
             }
         });
     }
 }
 
-// 3. Render My History (User Bets)
-export function renderMyHistory() {
+// 3. Render My History (User Bets for Active Mode)
+export function renderMyHistory(modeInput = activeModeKey) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
     const myHistoryView = document.getElementById('my-history-view');
     if (!myHistoryView) return;
 
-    if (userBets.length === 0) {
+    if (!state.userBets || state.userBets.length === 0) {
         myHistoryView.innerHTML = `
             <div class="MyGameRecordList__C" data-v-8bb41fd5="">
                 <div class="MyGameRecordList__C-empty" data-v-8bb41fd5="" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem 0; color: var(--text_color_L2);">
                     <div style="font-size: 1.2rem; margin-bottom: 0.2rem;">📜</div>
                     <div style="font-size: 0.38rem; font-weight: bold;">No Betting Records Yet</div>
-                    <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">Place your prediction on colors or numbers above!</div>
+                    <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">Place your prediction on ${state.displayName}!</div>
                 </div>
             </div>
         `;
         return;
     }
 
-    const totalPages = Math.ceil(userBets.length / ITEMS_PER_PAGE) || 1;
-    if (myHistoryPage > totalPages) myHistoryPage = totalPages;
-    if (myHistoryPage < 1) myHistoryPage = 1;
+    const totalPages = Math.ceil(state.userBets.length / ITEMS_PER_PAGE) || 1;
+    if (state.myHistoryPage > totalPages) state.myHistoryPage = totalPages;
+    if (state.myHistoryPage < 1) state.myHistoryPage = 1;
 
-    const startIndex = (myHistoryPage - 1) * ITEMS_PER_PAGE;
-    const items = userBets.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const startIndex = (state.myHistoryPage - 1) * ITEMS_PER_PAGE;
+    const items = state.userBets.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     let cardsHtml = '';
     items.forEach((bet) => {
         const isWin = bet.status === 'win';
         const isNumber = bet.type === 'number' || (!isNaN(Number(bet.selection)) && bet.type !== 'color' && bet.type !== 'size');
-        
+
         let badgeClass = '';
         let badgeText = '';
 
@@ -516,11 +670,11 @@ export function renderMyHistory() {
         <div class="MyGameRecordList__C" data-v-8bb41fd5="">
             ${cardsHtml}
             <div class="Trend__C-foot" data-v-9d93d892="" style="margin-top: .32rem;">
-                <div class="Trend__C-foot-previous ${myHistoryPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
+                <div class="Trend__C-foot-previous ${state.myHistoryPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
                     <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-left"></use></svg>
                 </div>
-                <div class="Trend__C-foot-page" data-v-9d93d892="">${myHistoryPage}/${totalPages}</div>
-                <div class="Trend__C-foot-next ${myHistoryPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
+                <div class="Trend__C-foot-page" data-v-9d93d892="">${state.myHistoryPage}/${totalPages}</div>
+                <div class="Trend__C-foot-next ${state.myHistoryPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
                     <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-right"></use></svg>
                 </div>
             </div>
@@ -536,12 +690,10 @@ export function renderMyHistory() {
             itemHeader.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isCurrentlyOpen = detailSection.style.display === 'block';
-                // Close all
                 recordWrappers.forEach(w => {
                     const d = w.querySelector('.MyGameRecordList__C-detail');
                     if (d) d.style.display = 'none';
                 });
-                // Toggle clicked
                 if (!isCurrentlyOpen) {
                     detailSection.style.display = 'block';
                 }
@@ -549,14 +701,14 @@ export function renderMyHistory() {
         }
     });
 
-    // Bind pagination
+    // Bind pagination for My History
     const prevBtn = myHistoryView.querySelector('.Trend__C-foot-previous');
     const nextBtn = myHistoryView.querySelector('.Trend__C-foot-next');
     if (prevBtn) {
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (myHistoryPage > 1) {
-                myHistoryPage--;
+            if (state.myHistoryPage > 1) {
+                state.myHistoryPage--;
                 renderMyHistory();
             }
         });
@@ -564,8 +716,8 @@ export function renderMyHistory() {
     if (nextBtn) {
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (myHistoryPage < totalPages) {
-                myHistoryPage++;
+            if (state.myHistoryPage < totalPages) {
+                state.myHistoryPage++;
                 renderMyHistory();
             }
         });
@@ -600,8 +752,9 @@ export function initSubtabs() {
 
     if (prevBtn) {
         prevBtn.addEventListener('click', () => {
-            if (historyPage > 1) {
-                historyPage--;
+            const state = getActiveModeState();
+            if (state.historyPage > 1) {
+                state.historyPage--;
                 renderGameHistory();
             }
         });
@@ -609,9 +762,10 @@ export function initSubtabs() {
 
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(gameHistory.length / ITEMS_PER_PAGE);
-            if (historyPage < totalPages) {
-                historyPage++;
+            const state = getActiveModeState();
+            const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE);
+            if (state.historyPage < totalPages) {
+                state.historyPage++;
                 renderGameHistory();
             }
         });

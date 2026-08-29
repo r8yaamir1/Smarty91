@@ -1,59 +1,58 @@
-// gameRecord.js - Game Loop, Countdown Timer & Draw Orchestrator
+// gameRecord.js - Game Loop, Countdown Timer & Multi-Mode Orchestrator
 
 import { period_time, period_number, tokenParent } from "./elements.js";
-import { generateOfflinePeriodData } from "./offlineTimer.js";
-import { drawNextResult, evaluateBets, renderGameHistory, renderChartTrend, renderMyHistory } from "./gameEngine.js";
+import { generateOfflinePeriodData, normalizeMode, MODE_DISPLAY_NAMES } from "./offlineTimer.js";
+import {
+    gameModes,
+    SUPPORTED_MODES,
+    getActiveModeKey,
+    getActiveModeState,
+    getModeState,
+    setActiveModeKey,
+    loadPersistedState,
+    drawNextResult,
+    evaluateModeBets,
+    renderGameHistory,
+    renderChartTrend,
+    renderMyHistory
+} from "./gameEngine.js";
 import { showEvaluationDialog } from "./updateWin.js";
 import { playTickSound } from "./audio.js";
 
-const GAME_INTERVALS = {
-    "Smarty91 30s": 30000,
-    "Smarty91 1Min": 60000,
-    "Smarty91 3Min": 180000,
-    "Smarty91 5Min": 300000,
-    "Win Go 30s": 30000,
-    "Win Go 1Min": 60000,
-    "Win Go 3Min": 180000,
-    "Win Go 5Min": 300000
-};
-
-let currentGameType = "Smarty91 30s";
-let currentIssueNumber = "";
-let countdownTimerId = null;
-let currentEndTimeMs = 0;
-let isLockoutActive = false;
-let lastTickSecond = -1;
+let masterTimerId = null;
 
 export function getCurrentGameType() {
-    return currentGameType;
+    const state = getActiveModeState();
+    return state ? state.displayName : "Smarty91 30s";
 }
 
 export function getCurrentIssueNumber() {
-    return currentIssueNumber;
+    const state = getActiveModeState();
+    return state ? state.currentIssueNumber : "";
 }
 
 export function isBettingLocked() {
-    return isLockoutActive;
+    const state = getActiveModeState();
+    return state ? state.isLockoutActive : false;
 }
 
 export function getRemainingSeconds() {
-    if (!currentEndTimeMs) return 0;
-    return Math.max(0, Math.floor((currentEndTimeMs - Date.now()) / 1000));
+    const state = getActiveModeState();
+    return state ? state.remainingSeconds : 0;
 }
 
-// Update top-right winning number tokens under How to play
-export function updateWinningTokens(number) {
+// Render top-right winning number tokens for active mode
+export function renderWinningTokensForActiveMode() {
     if (!tokenParent) return;
-
-    const newDiv = document.createElement('div');
-    newDiv.setAttribute("data-v-3e4c6499", "");
-    newDiv.className = `n${number}`;
-
-    tokenParent.insertBefore(newDiv, tokenParent.firstChild);
-
-    while (tokenParent.children.length > 5) {
-        tokenParent.removeChild(tokenParent.lastElementChild);
-    }
+    const state = getActiveModeState();
+    tokenParent.innerHTML = '';
+    const tokens = state.tokens && state.tokens.length > 0 ? state.tokens.slice(0, 5) : [1, 5, 8, 3, 0];
+    tokens.forEach(number => {
+        const newDiv = document.createElement('div');
+        newDiv.setAttribute("data-v-3e4c6499", "");
+        newDiv.className = `n${number}`;
+        tokenParent.appendChild(newDiv);
+    });
 }
 
 // Format and update 5-box digital stopwatch display
@@ -68,132 +67,191 @@ function updateTimeDisplay(minutes, seconds) {
     }
 }
 
-// Start countdown loop for the current round
-export function startCountdown(endTimeMs, gameType, issueNumber) {
-    if (countdownTimerId) {
-        clearTimeout(countdownTimerId);
-        countdownTimerId = null;
-    }
+// ----------------- MULTI-MODE MASTER SCHEDULER -----------------
 
-    currentGameType = gameType;
-    currentIssueNumber = issueNumber;
-    currentEndTimeMs = endTimeMs;
-
-    if (period_number) {
-        period_number.textContent = issueNumber;
-    }
-
+function processMasterTick() {
+    const now = Date.now();
+    const activeKey = getActiveModeKey();
     const bettingMark = document.querySelector(".Betting__C-mark");
-    lastTickSecond = -1;
 
-    const tick = () => {
-        const now = Date.now();
-        const timeLeftMs = Math.max(0, endTimeMs - now);
+    SUPPORTED_MODES.forEach(mode => {
+        const state = gameModes[mode];
+        if (!state) return;
+
+        const timeLeftMs = Math.max(0, state.currentEndTimeMs - now);
         const totalSeconds = Math.floor(timeLeftMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
+        state.remainingSeconds = totalSeconds;
 
-        updateTimeDisplay(minutes, seconds);
+        const isCurrentActive = mode === activeKey;
 
-        // 5-second countdown lock & overlay
-        if (totalSeconds <= 5 && totalSeconds > 0) {
-            isLockoutActive = true;
+        // 1. Check for Round Finish & Settlement
+        if (timeLeftMs <= 0) {
+            const finishedIssue = state.currentIssueNumber;
+            const settlementKey = `${mode}:${finishedIssue}`;
 
-            // Close any open betting popup to prevent late betting
-            const bettingOverlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
-            const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
-            if (bettingOverlay) bettingOverlay.style.display = 'none';
-            if (dialogDiv) dialogDiv.style.display = 'none';
-            document.body.classList.remove('van-overflow-hidden');
+            // Idempotent settlement guard
+            if (!state.settledRounds.has(settlementKey)) {
+                state.settledRounds.add(settlementKey);
 
-            if (bettingMark) {
-                bettingMark.style.display = "flex";
-                bettingMark.innerHTML = `
-                    <div data-v-4aca9bd1>${Math.floor(totalSeconds / 10)}</div>
-                    <div data-v-4aca9bd1>${totalSeconds % 10}</div>
-                `;
+                // Draw next result for this specific mode
+                const result = drawNextResult(mode, finishedIssue);
+
+                // Evaluate any active bets for this mode
+                const evaluation = evaluateModeBets(mode, result);
+
+                // Calculate next period data for this mode
+                const nextData = generateOfflinePeriodData(mode, new Date(now));
+                state.currentIssueNumber = nextData.issueNumber;
+                state.currentEndTimeMs = nextData.endTimeMs;
+                state.remainingSeconds = nextData.remainingSeconds;
+                state.isLockoutActive = false;
+                state.lastTickSecond = -1;
+
+                // Update UI if this mode is currently active
+                if (isCurrentActive) {
+                    if (bettingMark) bettingMark.style.display = "none";
+                    if (period_number) period_number.textContent = state.currentIssueNumber;
+
+                    renderWinningTokensForActiveMode();
+                    renderGameHistory(activeKey);
+                    renderChartTrend(activeKey);
+                    renderMyHistory(activeKey);
+
+                    // Show win/loss dialog if user played in this round
+                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
+                        showEvaluationDialog(evaluation);
+                    }
+                }
             }
+            return;
+        }
 
-            if (totalSeconds !== lastTickSecond) {
-                playTickSound(totalSeconds);
-                lastTickSecond = totalSeconds;
+        // 2. Check for 5-Second Betting Lockout
+        if (totalSeconds <= 5 && totalSeconds > 0) {
+            state.isLockoutActive = true;
+
+            if (isCurrentActive) {
+                // Close betting popup on lockout
+                const bettingOverlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
+                const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
+                if (bettingOverlay) bettingOverlay.style.display = 'none';
+                if (dialogDiv) dialogDiv.style.display = 'none';
+                document.body.classList.remove('van-overflow-hidden');
+
+                if (bettingMark) {
+                    bettingMark.style.display = "flex";
+                    bettingMark.innerHTML = `
+                        <div data-v-4aca9bd1>${Math.floor(totalSeconds / 10)}</div>
+                        <div data-v-4aca9bd1>${totalSeconds % 10}</div>
+                    `;
+                }
+
+                if (totalSeconds !== state.lastTickSecond) {
+                    playTickSound(totalSeconds);
+                    state.lastTickSecond = totalSeconds;
+                }
             }
         } else {
-            isLockoutActive = false;
-            if (bettingMark) {
+            state.isLockoutActive = false;
+            if (isCurrentActive && bettingMark) {
                 bettingMark.style.display = "none";
             }
         }
 
-        // When time expires
-        if (timeLeftMs <= 0) {
-            if (bettingMark) bettingMark.style.display = "none";
-            isLockoutActive = false;
-            updateTimeDisplay(0, 0);
+        // 3. Update Active Digital Clock & Period Display
+        if (isCurrentActive) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            updateTimeDisplay(minutes, seconds);
 
-            // Execute draw & settle round
-            onRoundFinished(issueNumber);
-            return;
+            if (period_number && period_number.textContent !== state.currentIssueNumber) {
+                period_number.textContent = state.currentIssueNumber;
+            }
         }
-
-        const nextDelay = Math.min(250, Math.max(50, (timeLeftMs % 1000) || 250));
-        countdownTimerId = setTimeout(tick, nextDelay);
-    };
-
-    tick();
+    });
 }
 
-function onRoundFinished(finishedIssueNumber) {
-    // 1. Draw result
-    const result = drawNextResult(finishedIssueNumber);
-
-    // 2. Update token balls
-    updateWinningTokens(result.number);
-
-    // 3. Evaluate bets and settle
-    const evaluation = evaluateBets(result);
-
-    // 4. Update table, chart, and history
-    renderGameHistory();
-    renderChartTrend();
-    renderMyHistory();
-
-    // 5. Show win/loss dialog if user played
-    if (evaluation) {
-        showEvaluationDialog(evaluation);
+export function startMasterScheduler() {
+    if (masterTimerId) {
+        clearInterval(masterTimerId);
+        masterTimerId = null;
     }
-
-    // 6. Start next round
-    startNextRound();
-}
-
-export function startNextRound() {
-    const periodData = generateOfflinePeriodData(currentGameType);
-    const endTime = new Date(periodData.endTime).getTime();
-    startCountdown(endTime, currentGameType, periodData.issueNumber);
+    // Run tick every 250ms for responsive timekeeping without high CPU usage
+    masterTimerId = setInterval(processMasterTick, 250);
 }
 
 // Switch game mode (30s, 1Min, 3Min, 5Min)
 export function switchGameMode(newGameType) {
-    if (countdownTimerId) {
-        clearTimeout(countdownTimerId);
-        countdownTimerId = null;
+    const targetMode = normalizeMode(newGameType);
+    setActiveModeKey(targetMode);
+
+    const state = getActiveModeState();
+    const bettingMark = document.querySelector(".Betting__C-mark");
+
+    // Update Period number
+    if (period_number) {
+        period_number.textContent = state.currentIssueNumber;
     }
 
-    const bettingMark = document.querySelector(".Betting__C-mark");
-    if (bettingMark) bettingMark.style.display = "none";
+    // Update Time display
+    const totalSeconds = state.remainingSeconds;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    updateTimeDisplay(minutes, seconds);
 
-    const periodData = generateOfflinePeriodData(newGameType);
-    const endTime = new Date(periodData.endTime).getTime();
-    startCountdown(endTime, newGameType, periodData.issueNumber);
+    // Update Lockout overlay state
+    if (state.isLockoutActive && totalSeconds <= 5 && totalSeconds > 0) {
+        if (bettingMark) {
+            bettingMark.style.display = "flex";
+            bettingMark.innerHTML = `
+                <div data-v-4aca9bd1>${Math.floor(totalSeconds / 10)}</div>
+                <div data-v-4aca9bd1>${totalSeconds % 10}</div>
+            `;
+        }
+    } else {
+        if (bettingMark) bettingMark.style.display = "none";
+    }
+
+    // Update header name display
+    const timeLeftName = document.querySelector('.TimeLeft__C .TimeLeft__C-name');
+    if (timeLeftName) {
+        timeLeftName.textContent = state.displayName;
+    }
+
+    const popupHeadTitle = document.querySelector('.Betting__Popup-head-title');
+    if (popupHeadTitle) {
+        popupHeadTitle.textContent = state.displayName;
+    }
+
+    // Refresh UI tokens and subtabs for newly selected mode
+    renderWinningTokensForActiveMode();
+    renderGameHistory(targetMode);
+    renderChartTrend(targetMode);
+    renderMyHistory(targetMode);
 }
 
 // Initialize on page load
 export function initGameRecord() {
-    // Seed initial tokens
-    for (let i = 0; i < 5; i++) {
-        const rand = Math.floor(Math.random() * 10);
-        updateWinningTokens(rand);
+    // 1. Load persisted multi-mode state
+    loadPersistedState();
+
+    // 2. Render initial view for default active mode (30s)
+    const initialMode = getActiveModeKey();
+    const state = getActiveModeState();
+
+    if (period_number) {
+        period_number.textContent = state.currentIssueNumber;
     }
-    startNextRound();
+    const timeLeftName = document.querySelector('.TimeLeft__C .TimeLeft__C-name');
+    if (timeLeftName) {
+        timeLeftName.textContent = state.displayName;
+    }
+
+    renderWinningTokensForActiveMode();
+    renderGameHistory(initialMode);
+    renderChartTrend(initialMode);
+    renderMyHistory(initialMode);
+
+    // 3. Start master scheduler
+    startMasterScheduler();
 }
