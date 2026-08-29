@@ -385,10 +385,31 @@ export function handleBettingOverlay_clicks() {
         updateTotalAmount();
     });
 
+    // Agreement Checkbox Toggle
+    const agreeContainer = document.querySelector('.Betting__Popup-agree');
+    const agreeCheckbox = document.querySelector('.Betting__Popup-agree-c');
+
+    agreeContainer?.addEventListener('click', (e) => {
+        // If clicking on "Pre-sale rules" link, don't toggle (it opens rule modal)
+        if (e.target.closest('.Betting__Popup-preSaleShow')) {
+            return;
+        }
+        playClickSound();
+        if (agreeCheckbox) {
+            agreeCheckbox.classList.toggle('active');
+        }
+    });
+
     // Submit Bet Button
     totalAmountDiv?.addEventListener("click", function () {
         if (isBettingLocked()) {
             showToast('Betting is locked for the draw', 'error');
+            return;
+        }
+
+        // Validate Pre-sale agreement checkbox
+        if (agreeCheckbox && !agreeCheckbox.classList.contains('active')) {
+            showToast('Please agree to the Pre-sale rules', 'warn');
             return;
         }
 
