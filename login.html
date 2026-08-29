@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" translate="no" class="notranslate" data-dpr="1">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎰</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Smarty91 - Login / Register</title>
+    <link rel="stylesheet" href="css/page-home.css" />
+    <link rel="stylesheet" href="css/module.css" />
+    <link rel="stylesheet" href="css/module-critical.css" />
+    <link rel="stylesheet" href="css/index.css" />
+    <link rel="stylesheet" href="css/premium-theme.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            function setRem() {
+                const html = document.documentElement;
+                let width = html.clientWidth || window.innerWidth;
+                if (width > 540) width = 540;
+                if (width < 320) width = 320;
+                const rem = (width / 10);
+                html.style.fontSize = rem + "px";
+            }
+            setRem();
+            window.addEventListener("resize", setRem);
+            window.addEventListener("orientationchange", setRem);
+            document.addEventListener("DOMContentLoaded", setRem);
+        })();
+    </script>
+    <style>
+        body {
+            background-color: #0f1015;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .auth-container {
+            width: 100%;
+            max-width: 540px;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #181920 0%, #0d0e12 100%);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-sizing: border-box;
+            padding: 0.5rem 0.5rem 1rem 0.5rem;
+        }
+        .auth-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.3rem 0.2rem;
+            position: relative;
+        }
+        .auth-back-btn {
+            width: 0.9rem;
+            height: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #d1d5db;
+        }
+        .auth-logo-wrap {
+            text-align: center;
+            margin: 0.4rem 0 0.6rem 0;
+        }
+        .brand-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            font-weight: 800;
+            letter-spacing: 0.05rem;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+        .brand-subtitle {
+            font-size: 0.32rem;
+            color: #9ca3af;
+            margin-top: 0.1rem;
+            letter-spacing: 0.02rem;
+        }
+        /* Tab Segment */
+        .auth-tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.3rem;
+            padding: 0.08rem;
+            margin-bottom: 0.6rem;
+            border: 1px solid rgba(255, 215, 0, 0.15);
+        }
+        .auth-tab-btn {
+            flex: 1;
+            padding: 0.32rem 0;
+            text-align: center;
+            font-size: 0.38rem;
+            font-weight: 600;
+            color: #9ca3af;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .auth-tab-btn.active {
+            background: linear-gradient(135deg, #e51837 0%, #c4122d 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.35);
+        }
+        /* Form */
+        .auth-form-group {
+            margin-bottom: 0.45rem;
+        }
+        .auth-label {
+            font-size: 0.34rem;
+            color: #e5e7eb;
+            font-weight: 500;
+            margin-bottom: 0.16rem;
+            display: flex;
+            align-items: center;
+            gap: 0.15rem;
+        }
+        .auth-input-box {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 0.25rem;
+            padding: 0 0.35rem;
+            height: 1.15rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .auth-input-box:focus-within {
+            border-color: #FFD700;
+            box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.3);
+        }
+        .country-prefix {
+            font-size: 0.38rem;
+            font-weight: 700;
+            color: #FFD700;
+            margin-right: 0.25rem;
+            padding-right: 0.25rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 0.1rem;
+        }
+        .auth-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 0.38rem;
+            font-family: inherit;
+        }
+        .auth-input::placeholder {
+            color: #6b7280;
+            font-size: 0.35rem;
+        }
+        .toggle-password {
+            cursor: pointer;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            padding-left: 0.2rem;
+        }
+        .auth-submit-btn {
+            width: 100%;
+            height: 1.2rem;
+            background: linear-gradient(90deg, #e51837 0%, #ff4b2b 100%);
+            border: none;
+            border-radius: 0.3rem;
+            color: #ffffff;
+            font-size: 0.42rem;
+            font-weight: 700;
+            letter-spacing: 0.02rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 20px rgba(229, 24, 55, 0.4);
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .auth-submit-btn:active {
+            transform: scale(0.98);
+        }
+        .auth-submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .auth-bonus-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.15rem;
+            margin-top: 0.4rem;
+            padding: 0.25rem;
+            background: rgba(255, 215, 0, 0.08);
+            border: 1px dashed rgba(255, 215, 0, 0.35);
+            border-radius: 0.25rem;
+            font-size: 0.32rem;
+            color: #fde047;
+            text-align: center;
+        }
+        /* Notification Toast */
+        .toast-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            color: #fff;
+            padding: 0.35rem 0.6rem;
+            border-radius: 0.25rem;
+            font-size: 0.35rem;
+            z-index: 9999;
+            display: none;
+            text-align: center;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <!-- Top bar -->
+        <div class="auth-header">
+            <div class="auth-back-btn" onclick="window.location.href='index.html'">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+            </div>
+            <div style="font-size: 0.38rem; font-weight: 600; color: #d1d5db;">VIP Security</div>
+            <div style="width: 22px;"></div>
+        </div>
+
+        <!-- Brand logo -->
+        <div class="auth-logo-wrap">
+            <h1 class="brand-title">SMARTY91</h1>
+            <div class="brand-subtitle">Official Luxury Prediction Platform</div>
+        </div>
+
+        <!-- Tab switcher -->
+        <div class="auth-tabs">
+            <div id="tab-login-btn" class="auth-tab-btn active" onclick="switchAuthTab('login')">Login</div>
+            <div id="tab-register-btn" class="auth-tab-btn" onclick="switchAuthTab('register')">Register</div>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="login-form" onsubmit="handleLoginSubmit(event)">
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    Phone Number
+                </div>
+                <div class="auth-input-box">
+                    <div class="country-prefix">+91</div>
+                    <input id="login-phone" class="auth-input" type="tel" maxlength="10" placeholder="Enter 10-digit mobile" required />
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    Password
+                </div>
+                <div class="auth-input-box">
+                    <input id="login-password" class="auth-input" type="password" placeholder="Enter your password" required />
+                    <div class="toggle-password" onclick="togglePasswordVisibility('login-password')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <button id="login-submit-btn" type="submit" class="auth-submit-btn">
+                Log In
+            </button>
+        </form>
+
+        <!-- REGISTER FORM -->
+        <form id="register-form" style="display: none;" onsubmit="handleRegisterSubmit(event)">
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    Mobile Number
+                </div>
+                <div class="auth-input-box">
+                    <div class="country-prefix">+91</div>
+                    <input id="reg-phone" class="auth-input" type="tel" maxlength="10" placeholder="10-digit mobile number" required />
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    Set Password
+                </div>
+                <div class="auth-input-box">
+                    <input id="reg-password" class="auth-input" type="password" placeholder="At least 6 characters" minlength="6" required />
+                    <div class="toggle-password" onclick="togglePasswordVisibility('reg-password')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    Confirm Password
+                </div>
+                <div class="auth-input-box">
+                    <input id="reg-confirm-password" class="auth-input" type="password" placeholder="Re-enter password" minlength="6" required />
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <div class="auth-label">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7.5" r="4"></circle>
+                        <line x1="20" y1="8" x2="20" y2="14"></line>
+                        <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                    Invite / Referral Code <span style="font-size: 0.28rem; color: #9ca3af; font-weight: normal;">(Optional)</span>
+                </div>
+                <div class="auth-input-box">
+                    <input id="reg-invite-code" class="auth-input" type="text" placeholder="Enter invite code (e.g. SM9182)" />
+                </div>
+            </div>
+
+            <div class="auth-bonus-badge">
+                <span>🎁 Refer & Earn: Your inviter gets instant ₹100 upon first deposit!</span>
+            </div>
+
+            <button id="reg-submit-btn" type="submit" class="auth-submit-btn">
+                Register & Play
+            </button>
+        </form>
+
+        <div id="auth-toast" class="toast-box"></div>
+    </div>
+
+    <script type="module" src="js/authPage.js"></script>
+</body>
+</html>

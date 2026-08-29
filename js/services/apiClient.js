@@ -14,6 +14,10 @@ class ApiClient {
         });
 
         const headers = { 'Accept': 'application/json' };
+        const authToken = localStorage.getItem('smarty91_auth_token');
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
         const adminPin = sessionStorage.getItem('smarty91_admin_pin') || localStorage.getItem('smarty91_admin_pin');
         if (adminPin) {
             headers['x-admin-pin'] = adminPin;
@@ -33,6 +37,10 @@ class ApiClient {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
+        const authToken = localStorage.getItem('smarty91_auth_token');
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
         const adminPin = sessionStorage.getItem('smarty91_admin_pin') || localStorage.getItem('smarty91_admin_pin');
         if (adminPin) {
             headers['x-admin-pin'] = adminPin;

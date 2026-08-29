@@ -1,6 +1,6 @@
 // gameEngine.js - Multi-Mode Lottery Engine, Statistics, Trends & Bet Ledger
 
-import { getBalance, formatCurrency, showToast, setBalanceLocally, syncServerBalance } from './wallet.js';
+import { getBalance, formatCurrency, showToast, setBalanceLocally, addBalance, deductBalance, syncServerBalance } from './wallet.js';
 import { playWinChime } from './audio.js';
 import { normalizeMode, getGameInterval, generateOfflinePeriodData, calculateTotalPeriods, formatIssueNumber, MODE_DISPLAY_NAMES } from './offlineTimer.js';
 import { gameService } from './services/gameService.js';
@@ -148,32 +148,6 @@ export function saveMultiModeState() {
     } catch (err) {
         console.warn('Could not save multi mode state to localStorage', err);
     }
-}
-
-export function updateModeHistoryFromServer(modeInput, serverItems) {
-    const mode = normalizeMode(modeInput);
-    const state = gameModes[mode];
-    if (!state || !Array.isArray(serverItems) || serverItems.length === 0) return;
-
-    const normalized = serverItems.map(item => {
-        const num = Number(item.number);
-        const prop = NUMBER_PROPERTIES[num] || { isBig: num >= 5, primaryColor: 'green', secondaryColor: null, colorName: 'Green' };
-        return {
-            mode,
-            periodId: item.periodId || item.period,
-            number: num,
-            isBig: item.isBig !== undefined ? item.isBig : (item.size === 'big' || num >= 5),
-            primaryColor: item.primaryColor || (item.color === 'violet-red' ? 'red' : item.color === 'violet-green' ? 'green' : item.color),
-            secondaryColor: item.secondaryColor || (item.color?.includes('violet') ? 'violet' : null),
-            colorName: item.colorName || item.colorLabel || prop.colorName,
-            timestamp: item.timestamp || (item.settledAt ? new Date(item.settledAt).getTime() : Date.now())
-        };
-    });
-
-    state.history = normalized;
-    state.latestResult = normalized[0];
-    state.tokens = normalized.slice(0, 5).map(h => h.number);
-    saveMultiModeState();
 }
 
 // ----------------- ACCESSORS -----------------
@@ -575,22 +549,22 @@ export function renderChartTrend(modeInput = activeModeKey) {
     const prevBtn = chartView.querySelector('.Trend__C-foot-previous');
     const nextBtn = chartView.querySelector('.Trend__C-foot-next');
     if (prevBtn) {
-        prevBtn.addEventListener('click', (e) => {
+        prevBtn.onclick = (e) => {
             e.stopPropagation();
             if (state.chartPage > 1) {
                 state.chartPage--;
                 renderChartTrend();
             }
-        });
+        };
     }
     if (nextBtn) {
-        nextBtn.addEventListener('click', (e) => {
+        nextBtn.onclick = (e) => {
             e.stopPropagation();
             if (state.chartPage < totalPages) {
                 state.chartPage++;
                 renderChartTrend();
             }
-        });
+        };
     }
 }
 
@@ -748,22 +722,22 @@ export function renderMyHistory(modeInput = activeModeKey) {
     const prevBtn = myHistoryView.querySelector('.Trend__C-foot-previous');
     const nextBtn = myHistoryView.querySelector('.Trend__C-foot-next');
     if (prevBtn) {
-        prevBtn.addEventListener('click', (e) => {
+        prevBtn.onclick = (e) => {
             e.stopPropagation();
             if (state.myHistoryPage > 1) {
                 state.myHistoryPage--;
                 renderMyHistory();
             }
-        });
+        };
     }
     if (nextBtn) {
-        nextBtn.addEventListener('click', (e) => {
+        nextBtn.onclick = (e) => {
             e.stopPropagation();
             if (state.myHistoryPage < totalPages) {
                 state.myHistoryPage++;
                 renderMyHistory();
             }
-        });
+        };
     }
 }
 
@@ -815,4 +789,32 @@ export function initSubtabs() {
     }
 
     renderGameHistory();
+}
+
+export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
+    if (!state || !Array.isArray(serverHistoryItems)) return;
+
+    const formatted = serverHistoryItems.map(item => {
+        const num = Number(item.number !== undefined ? item.number : 0);
+        const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+        return {
+            mode,
+            periodId: item.period || item.periodId,
+            number: num,
+            isBig: item.size === 'big' || prop.isBig,
+            primaryColor: prop.primaryColor,
+            secondaryColor: prop.secondaryColor,
+            colorName: item.colorLabel || prop.colorName,
+            timestamp: item.timestamp || (item.settledAt ? new Date(item.settledAt).getTime() : Date.now())
+        };
+    });
+
+    if (formatted.length > 0) {
+        state.history = formatted;
+        state.latestResult = formatted[0];
+        state.tokens = formatted.slice(0, 5).map(h => h.number);
+        saveMultiModeState();
+    }
 }

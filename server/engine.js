@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { firebaseSync } from './firebaseSync.js';
 
 // Number Properties mapping (0-9)
 export const NUMBER_PROPERTIES = {
@@ -46,10 +47,27 @@ class Smarty91ServerEngine {
                 bigSmall: 2         // 2x (Big or Small)
             },
             modes: {
-                '30s': { enabled: true, paused: false, lockoutSeconds: 5 },
-                '1m': { enabled: true, paused: false, lockoutSeconds: 5 },
-                '3m': { enabled: true, paused: false, lockoutSeconds: 5 },
-                '5m': { enabled: true, paused: false, lockoutSeconds: 5 }
+                '30s': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 },
+                '1m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 },
+                '3m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 },
+                '5m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 }
+            },
+            // Winning Chances & Probability Weights (Adjustable from Admin Panel)
+            probabilities: {
+                enabled: false, // Set to true when custom probabilities are active
+                // Weights for numbers 0 to 9 (Default: 10% each)
+                numbers: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10 },
+                // Weights for colors
+                colors: { green: 40, red: 40, violet: 20 },
+                // Weights for sizes
+                sizes: { big: 50, small: 50 },
+                // Per-mode custom overrides
+                modeProbabilities: {
+                    '30s': null,
+                    '1m': null,
+                    '3m': null,
+                    '5m': null
+                }
             }
         };
 
@@ -71,9 +89,14 @@ class Smarty91ServerEngine {
 
         // User Accounts & Wallets Store
         this.users = new Map();
+        this.userTokens = new Map(); // token -> userId
+        this.referralCodes = new Map(); // inviteCode -> userId
         
         // Transaction Ledger: Array of { id, userId, type, amount, balanceBefore, balanceAfter, referenceId, timestamp, description }
         this.ledger = [];
+
+        // Realtime User Deposit & Withdrawal Requests: Array of { id, userId, type, amount, details, status: 'PENDING'|'APPROVED'|'REJECTED', createdAt, processedAt, adminRemarks }
+        this.transactions = [];
 
         // All Bet Orders: Map<id, BetOrder>
         this.bets = new Map();
@@ -81,14 +104,17 @@ class Smarty91ServerEngine {
         // Admin Audit Logs: Array of { id, action, details, timestamp, adminIp }
         this.auditLogs = [];
 
-        // Seed default VIP demo user
-        this._ensureDefaultUser('default_user', 25679.96);
+        // Seed default guest user with 0 balance
+        this._ensureDefaultUser('default_user', 0.00);
 
         // Populate initial mock history for clean startup
         this._seedInitialHistory();
 
         // Start Server Clock Daemon Loop (100ms high-precision interval)
         this.intervalId = setInterval(() => this._tick(), 100);
+
+        // Connect Firebase Firestore Cloud Sync
+        firebaseSync.init(this);
     }
 
     _createInitialModeState(mode) {
@@ -99,22 +125,30 @@ class Smarty91ServerEngine {
             currentEndTimeMs: 0,
             remainingSeconds: 0,
             isLocked: false,
+            isPaused: false,
+            pausePending: false,
             settledRounds: new Set(),
             history: [], // Array of settled round records
             activeBets: [] // Array of bet IDs in current round
         };
     }
 
-    _ensureDefaultUser(userId = 'default_user', initialBalance = 25679.96) {
+    _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {
         if (!this.users.has(userId)) {
-            this.users.set(userId, {
+            const defaultUser = {
                 id: userId,
-                username: 'VIP Player',
+                username: 'Guest Player',
                 phone: '9876543210',
+                passwordHash: this._hashPassword('123456'),
                 balance: initialBalance,
+                inviteCode: 'SM9101',
+                referredBy: null,
+                hasDeposited: false,
                 isBlocked: false,
                 createdAt: new Date().toISOString()
-            });
+            };
+            this.users.set(userId, defaultUser);
+            this.referralCodes.set('SM9101', userId);
 
             this.ledger.push({
                 id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -125,10 +159,135 @@ class Smarty91ServerEngine {
                 balanceAfter: initialBalance,
                 referenceId: 'SYSTEM_INIT',
                 timestamp: new Date().toISOString(),
-                description: 'Initial VIP balance allocation'
+                description: 'Initial account setup (Zero balance)'
             });
         }
         return this.users.get(userId);
+    }
+
+    _hashPassword(password) {
+        return crypto.createHash('sha256').update(password + '_smarty91_salt_secure').digest('hex');
+    }
+
+    _generateInviteCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = 'SM';
+        for (let i = 0; i < 4; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    registerUser({ phone, password, inviteCode }) {
+        const cleanPhone = String(phone).trim();
+        if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+            throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
+        }
+        if (!password || password.length < 6) {
+            throw new Error('Password must be at least 6 characters');
+        }
+
+        // Check if user already exists
+        for (const u of this.users.values()) {
+            if (u.phone === cleanPhone) {
+                throw new Error('An account with this mobile number already exists. Please log in');
+            }
+        }
+
+        const userId = 'USR_' + cleanPhone;
+        let referrerId = null;
+        if (inviteCode) {
+            const cleanInvite = String(inviteCode).trim().toUpperCase();
+            referrerId = this.referralCodes.get(cleanInvite) || null;
+        }
+
+        let userInviteCode = this._generateInviteCode();
+        while (this.referralCodes.has(userInviteCode)) {
+            userInviteCode = this._generateInviteCode();
+        }
+
+        const newUser = {
+            id: userId,
+            username: `VIP_${cleanPhone.slice(-4)}`,
+            phone: cleanPhone,
+            passwordHash: this._hashPassword(password),
+            balance: 0.00, // Starts with exact 0 balance
+            inviteCode: userInviteCode,
+            referredBy: referrerId,
+            hasDeposited: false,
+            isBlocked: false,
+            createdAt: new Date().toISOString()
+        };
+
+        this.users.set(userId, newUser);
+        this.referralCodes.set(userInviteCode, userId);
+
+        // Generate session token
+        const token = 'JWT_' + crypto.randomBytes(24).toString('hex');
+        this.userTokens.set(token, userId);
+
+        firebaseSync.updateUserBalance(userId, 0.00, 'User registered (0 balance)');
+
+        return {
+            success: true,
+            token,
+            user: {
+                id: newUser.id,
+                username: newUser.username,
+                phone: newUser.phone,
+                balance: newUser.balance,
+                inviteCode: newUser.inviteCode,
+                referredBy: newUser.referredBy
+            }
+        };
+    }
+
+    loginUser({ phone, password }) {
+        const cleanPhone = String(phone).trim();
+        let targetUser = null;
+        for (const u of this.users.values()) {
+            if (u.phone === cleanPhone) {
+                targetUser = u;
+                break;
+            }
+        }
+
+        if (!targetUser) {
+            throw new Error('No account found with this mobile number. Please click Register first');
+        }
+
+        if (targetUser.isBlocked) {
+            throw new Error('Account is suspended. Please contact support');
+        }
+
+        const hash = this._hashPassword(password);
+        if (targetUser.passwordHash !== hash) {
+            throw new Error('Incorrect password');
+        }
+
+        const token = 'JWT_' + crypto.randomBytes(24).toString('hex');
+        this.userTokens.set(token, targetUser.id);
+
+        return {
+            success: true,
+            token,
+            user: {
+                id: targetUser.id,
+                username: targetUser.username,
+                phone: targetUser.phone,
+                balance: targetUser.balance,
+                inviteCode: targetUser.inviteCode,
+                referredBy: targetUser.referredBy
+            }
+        };
+    }
+
+    getUserFromToken(token) {
+        if (!token) return null;
+        const cleanToken = token.replace('Bearer ', '').trim();
+        const userId = this.userTokens.get(cleanToken);
+        if (!userId) return null;
+        return this.users.get(userId) || null;
     }
 
     _seedInitialHistory() {
@@ -185,9 +344,62 @@ class Smarty91ServerEngine {
         };
     }
 
-    // Server-Authoritative CSPRNG Result Generator
-    generateRandomNumber() {
-        return crypto.randomInt(0, 10); // 0 to 9 securely
+    // Outcome Generator with Dynamic Probability Weights Support
+    generateRandomNumber(mode = null) {
+        const probConfig = this.config.probabilities;
+        if (probConfig && probConfig.enabled) {
+            return this.generateWeightedNumber(mode);
+        }
+        return crypto.randomInt(0, 10); // Standard 0 to 9 securely
+    }
+
+    // Weighted Probability Outcome Generator
+    generateWeightedNumber(mode = null) {
+        const probConfig = this.config.probabilities || {};
+        const modeWeights = (mode && probConfig.modeProbabilities && probConfig.modeProbabilities[mode]) || probConfig;
+
+        const numWeights = modeWeights.numbers || probConfig.numbers || { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10 };
+        const colorWeights = modeWeights.colors || probConfig.colors || { green: 40, red: 40, violet: 20 };
+        const sizeWeights = modeWeights.sizes || probConfig.sizes || { big: 50, small: 50 };
+
+        const weights = [];
+        for (let num = 0; num <= 9; num++) {
+            const prop = NUMBER_PROPERTIES[num];
+            const baseNumWeight = Number(numWeights[num] !== undefined ? numWeights[num] : 10);
+            
+            // Color Weight Factor
+            let colorFactor = 1.0;
+            if (prop.color === 'green') {
+                colorFactor = (Number(colorWeights.green) || 40) / 40;
+            } else if (prop.color === 'red') {
+                colorFactor = (Number(colorWeights.red) || 40) / 40;
+            } else if (prop.color === 'violet-red' || prop.color === 'violet-green') {
+                colorFactor = (Number(colorWeights.violet) || 20) / 20;
+            }
+
+            // Size Weight Factor
+            let sizeFactor = 1.0;
+            if (prop.size === 'big') {
+                sizeFactor = (Number(sizeWeights.big) || 50) / 50;
+            } else if (prop.size === 'small') {
+                sizeFactor = (Number(sizeWeights.small) || 50) / 50;
+            }
+
+            const totalWeight = Math.max(0.01, baseNumWeight * colorFactor * sizeFactor);
+            weights.push({ number: num, weight: totalWeight });
+        }
+
+        const sumWeights = weights.reduce((acc, item) => acc + item.weight, 0);
+        const randomVal = Math.random() * sumWeights;
+
+        let cumulative = 0;
+        for (const item of weights) {
+            cumulative += item.weight;
+            if (randomVal <= cumulative) {
+                return item.number;
+            }
+        }
+        return crypto.randomInt(0, 10);
     }
 
     _tick() {
@@ -196,30 +408,53 @@ class Smarty91ServerEngine {
         Object.keys(this.modes).forEach(mode => {
             const state = this.modes[mode];
             const modeConfig = this.config.modes[mode];
-            if (!modeConfig || !modeConfig.enabled || modeConfig.paused) return;
+            if (!modeConfig || !modeConfig.enabled) return;
+
+            // If mode is currently paused
+            if (modeConfig.paused) {
+                state.isPaused = true;
+                state.isLocked = true;
+                state.remainingSeconds = 0;
+                state.pausePending = false;
+                return;
+            }
+
+            state.isPaused = false;
+            state.pausePending = Boolean(modeConfig.pausePending);
 
             const interval = MODE_INTERVALS[mode];
             const times = this._calculateRoundTimes(now, interval);
-            const periodId = this._calculatePeriodId(now, interval);
-            const remainingSec = Math.floor(times.timeLeftMs / 1000);
+            const currentPeriodId = this._calculatePeriodId(now, interval);
+            const remainingSec = Math.max(0, Math.ceil(times.timeLeftMs / 1000));
 
-            state.currentPeriodId = periodId;
+            // Period Boundary Transition Check:
+            // If current period changed and previous period was not settled, settle it immediately!
+            if (state.currentPeriodId && state.currentPeriodId !== currentPeriodId) {
+                const previousPeriod = state.currentPeriodId;
+                if (!state.settledRounds.has(previousPeriod)) {
+                    state.settledRounds.add(previousPeriod);
+                    this._settleRound(mode, previousPeriod);
+                }
+            }
+
+            state.currentPeriodId = currentPeriodId;
             state.currentEndTimeMs = times.endTime;
             state.remainingSeconds = remainingSec;
             state.isLocked = remainingSec <= (modeConfig.lockoutSeconds || 5);
 
-            // Round Settlement when time reaches 0
-            if (times.timeLeftMs <= 200 && !state.settledRounds.has(periodId)) {
-                state.settledRounds.add(periodId);
-                this._settleRound(mode, periodId);
+            // Settle immediately if within last 150ms of the period
+            if (times.timeLeftMs <= 150 && !state.settledRounds.has(currentPeriodId)) {
+                state.settledRounds.add(currentPeriodId);
+                this._settleRound(mode, currentPeriodId);
             }
         });
     }
 
     _settleRound(mode, periodId) {
         const state = this.modes[mode];
+        const modeConfig = this.config.modes[mode];
         
-        // 1. Determine Winning Number (Check Admin Override first, else CSPRNG)
+        // 1. Determine Winning Number (Check Admin Override first, else weighted/CSPRNG)
         let winningNumber;
         let isOverridden = false;
         
@@ -228,14 +463,16 @@ class Smarty91ServerEngine {
             isOverridden = true;
             this.adminOverrides[mode] = null; // Consume single-use override
             
+            const logMsg = `Mode ${mode} Period ${periodId} settled with forced outcome: ${winningNumber}`;
             this.auditLogs.unshift({
                 id: 'AUDIT_' + Date.now(),
                 action: 'ADMIN_RESULT_OVERRIDE_EXECUTED',
-                details: `Mode ${mode} Period ${periodId} settled with forced outcome: ${winningNumber}`,
+                details: logMsg,
                 timestamp: new Date().toISOString()
             });
+            firebaseSync.logAdminAction('ADMIN_RESULT_OVERRIDE_EXECUTED', logMsg);
         } else {
-            winningNumber = this.generateRandomNumber();
+            winningNumber = this.generateRandomNumber(mode);
         }
 
         const props = NUMBER_PROPERTIES[winningNumber];
@@ -253,6 +490,9 @@ class Smarty91ServerEngine {
         state.history.unshift(roundRecord);
         if (state.history.length > 200) state.history.pop();
 
+        // Persist settled round to Firestore
+        firebaseSync.saveSettledRound(mode, roundRecord);
+
         // 2. Settle all pending bets for this mode and periodId
         const pendingBetsForRound = Array.from(this.bets.values()).filter(
             b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
@@ -266,6 +506,8 @@ class Smarty91ServerEngine {
             bet.resultSize = props.size;
             bet.payoutAmount = settlement.payoutAmount;
             bet.settledAt = new Date().toISOString();
+
+            firebaseSync.updateBetSettlement(bet);
 
             if (settlement.isWin && settlement.payoutAmount > 0) {
                 const user = this.users.get(bet.userId);
@@ -285,9 +527,28 @@ class Smarty91ServerEngine {
                         timestamp: new Date().toISOString(),
                         description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
                     });
+
+                    firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
                 }
             }
         });
+
+        // 3. Check if Pause was scheduled for after current round completes
+        if (modeConfig && modeConfig.pausePending) {
+            modeConfig.paused = true;
+            modeConfig.pausePending = false;
+            state.isPaused = true;
+            state.pausePending = false;
+            
+            const logMsg = `Mode ${mode} successfully entered PAUSED state after finishing round #${periodId}`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'MODE_PAUSED_AFTER_ROUND',
+                details: logMsg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('MODE_PAUSED_AFTER_ROUND', logMsg);
+        }
     }
 
     _evaluateBet(bet, winningNumber) {
@@ -418,6 +679,10 @@ class Smarty91ServerEngine {
 
         this.bets.set(betId, betOrder);
 
+        // Save bet order and update balance in Firestore
+        firebaseSync.saveBet(betOrder);
+        firebaseSync.updateUserBalance(user.id, user.balance, 'Bet placed');
+
         // Record in Ledger
         this.ledger.unshift({
             id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -480,16 +745,369 @@ class Smarty91ServerEngine {
         const num = Number(targetNumber);
         if (isNaN(num) || num < 0 || num > 9) {
             this.adminOverrides[mode] = null;
-            return { mode, override: null, message: `Auto CSPRNG restored for ${mode}` };
+            firebaseSync.setAdminOverride(mode, null);
+            const msg = `Auto CSPRNG restored for ${mode}`;
+            firebaseSync.logAdminAction('ADMIN_RESTORE_AUTO_OUTCOME', msg);
+            return { mode, override: null, message: msg };
         }
         this.adminOverrides[mode] = num;
+        firebaseSync.setAdminOverride(mode, num);
+        
+        const details = `Forced outcome for ${mode} next round set to ${num}`;
         this.auditLogs.unshift({
             id: 'AUDIT_' + Date.now(),
             action: 'ADMIN_SET_NEXT_OUTCOME',
-            details: `Forced outcome for ${mode} next round set to ${num}`,
+            details,
             timestamp: new Date().toISOString()
         });
-        return { mode, override: num, message: `Forced outcome for ${mode} set to ${num}` };
+        firebaseSync.logAdminAction('ADMIN_SET_NEXT_OUTCOME', details);
+        return { mode, override: num, message: details };
+    }
+
+    // Graceful Mode Pause & Resume Controller
+    // Allows current round to finish its countdown and settle, then pauses subsequent rounds
+    setModePauseState(mode, action = 'PAUSE_AFTER_ROUND') {
+        if (!this.modes[mode]) throw new Error('Invalid game mode');
+        const modeConfig = this.config.modes[mode];
+        const state = this.modes[mode];
+
+        if (action === 'PAUSE_AFTER_ROUND') {
+            modeConfig.pausePending = true;
+            modeConfig.paused = false;
+            state.pausePending = true;
+            
+            const msg = `Mode ${mode} scheduled to PAUSE after current round #${state.currentPeriodId} completes.`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_SCHEDULE_PAUSE',
+                details: msg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_SCHEDULE_PAUSE', msg);
+            return { mode, paused: false, pausePending: true, message: msg };
+        } else if (action === 'RESUME') {
+            modeConfig.paused = false;
+            modeConfig.pausePending = false;
+            state.isPaused = false;
+            state.pausePending = false;
+
+            const msg = `Mode ${mode} RESUMED live draws and active betting immediately.`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_RESUME_MODE',
+                details: msg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_RESUME_MODE', msg);
+            return { mode, paused: false, pausePending: false, message: msg };
+        } else if (action === 'PAUSE_IMMEDIATE') {
+            modeConfig.paused = true;
+            modeConfig.pausePending = false;
+            state.isPaused = true;
+            state.pausePending = false;
+
+            const msg = `Mode ${mode} PAUSED immediately by admin.`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_PAUSE_IMMEDIATE',
+                details: msg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_PAUSE_IMMEDIATE', msg);
+            return { mode, paused: true, pausePending: false, message: msg };
+        }
+        throw new Error('Invalid pause action');
+    }
+
+    // Dynamic Probability & Winning Chances Management
+    updateProbabilities(payload) {
+        if (!payload) throw new Error('Invalid probabilities payload');
+        
+        this.config.probabilities.enabled = Boolean(payload.enabled !== undefined ? payload.enabled : true);
+        
+        if (payload.numbers) {
+            this.config.probabilities.numbers = {
+                ...this.config.probabilities.numbers,
+                ...payload.numbers
+            };
+        }
+        if (payload.colors) {
+            this.config.probabilities.colors = {
+                ...this.config.probabilities.colors,
+                ...payload.colors
+            };
+        }
+        if (payload.sizes) {
+            this.config.probabilities.sizes = {
+                ...this.config.probabilities.sizes,
+                ...payload.sizes
+            };
+        }
+        if (payload.modeProbabilities) {
+            this.config.probabilities.modeProbabilities = {
+                ...this.config.probabilities.modeProbabilities,
+                ...payload.modeProbabilities
+            };
+        }
+
+        const logMsg = `Updated winning chances/probabilities (Enabled: ${this.config.probabilities.enabled})`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'ADMIN_UPDATE_PROBABILITIES',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        firebaseSync.logAdminAction('ADMIN_UPDATE_PROBABILITIES', logMsg);
+        firebaseSync.saveSystemConfig(this.config);
+
+        return {
+            success: true,
+            probabilities: this.config.probabilities,
+            message: 'Winning chances and probability weights updated successfully!'
+        };
+    }
+
+    getProbabilities() {
+        return this.config.probabilities;
+    }
+
+    // ==========================================
+    // Realtime User Deposit & Withdrawal Requests
+    // ==========================================
+
+    createDepositRequest({ userId = 'default_user', amount, utrNumber, upiId = '', channel = 'UPI_MANUAL' }) {
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 100) {
+            throw new Error('Minimum deposit amount is ₹100');
+        }
+
+        const txId = 'DEP_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const req = {
+            id: txId,
+            userId,
+            type: 'DEPOSIT',
+            amount: numAmount,
+            utrNumber: utrNumber || `UTR${Date.now()}`,
+            upiId: upiId || 'vip.pay@upi',
+            channel,
+            status: 'PENDING',
+            createdAt: new Date().toISOString(),
+            processedAt: null,
+            adminRemarks: ''
+        };
+
+        this.transactions.unshift(req);
+        firebaseSync.saveTransaction(req);
+
+        return {
+            success: true,
+            transaction: req,
+            message: `Deposit request for ₹${numAmount.toLocaleString('en-IN')} submitted successfully! Awaiting Admin approval.`
+        };
+    }
+
+    createWithdrawalRequest({ userId = 'default_user', amount, bankName = 'State Bank of India', accountNumber = '98765432100', ifsc = 'SBIN0001234', upiId = '' }) {
+        const user = this.users.get(userId);
+        if (!user) throw new Error('User not found');
+
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 100) {
+            throw new Error('Minimum withdrawal amount is ₹100');
+        }
+        if (user.balance < numAmount) {
+            throw new Error(`Insufficient wallet balance. Current: ₹${user.balance.toFixed(2)}`);
+        }
+
+        // Deduct/hold balance immediately for withdrawal request
+        const balanceBefore = user.balance;
+        user.balance -= numAmount;
+        const balanceAfter = user.balance;
+
+        const txId = 'WTH_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const req = {
+            id: txId,
+            userId,
+            type: 'WITHDRAWAL',
+            amount: numAmount,
+            bankName,
+            accountNumber,
+            ifsc,
+            upiId: upiId || `${user.phone || '9876543210'}@upi`,
+            status: 'PENDING',
+            createdAt: new Date().toISOString(),
+            processedAt: null,
+            adminRemarks: ''
+        };
+
+        this.transactions.unshift(req);
+        firebaseSync.saveTransaction(req);
+        firebaseSync.updateUserBalance(userId, user.balance, 'Withdrawal request initiated');
+
+        // Record in ledger
+        this.ledger.unshift({
+            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            userId,
+            type: 'WITHDRAWAL_REQUEST',
+            amount: -numAmount,
+            balanceBefore,
+            balanceAfter,
+            referenceId: txId,
+            timestamp: new Date().toISOString(),
+            description: `Withdrawal request of ₹${numAmount} submitted`
+        });
+
+        return {
+            success: true,
+            transaction: req,
+            newBalance: user.balance,
+            message: `Withdrawal request for ₹${numAmount.toLocaleString('en-IN')} submitted! Admin will process payment shortly.`
+        };
+    }
+
+    processTransaction(txId, action, adminRemarks = '') {
+        const tx = this.transactions.find(t => t.id === txId);
+        if (!tx) throw new Error('Transaction request not found');
+        if (tx.status !== 'PENDING') throw new Error(`Transaction is already ${tx.status}`);
+
+        const user = this.users.get(tx.userId);
+        if (!user) throw new Error('Associated user not found');
+
+        if (action === 'APPROVE') {
+            tx.status = 'APPROVED';
+            tx.processedAt = new Date().toISOString();
+            tx.adminRemarks = adminRemarks || 'Approved by Admin';
+
+            if (tx.type === 'DEPOSIT') {
+                const balanceBefore = user.balance;
+                user.balance += tx.amount;
+                const balanceAfter = user.balance;
+
+                this.ledger.unshift({
+                    id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                    userId: tx.userId,
+                    type: 'DEPOSIT_CREDIT',
+                    amount: tx.amount,
+                    balanceBefore,
+                    balanceAfter,
+                    referenceId: tx.id,
+                    timestamp: new Date().toISOString(),
+                    description: `Deposit approved: UTR ${tx.utrNumber}`
+                });
+
+                // Check First Deposit Referral Reward: Referrer gets ₹100 instant real balance!
+                if (!user.hasDeposited && user.referredBy) {
+                    user.hasDeposited = true;
+                    const referrer = this.users.get(user.referredBy);
+                    if (referrer) {
+                        const refBalBefore = referrer.balance;
+                        referrer.balance += 100.00; // Flat ₹100 real balance bonus
+                        const refBalAfter = referrer.balance;
+
+                        this.ledger.unshift({
+                            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                            userId: referrer.id,
+                            type: 'REFERRAL_REWARD',
+                            amount: 100.00,
+                            balanceBefore: refBalBefore,
+                            balanceAfter: refBalAfter,
+                            referenceId: tx.id,
+                            timestamp: new Date().toISOString(),
+                            description: `Instant ₹100 Referral Bonus for invited friend's first deposit (User: ${user.phone})`
+                        });
+
+                        firebaseSync.updateUserBalance(referrer.id, referrer.balance, 'Referral deposit reward ₹100');
+                        
+                        const refLogMsg = `Awarded ₹100 Referral Reward to ${referrer.phone} for first deposit of ${user.phone}`;
+                        this.auditLogs.unshift({
+                            id: 'AUDIT_' + Date.now(),
+                            action: 'REFERRAL_REWARD_CREDITED',
+                            details: refLogMsg,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                } else {
+                    user.hasDeposited = true;
+                }
+
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin');
+            } else if (tx.type === 'WITHDRAWAL') {
+                this.ledger.unshift({
+                    id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                    userId: tx.userId,
+                    type: 'WITHDRAWAL_PAID',
+                    amount: 0,
+                    balanceBefore: user.balance,
+                    balanceAfter: user.balance,
+                    referenceId: tx.id,
+                    timestamp: new Date().toISOString(),
+                    description: `Withdrawal payout completed: ₹${tx.amount}`
+                });
+            }
+
+            const logMsg = `Approved ${tx.type} #${tx.id} for user ${tx.userId} amount ₹${tx.amount}`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_APPROVE_TRANSACTION',
+                details: logMsg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_APPROVE_TRANSACTION', logMsg);
+            firebaseSync.updateTransaction(tx);
+
+            return { success: true, transaction: tx, userBalance: user.balance, message: logMsg };
+        } else if (action === 'REJECT') {
+            tx.status = 'REJECTED';
+            tx.processedAt = new Date().toISOString();
+            tx.adminRemarks = adminRemarks || 'Rejected by Admin';
+
+            // If withdrawal rejected, refund held amount back to user's wallet
+            if (tx.type === 'WITHDRAWAL') {
+                const balanceBefore = user.balance;
+                user.balance += tx.amount;
+                const balanceAfter = user.balance;
+
+                this.ledger.unshift({
+                    id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                    userId: tx.userId,
+                    type: 'WITHDRAWAL_REFUND',
+                    amount: tx.amount,
+                    balanceBefore,
+                    balanceAfter,
+                    referenceId: tx.id,
+                    timestamp: new Date().toISOString(),
+                    description: `Refund for rejected withdrawal #${tx.id}`
+                });
+
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal rejected - balance refunded');
+            }
+
+            const logMsg = `Rejected ${tx.type} #${tx.id} for user ${tx.userId} amount ₹${tx.amount}. Remarks: ${tx.adminRemarks}`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_REJECT_TRANSACTION',
+                details: logMsg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_REJECT_TRANSACTION', logMsg);
+            firebaseSync.updateTransaction(tx);
+
+            return { success: true, transaction: tx, userBalance: user.balance, message: logMsg };
+        }
+        throw new Error('Invalid transaction action');
+    }
+
+    getTransactions(filter = {}) {
+        let result = [...this.transactions];
+        if (filter.type) {
+            result = result.filter(t => t.type === filter.type);
+        }
+        if (filter.status) {
+            result = result.filter(t => t.status === filter.status);
+        }
+        if (filter.userId) {
+            result = result.filter(t => t.userId === filter.userId);
+        }
+        return result;
     }
 }
 

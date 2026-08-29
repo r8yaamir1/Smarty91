@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "game_config": {
+      "title": "Game Config",
+      "description": "System payout rules, multipliers, fees, and mode states",
+      "type": "object",
+      "properties": {
+        "multipliers": { "type": "object" },
+        "serviceFeePercent": { "type": "number" },
+        "minBetAmount": { "type": "number" },
+        "maxBetAmount": { "type": "number" },
+        "modes": { "type": "object" }
+      }
+    },
+    "game_overrides": {
+      "title": "Game Overrides",
+      "description": "Admin forced outcomes per mode (30s, 1m, 3m, 5m)",
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string" },
+        "forcedOutcome": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "game_periods": {
+      "title": "Game Periods",
+      "description": "Live period states and synchronization per mode",
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string" },
+        "periodId": { "type": "string" },
+        "startTime": { "type": "number" },
+        "durationSeconds": { "type": "number" },
+        "isLocked": { "type": "boolean" }
+      }
+    },
+    "game_history": {
+      "title": "Game History",
+      "description": "Completed period results and trends",
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string" },
+        "periodId": { "type": "string" },
+        "number": { "type": "number" },
+        "color": { "type": "string" },
+        "size": { "type": "string" },
+        "timestamp": { "type": "number" }
+      }
+    },
+    "users": {
+      "title": "User Accounts",
+      "description": "User wallets and profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "balance": { "type": "number" },
+        "totalBet": { "type": "number" },
+        "totalWon": { "type": "number" }
+      }
+    },
+    "bets": {
+      "title": "User Bets",
+      "description": "Live and settled game bets",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "mode": { "type": "string" },
+        "periodId": { "type": "string" },
+        "betType": { "type": "string" },
+        "selection": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "payout": { "type": "number" }
+      }
+    },
+    "audit_logs": {
+      "title": "Audit Logs",
+      "description": "Admin and security activity records",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "number" }
+      }
+    }
+  }
+}

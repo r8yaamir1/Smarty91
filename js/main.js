@@ -1,7 +1,7 @@
 // main.js - Application Entrypoint
 
 import { initAudio } from './audio.js';
-import { initWalletModals } from './wallet.js';
+import { initWalletModals, updateHeaderUserUI, renderBalance } from './wallet.js';
 import { initGameRecord } from './gameRecord.js';
 import { initAllEvents } from './events.js';
 import { initAdminPanel } from './adminPanel.js';
@@ -32,6 +32,8 @@ function bootstrap() {
     console.log('Initializing Smarty91 VIP...');
     initViewportLock();
     initAudio();
+    updateHeaderUserUI();
+    renderBalance();
     initWalletModals();
     initAllEvents();
     initGameRecord();

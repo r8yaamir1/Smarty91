@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Game Config & Overrides: Publicly readable by clients, writable by backend/admin
+    match /game_config/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /game_overrides/{mode} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /game_periods/{mode} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /game_history/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /bets/{betId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /transactions/{txnId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

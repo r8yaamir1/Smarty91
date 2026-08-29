@@ -1,7 +1,7 @@
 // gameRecord.js - Server-Authoritative Live Game Loop & Multi-Mode Orchestrator
 
 import { period_time, period_number, tokenParent } from "./elements.js";
-import { normalizeMode } from "./offlineTimer.js";
+import { normalizeMode, generateOfflinePeriodData } from "./offlineTimer.js";
 import {
     gameModes,
     SUPPORTED_MODES,
@@ -19,6 +19,7 @@ import { showEvaluationDialog } from "./updateWin.js";
 import { playTickSound, stopCountdownAudio } from "./audio.js";
 import { gameService } from "./services/gameService.js";
 import { syncServerBalance } from "./wallet.js";
+import { subscribeToGamePeriod, subscribeToGameHistory } from "./services/firebaseClient.js";
 
 let masterTimerId = null;
 let serverSyncTimerId = null;
@@ -170,23 +171,26 @@ function processMasterTick() {
         const state = gameModes[mode];
         if (!state) return;
 
-        const timeLeftMs = Math.max(0, state.currentEndTimeMs - adjustedNow);
-        const totalSeconds = Math.floor(timeLeftMs / 1000);
+        const periodData = generateOfflinePeriodData(mode, new Date(adjustedNow));
+        const totalSeconds = periodData.remainingSeconds;
         state.remainingSeconds = totalSeconds;
+        state.currentEndTimeMs = periodData.endTimeMs;
 
         const isCurrentActive = mode === activeKey;
 
-        // 1. Check for Round Finish & Request Server Settle
-        if (timeLeftMs <= 0) {
-            const finishedIssue = state.currentIssueNumber;
-            const settlementKey = `${mode}:${finishedIssue}`;
+        // 1. Detect if period transitioned (Round Finished)
+        if (state.currentIssueNumber && state.currentIssueNumber !== periodData.issueNumber) {
+            const finishedPeriod = state.currentIssueNumber;
+            state.currentIssueNumber = periodData.issueNumber;
 
+            const settlementKey = `${mode}:${finishedPeriod}`;
             if (!state.settledRounds.has(settlementKey)) {
                 state.settledRounds.add(settlementKey);
-                // Trigger fast server sync on boundary
-                setTimeout(() => syncServerGameState(), 300);
+                // Asynchronously fetch latest outcome & evaluate bets without blocking timer
+                setTimeout(() => handlePeriodSettledFromServer(mode, finishedPeriod), 400);
             }
-            return;
+        } else if (!state.currentIssueNumber) {
+            state.currentIssueNumber = periodData.issueNumber;
         }
 
         // 2. Check for 5-Second Betting Lockout
@@ -312,6 +316,40 @@ export async function initGameRecord() {
     // Initial server sync
     await syncServerGameState();
     await initializeServerHistories();
+
+    // Setup Real-time Firebase Firestore Listeners for zero-latency sync
+    try {
+        SUPPORTED_MODES.forEach(mode => {
+            // Real-time period timer and lockout state from Firestore
+            subscribeToGamePeriod(mode, (periodData) => {
+                if (!periodData) return;
+                const state = gameModes[mode];
+                if (!state) return;
+                if (periodData.currentPeriodId) state.currentIssueNumber = periodData.currentPeriodId;
+                if (periodData.remainingSeconds !== undefined) state.remainingSeconds = periodData.remainingSeconds;
+                if (periodData.isLocked !== undefined) state.isLockoutActive = periodData.isLocked;
+                if (periodData.currentEndTimeMs) state.currentEndTimeMs = periodData.currentEndTimeMs;
+                
+                if (mode === getActiveModeKey() && period_number && state.currentIssueNumber) {
+                    period_number.textContent = state.currentIssueNumber;
+                }
+            });
+
+            // Real-time history & result settlement from Firestore
+            subscribeToGameHistory(mode, (historyItems) => {
+                if (Array.isArray(historyItems) && historyItems.length > 0) {
+                    updateModeHistoryFromServer(mode, historyItems);
+                    if (mode === getActiveModeKey()) {
+                        renderWinningTokensForActiveMode();
+                        renderGameHistory(mode);
+                        renderChartTrend(mode);
+                    }
+                }
+            });
+        });
+    } catch (firebaseErr) {
+        console.warn('Firebase realtime subscription setup:', firebaseErr);
+    }
 
     // Start local and server timers
     startMasterScheduler();

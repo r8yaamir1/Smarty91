@@ -1,8 +1,80 @@
 import express from 'express';
 import { serverEngine, NUMBER_PROPERTIES, MODE_DISPLAY_NAMES } from './engine.js';
+import { firebaseSync } from './firebaseSync.js';
 
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
+
+// Helper to resolve current logged-in user or guest
+const getAuthUser = (req) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        const user = serverEngine.getUserFromToken(authHeader);
+        if (user) return user;
+    }
+    return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
+};
+
+// -------------------------------------------------------------
+// 0. AUTHENTICATION & USER MANAGEMENT (PHONE + PASSWORD + REFERRAL)
+// -------------------------------------------------------------
+
+// POST /api/auth/register
+apiRouter.post('/auth/register', (req, res) => {
+    try {
+        const { phone, password, inviteCode } = req.body;
+        const result = serverEngine.registerUser({ phone, password, inviteCode });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/auth/login
+apiRouter.post('/auth/login', (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        const result = serverEngine.loginUser({ phone, password });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// GET /api/auth/me
+apiRouter.get('/auth/me', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).json({ success: false, message: 'No authorization token provided' });
+    }
+    const user = serverEngine.getUserFromToken(authHeader);
+    if (!user) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired session' });
+    }
+    res.json({
+        success: true,
+        user: {
+            id: user.id,
+            username: user.username,
+            phone: user.phone,
+            balance: user.balance,
+            inviteCode: user.inviteCode,
+            referredBy: user.referredBy,
+            hasDeposited: user.hasDeposited,
+            createdAt: user.createdAt
+        }
+    });
+});
+
+// POST /api/auth/logout
+apiRouter.post('/auth/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        const cleanToken = authHeader.replace('Bearer ', '').trim();
+        serverEngine.userTokens.delete(cleanToken);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+});
 
 // Helper for error handling
 const asyncWrap = (fn) => (req, res, next) => {
@@ -108,9 +180,10 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
 // POST /api/bets/place -> Place bet order
 apiRouter.post('/bets/place', (req, res) => {
     try {
+        const authUser = getAuthUser(req);
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
         const result = serverEngine.placeBet({
-            userId: 'default_user',
+            userId: authUser.id,
             mode,
             periodId,
             type,
@@ -128,12 +201,13 @@ apiRouter.post('/bets/place', (req, res) => {
 
 // GET /api/bets/my-history/:mode -> User's bet orders for a mode
 apiRouter.get('/bets/my-history/:mode', (req, res) => {
+    const authUser = getAuthUser(req);
     const mode = req.params.mode;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
 
     const userBets = Array.from(serverEngine.bets.values())
-        .filter(b => b.userId === 'default_user' && b.mode === mode)
+        .filter(b => b.userId === authUser.id && b.mode === mode)
         .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
 
     const start = (page - 1) * limit;
@@ -157,7 +231,8 @@ apiRouter.get('/bets/my-history/:mode', (req, res) => {
 
 // GET /api/wallet/balance -> Real-time balance
 apiRouter.get('/wallet/balance', (req, res) => {
-    const user = serverEngine.users.get('default_user');
+    const authUser = getAuthUser(req);
+    const user = serverEngine.users.get(authUser.id) || authUser;
     res.json({
         success: true,
         balance: user ? user.balance : 0,
@@ -167,8 +242,9 @@ apiRouter.get('/wallet/balance', (req, res) => {
 
 // GET /api/wallet/ledger -> Transaction passbook
 apiRouter.get('/wallet/ledger', (req, res) => {
+    const authUser = getAuthUser(req);
     const userLedger = serverEngine.ledger
-        .filter(l => l.userId === 'default_user')
+        .filter(l => l.userId === authUser.id)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     res.json({
@@ -179,20 +255,21 @@ apiRouter.get('/wallet/ledger', (req, res) => {
 
 // POST /api/wallet/deposit -> User deposit mock request
 apiRouter.post('/wallet/deposit', (req, res) => {
+    const authUser = getAuthUser(req);
     const { amount = 1000 } = req.body;
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
         return res.status(400).json({ success: false, message: 'Invalid deposit amount' });
     }
 
-    const user = serverEngine.users.get('default_user');
+    const user = serverEngine.users.get(authUser.id);
     const balanceBefore = user.balance;
     user.balance = Number((user.balance + numAmount).toFixed(2));
     const balanceAfter = user.balance;
 
     serverEngine.ledger.unshift({
         id: 'LEDGER_' + Date.now(),
-        userId: 'default_user',
+        userId: user.id,
         type: 'DEPOSIT',
         amount: numAmount,
         balanceBefore,
@@ -211,9 +288,10 @@ apiRouter.post('/wallet/deposit', (req, res) => {
 
 // POST /api/wallet/withdraw -> User withdrawal mock request
 apiRouter.post('/wallet/withdraw', (req, res) => {
+    const authUser = getAuthUser(req);
     const { amount = 500 } = req.body;
     const numAmount = Number(amount);
-    const user = serverEngine.users.get('default_user');
+    const user = serverEngine.users.get(authUser.id);
 
     if (isNaN(numAmount) || numAmount <= 0) {
         return res.status(400).json({ success: false, message: 'Invalid withdrawal amount' });
@@ -228,7 +306,7 @@ apiRouter.post('/wallet/withdraw', (req, res) => {
 
     serverEngine.ledger.unshift({
         id: 'LEDGER_' + Date.now(),
-        userId: 'default_user',
+        userId: user.id,
         type: 'WITHDRAWAL',
         amount: -numAmount,
         balanceBefore,
@@ -243,6 +321,49 @@ apiRouter.post('/wallet/withdraw', (req, res) => {
         message: `₹${numAmount} withdrawal request submitted successfully!`,
         newBalance: user.balance
     });
+});
+
+// POST /api/wallet/deposit-request -> Submit real user deposit request (Awaiting Admin)
+apiRouter.post('/wallet/deposit-request', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount, utrNumber, upiId, channel } = req.body;
+        const result = serverEngine.createDepositRequest({
+            userId: authUser.id,
+            amount,
+            utrNumber,
+            upiId,
+            channel
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/wallet/withdraw-request -> Submit real user withdrawal request (Awaiting Admin)
+apiRouter.post('/wallet/withdraw-request', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount, bankName, accountNumber, ifsc, upiId } = req.body;
+        const result = serverEngine.createWithdrawalRequest({
+            userId: authUser.id,
+            amount,
+            bankName,
+            accountNumber,
+            ifsc,
+            upiId
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// GET /api/wallet/transactions -> User transactions status list
+apiRouter.get('/wallet/transactions', (req, res) => {
+    const txs = serverEngine.getTransactions({ userId: 'default_user' });
+    res.json({ success: true, items: txs });
 });
 
 // -------------------------------------------------------------
@@ -279,6 +400,10 @@ apiRouter.get('/admin/overview', checkAdminAuth, (req, res) => {
         liveExposures[mode] = serverEngine.getLiveExposure(mode);
     });
 
+    const pendingTransactions = serverEngine.transactions.filter(t => t.status === 'PENDING');
+    const totalPendingDeposits = pendingTransactions.filter(t => t.type === 'DEPOSIT').reduce((s, t) => s + t.amount, 0);
+    const totalPendingWithdrawals = pendingTransactions.filter(t => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.amount, 0);
+
     res.json({
         success: true,
         overview: {
@@ -287,13 +412,69 @@ apiRouter.get('/admin/overview', checkAdminAuth, (req, res) => {
             totalBetVolume: Number(totalBetVolume.toFixed(2)),
             totalPayoutVolume: Number(totalPayoutVolume.toFixed(2)),
             totalFeeCollected: Number(totalFeeCollected.toFixed(2)),
-            grossHouseProfit: Number((totalBetVolume - totalPayoutVolume).toFixed(2))
+            grossHouseProfit: Number((totalBetVolume - totalPayoutVolume).toFixed(2)),
+            pendingDepositsCount: pendingTransactions.filter(t => t.type === 'DEPOSIT').length,
+            pendingDepositsAmount: totalPendingDeposits,
+            pendingWithdrawalsCount: pendingTransactions.filter(t => t.type === 'WITHDRAWAL').length,
+            pendingWithdrawalsAmount: totalPendingWithdrawals
         },
         overrides: serverEngine.adminOverrides,
         config: serverEngine.config,
+        probabilities: serverEngine.getProbabilities(),
         liveExposures,
-        recentAuditLogs: serverEngine.auditLogs.slice(0, 20)
+        recentTransactions: serverEngine.transactions.slice(0, 50),
+        recentAuditLogs: serverEngine.auditLogs.slice(0, 30)
     });
+});
+
+// POST /api/admin/mode-pause -> Gracefully pause after current round or resume mode
+apiRouter.post('/admin/mode-pause', checkAdminAuth, (req, res) => {
+    try {
+        const { mode, action = 'PAUSE_AFTER_ROUND' } = req.body;
+        const result = serverEngine.setModePauseState(mode, action);
+        res.json({ success: true, result });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// GET /api/admin/probabilities -> Get current odds/probabilities
+apiRouter.get('/admin/probabilities', checkAdminAuth, (req, res) => {
+    res.json({
+        success: true,
+        probabilities: serverEngine.getProbabilities()
+    });
+});
+
+// POST /api/admin/probabilities -> Update winning chance weights
+apiRouter.post('/admin/probabilities', checkAdminAuth, (req, res) => {
+    try {
+        const result = serverEngine.updateProbabilities(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// GET /api/admin/transactions -> Real-time user deposits & withdrawals list
+apiRouter.get('/admin/transactions', checkAdminAuth, (req, res) => {
+    const { type, status, userId } = req.query;
+    const items = serverEngine.getTransactions({ type, status, userId });
+    res.json({
+        success: true,
+        items
+    });
+});
+
+// POST /api/admin/transactions/process -> Approve / Reject User Deposit or Withdrawal
+apiRouter.post('/admin/transactions/process', checkAdminAuth, (req, res) => {
+    try {
+        const { txId, action, adminRemarks } = req.body;
+        const result = serverEngine.processTransaction(txId, action, adminRemarks);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // POST /api/admin/game-control -> Manual Next Outcome Override (or Reset Auto)
@@ -355,6 +536,9 @@ apiRouter.post('/admin/payout-rules', checkAdminAuth, (req, res) => {
         timestamp: new Date().toISOString()
     });
 
+    firebaseSync.saveSystemConfig(serverEngine.config);
+    firebaseSync.logAdminAction('ADMIN_UPDATE_PAYOUT_RULES', 'Updated multipliers and limits');
+
     res.json({ success: true, message: 'Payout rules updated', config: serverEngine.config });
 });
 
@@ -398,12 +582,16 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, (req, res) => {
         description: `Admin adjustment (${action}): ${remarks}`
     });
 
+    const auditDetail = `${action} ₹${numAmount} for user ${userId}. Reason: ${remarks}`;
     serverEngine.auditLogs.unshift({
         id: 'AUDIT_' + Date.now(),
         action: 'ADMIN_ADJUST_BALANCE',
-        details: `${action} ₹${numAmount} for user ${userId}. Reason: ${remarks}`,
+        details: auditDetail,
         timestamp: new Date().toISOString()
     });
+
+    firebaseSync.updateUserBalance(userId, user.balance, auditDetail);
+    firebaseSync.logAdminAction('ADMIN_ADJUST_BALANCE', auditDetail);
 
     res.json({
         success: true,
