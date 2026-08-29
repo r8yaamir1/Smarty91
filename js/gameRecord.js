@@ -1,25 +1,28 @@
-// gameRecord.js - Game Loop, Countdown Timer & Multi-Mode Orchestrator
+// gameRecord.js - Server-Authoritative Live Game Loop & Multi-Mode Orchestrator
 
 import { period_time, period_number, tokenParent } from "./elements.js";
-import { generateOfflinePeriodData, normalizeMode, MODE_DISPLAY_NAMES } from "./offlineTimer.js";
+import { normalizeMode } from "./offlineTimer.js";
 import {
     gameModes,
     SUPPORTED_MODES,
     getActiveModeKey,
     getActiveModeState,
-    getModeState,
     setActiveModeKey,
     loadPersistedState,
-    drawNextResult,
     evaluateModeBets,
     renderGameHistory,
     renderChartTrend,
-    renderMyHistory
+    renderMyHistory,
+    updateModeHistoryFromServer
 } from "./gameEngine.js";
 import { showEvaluationDialog } from "./updateWin.js";
-import { playTickSound } from "./audio.js";
+import { playTickSound, stopCountdownAudio } from "./audio.js";
+import { gameService } from "./services/gameService.js";
+import { syncServerBalance } from "./wallet.js";
 
 let masterTimerId = null;
+let serverSyncTimerId = null;
+let serverClockOffset = 0;
 
 export function getCurrentGameType() {
     const state = getActiveModeState();
@@ -67,10 +70,99 @@ function updateTimeDisplay(minutes, seconds) {
     }
 }
 
-// ----------------- MULTI-MODE MASTER SCHEDULER -----------------
+// ----------------- SERVER SYNCHRONIZER -----------------
+
+export async function syncServerGameState() {
+    try {
+        const res = await gameService.getGameStatus();
+        if (res && res.success && res.modes) {
+            if (res.serverTime) {
+                serverClockOffset = res.serverTime - Date.now();
+            }
+
+            const activeKey = getActiveModeKey();
+
+            for (const mode of SUPPORTED_MODES) {
+                const serverMode = res.modes[mode];
+                const state = gameModes[mode];
+                if (!serverMode || !state) continue;
+
+                const prevPeriod = state.currentIssueNumber;
+                state.currentIssueNumber = serverMode.periodId;
+                state.currentEndTimeMs = serverMode.endTimeMs;
+                state.remainingSeconds = serverMode.remainingSeconds;
+                state.isLockoutActive = serverMode.isLocked;
+
+                // Detect period transition from server
+                if (prevPeriod && prevPeriod !== serverMode.periodId) {
+                    await handlePeriodSettledFromServer(mode, prevPeriod);
+                }
+            }
+
+            // Sync active view UI
+            const activeState = gameModes[activeKey];
+            if (activeState && period_number) {
+                period_number.textContent = activeState.currentIssueNumber;
+            }
+        }
+    } catch (err) {
+        console.warn('Server game state poll note:', err.message);
+    }
+}
+
+async function handlePeriodSettledFromServer(mode, settledPeriodId) {
+    try {
+        const historyRes = await gameService.getGameHistory(mode, 1, 20);
+        if (historyRes && historyRes.success && historyRes.items) {
+            updateModeHistoryFromServer(mode, historyRes.items);
+
+            const state = gameModes[mode];
+            const latestResult = state.history[0];
+
+            if (latestResult) {
+                const evaluation = evaluateModeBets(mode, latestResult);
+                syncServerBalance();
+
+                if (mode === getActiveModeKey()) {
+                    renderWinningTokensForActiveMode();
+                    renderGameHistory(mode);
+                    renderChartTrend(mode);
+                    renderMyHistory(mode);
+
+                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
+                        showEvaluationDialog(evaluation);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('History fetch error on settlement:', e);
+    }
+}
+
+// Initial fetch of histories for all 4 modes
+export async function initializeServerHistories() {
+    for (const mode of SUPPORTED_MODES) {
+        try {
+            const res = await gameService.getGameHistory(mode, 1, 30);
+            if (res && res.success && res.items && res.items.length > 0) {
+                updateModeHistoryFromServer(mode, res.items);
+            }
+        } catch (e) {
+            console.warn(`Could not seed history for ${mode}:`, e);
+        }
+    }
+    const activeMode = getActiveModeKey();
+    renderWinningTokensForActiveMode();
+    renderGameHistory(activeMode);
+    renderChartTrend(activeMode);
+    renderMyHistory(activeMode);
+}
+
+// ----------------- LOCAL SMOOTH TICK LOOP -----------------
 
 function processMasterTick() {
-    const now = Date.now();
+    const adjustedNow = Date.now() + serverClockOffset;
     const activeKey = getActiveModeKey();
     const bettingMark = document.querySelector(".Betting__C-mark");
 
@@ -78,50 +170,21 @@ function processMasterTick() {
         const state = gameModes[mode];
         if (!state) return;
 
-        const timeLeftMs = Math.max(0, state.currentEndTimeMs - now);
+        const timeLeftMs = Math.max(0, state.currentEndTimeMs - adjustedNow);
         const totalSeconds = Math.floor(timeLeftMs / 1000);
         state.remainingSeconds = totalSeconds;
 
         const isCurrentActive = mode === activeKey;
 
-        // 1. Check for Round Finish & Settlement
+        // 1. Check for Round Finish & Request Server Settle
         if (timeLeftMs <= 0) {
             const finishedIssue = state.currentIssueNumber;
             const settlementKey = `${mode}:${finishedIssue}`;
 
-            // Idempotent settlement guard
             if (!state.settledRounds.has(settlementKey)) {
                 state.settledRounds.add(settlementKey);
-
-                // Draw next result for this specific mode
-                const result = drawNextResult(mode, finishedIssue);
-
-                // Evaluate any active bets for this mode
-                const evaluation = evaluateModeBets(mode, result);
-
-                // Calculate next period data for this mode
-                const nextData = generateOfflinePeriodData(mode, new Date(now));
-                state.currentIssueNumber = nextData.issueNumber;
-                state.currentEndTimeMs = nextData.endTimeMs;
-                state.remainingSeconds = nextData.remainingSeconds;
-                state.isLockoutActive = false;
-                state.lastTickSecond = -1;
-
-                // Update UI if this mode is currently active
-                if (isCurrentActive) {
-                    if (bettingMark) bettingMark.style.display = "none";
-                    if (period_number) period_number.textContent = state.currentIssueNumber;
-
-                    renderWinningTokensForActiveMode();
-                    renderGameHistory(activeKey);
-                    renderChartTrend(activeKey);
-                    renderMyHistory(activeKey);
-
-                    // Show win/loss dialog if user played in this round
-                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
-                        showEvaluationDialog(evaluation);
-                    }
-                }
+                // Trigger fast server sync on boundary
+                setTimeout(() => syncServerGameState(), 300);
             }
             return;
         }
@@ -131,7 +194,6 @@ function processMasterTick() {
             state.isLockoutActive = true;
 
             if (isCurrentActive) {
-                // Close betting popup on lockout
                 const bettingOverlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
                 const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
                 if (bettingOverlay) bettingOverlay.style.display = 'none';
@@ -172,12 +234,12 @@ function processMasterTick() {
 }
 
 export function startMasterScheduler() {
-    if (masterTimerId) {
-        clearInterval(masterTimerId);
-        masterTimerId = null;
-    }
-    // Run tick every 250ms for responsive timekeeping without high CPU usage
+    if (masterTimerId) clearInterval(masterTimerId);
     masterTimerId = setInterval(processMasterTick, 250);
+
+    if (serverSyncTimerId) clearInterval(serverSyncTimerId);
+    // Poll server game state every 1000ms for continuous sync
+    serverSyncTimerId = setInterval(syncServerGameState, 1000);
 }
 
 // Switch game mode (30s, 1Min, 3Min, 5Min)
@@ -185,21 +247,20 @@ export function switchGameMode(newGameType) {
     const targetMode = normalizeMode(newGameType);
     setActiveModeKey(targetMode);
 
+    stopCountdownAudio();
+
     const state = getActiveModeState();
     const bettingMark = document.querySelector(".Betting__C-mark");
 
-    // Update Period number
     if (period_number) {
         period_number.textContent = state.currentIssueNumber;
     }
 
-    // Update Time display
     const totalSeconds = state.remainingSeconds;
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     updateTimeDisplay(minutes, seconds);
 
-    // Update Lockout overlay state
     if (state.isLockoutActive && totalSeconds <= 5 && totalSeconds > 0) {
         if (bettingMark) {
             bettingMark.style.display = "flex";
@@ -212,7 +273,6 @@ export function switchGameMode(newGameType) {
         if (bettingMark) bettingMark.style.display = "none";
     }
 
-    // Update header name display
     const timeLeftName = document.querySelector('.TimeLeft__C .TimeLeft__C-name');
     if (timeLeftName) {
         timeLeftName.textContent = state.displayName;
@@ -223,7 +283,6 @@ export function switchGameMode(newGameType) {
         popupHeadTitle.textContent = state.displayName;
     }
 
-    // Refresh UI tokens and subtabs for newly selected mode
     renderWinningTokensForActiveMode();
     renderGameHistory(targetMode);
     renderChartTrend(targetMode);
@@ -231,11 +290,9 @@ export function switchGameMode(newGameType) {
 }
 
 // Initialize on page load
-export function initGameRecord() {
-    // 1. Load persisted multi-mode state
+export async function initGameRecord() {
     loadPersistedState();
 
-    // 2. Render initial view for default active mode (30s)
     const initialMode = getActiveModeKey();
     const state = getActiveModeState();
 
@@ -252,6 +309,10 @@ export function initGameRecord() {
     renderChartTrend(initialMode);
     renderMyHistory(initialMode);
 
-    // 3. Start master scheduler
+    // Initial server sync
+    await syncServerGameState();
+    await initializeServerHistories();
+
+    // Start local and server timers
     startMasterScheduler();
 }

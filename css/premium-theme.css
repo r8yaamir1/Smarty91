@@ -624,18 +624,316 @@ body {
 }
 
 /* ----------------------------------------------------------
-   WINNING DIALOG / CONGRATULATIONS CELEBRATION
+   WINNING & LOSS DIALOG - AUTHENTIC WIN GO EXPERIENCE
    ---------------------------------------------------------- */
-.WinningTip__C-body {
-  border-radius: 0.5rem !important;
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4) !important;
+.WinningTip__C {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.72) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  z-index: 99999 !important;
+  display: none;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: tipFadeIn 0.22s ease-out !important;
 }
 
-.bonus {
+.WinningTip__C[style*="display: block"],
+.WinningTip__C[style*="display: flex"] {
+  display: flex !important;
+}
+
+.WinningTip__C[style*="display: none"] {
+  display: none !important;
+}
+
+@keyframes tipFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tipPopUp {
+  0% { transform: translate(-50%, -46%) scale(0.78); opacity: 0; }
+  75% { transform: translate(-50%, -50.5%) scale(1.02); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* Modal Body Box */
+.WinningTip__C-body {
+  position: absolute !important;
+  width: 7.73333rem !important;
+  height: 10.93333rem !important;
+  max-width: 95vw !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  box-sizing: border-box !important;
+  padding-top: 3.33333rem !important;
+  animation: tipPopUp 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  z-index: 100000 !important;
+  text-align: center !important;
+}
+
+/* Background image handling for Win and Loss */
+.WinningTip__C-body::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-image: url(/assets/png/missningBg-c1f02bcd.png), url(../assets/png/missningBg-c1f02bcd.png) !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 100% 100% !important;
+  z-index: -1 !important;
+  filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.6));
+}
+
+/* LOSS STATE: EXACT SAME HIGH QUALITY AS WIN, THEMED IN COOL SAPPHIRE SLATE */
+.WinningTip__C-body.isL::before {
+  filter: hue-rotate(185deg) saturate(0.82) brightness(0.95) drop-shadow(0 15px 35px rgba(0, 0, 0, 0.7)) !important;
+}
+
+/* Line 1: Title (Congratulations / Sorry) */
+.WinningTip__C-body-l1 {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 0.64rem !important;
+  text-align: center !important;
+  color: #FFFFFF !important;
+  height: 0.77333rem !important;
+  line-height: 0.77333rem !important;
+  margin-bottom: 0.85rem !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+  letter-spacing: 0.02em !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l1 {
+  color: #E2E8F0 !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Line 2: Lottery Result Pills */
+.WinningTip__C-body-l2 {
+  height: 0.58667rem !important;
+  line-height: 0.58667rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-inline-start: 0.72rem !important;
+  color: #FFFFFF !important;
+  font-size: 0.29333rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.82rem !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l2 {
+  color: #CBD5E1 !important;
+}
+
+.WinningTip__C-body-l2 > div {
+  height: 0.58667rem !important;
+  line-height: 0.58667rem !important;
+  background: #FDAC32 !important;
+  color: #FFFFFF !important;
+  border-radius: 0.13333rem !important;
+  padding: 0 0.3rem !important;
+  border: 0.01333rem solid rgba(255, 255, 255, 0.6) !important;
+  font-size: 0.28rem !important;
+  font-weight: 700 !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-transform: capitalize !important;
+}
+
+.WinningTip__C-body-l2 > div:first-child {
+  margin-left: 0.28rem !important;
+}
+
+.WinningTip__C-body-l2 > div.WinningNum,
+.WinningTip__C-body-l2 .tip-num-val {
+  width: 0.53333rem !important;
+  height: 0.53333rem !important;
+  line-height: 0.53333rem !important;
+  margin: 0 0.18667rem !important;
+  padding: 0 !important;
+  text-align: center !important;
+  border-radius: 50% !important;
   font-family: 'Outfit', sans-serif !important;
   font-weight: 900 !important;
-  color: #FFD700 !important;
-  text-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+  font-size: 0.36rem !important;
+}
+
+/* Lottery result dynamic colors */
+.WinningTip__C-body-l2.type0 > div:first-child,
+.WinningTip__C-body-l2.type0 .WinningNum {
+  background: linear-gradient(135deg, #E51837 50.96%, #9C27B0 50.97%) !important;
+}
+
+.WinningTip__C-body-l2.type5 > div:first-child,
+.WinningTip__C-body-l2.type5 .WinningNum {
+  background: linear-gradient(135deg, #00C853 51.48%, #9C27B0 51.49%) !important;
+}
+
+.WinningTip__C-body-l2.type1 > div:first-child,
+.WinningTip__C-body-l2.type3 > div:first-child,
+.WinningTip__C-body-l2.type7 > div:first-child,
+.WinningTip__C-body-l2.type9 > div:first-child,
+.WinningTip__C-body-l2.type1 .WinningNum,
+.WinningTip__C-body-l2.type3 .WinningNum,
+.WinningTip__C-body-l2.type7 .WinningNum,
+.WinningTip__C-body-l2.type9 .WinningNum {
+  background: #00C853 !important;
+}
+
+.WinningTip__C-body-l2.type2 > div:first-child,
+.WinningTip__C-body-l2.type4 > div:first-child,
+.WinningTip__C-body-l2.type6 > div:first-child,
+.WinningTip__C-body-l2.type8 > div:first-child,
+.WinningTip__C-body-l2.type2 .WinningNum,
+.WinningTip__C-body-l2.type4 .WinningNum,
+.WinningTip__C-body-l2.type6 .WinningNum,
+.WinningTip__C-body-l2.type8 .WinningNum {
+  background: #E51837 !important;
+}
+
+/* Line 3: Bonus / Loss & Period Area */
+.WinningTip__C-body-l3 {
+  height: 1.73333rem !important;
+  text-align: center !important;
+}
+
+.WinningTip__C-body-l3 .head {
+  height: 0.4rem !important;
+  line-height: 0.4rem !important;
+  font-weight: 700 !important;
+  font-size: 0.34667rem !important;
+  color: #FB5B5B !important;
+  text-align: center !important;
+  margin-bottom: 0.10667rem !important;
+  letter-spacing: 0.04em !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l3 .head {
+  color: #7190B4 !important;
+}
+
+.WinningTip__C-body-l3 .bonus {
+  height: 0.64rem !important;
+  line-height: 0.64rem !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 900 !important;
+  font-size: 0.58rem !important;
+  color: #FB5B5B !important;
+  text-align: center !important;
+  margin-bottom: 0.22rem !important;
+  letter-spacing: 0.02em !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l3 .bonus {
+  color: #7190B4 !important;
+}
+
+.WinningTip__C-body-l3 .gameDetail {
+  height: 0.37333rem !important;
+  line-height: 0.37333rem !important;
+  font-size: 0.29333rem !important;
+  text-align: center !important;
+  color: #8E9AAF !important;
+  font-weight: 600 !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l3 .gameDetail {
+  color: #64748B !important;
+}
+
+/* Line 4: Auto Close Switch */
+.WinningTip__C-body-l4 {
+  height: 0.64rem !important;
+  line-height: 0.64rem !important;
+  font-size: 0.32rem !important;
+  color: #FFFFFF !important;
+  position: absolute !important;
+  left: 0.74667rem !important;
+  bottom: 0.74667rem !important;
+  display: flex !important;
+  align-items: center !important;
+  font-weight: 500 !important;
+  user-select: none !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l4 {
+  color: #94A3B8 !important;
+}
+
+.WinningTip__C-body-l4 .acitveBtn {
+  height: 0.56rem !important;
+  width: 0.56rem !important;
+  border-radius: 50% !important;
+  background: #FF646C !important;
+  border: 0.01333rem solid rgba(255, 255, 255, 0.8) !important;
+  margin-right: 0.18667rem !important;
+  position: relative !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.WinningTip__C-body.isL .WinningTip__C-body-l4 .acitveBtn {
+  background: #475569 !important;
+  border-color: #94A3B8 !important;
+}
+
+.WinningTip__C-body-l4 .acitveBtn.active::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  height: 0.24rem !important;
+  width: 0.32rem !important;
+  display: block !important;
+  background-image: url(/assets/png/vector-dc489162.png), url(../assets/png/vector-dc489162.png) !important;
+  background-repeat: no-repeat !important;
+  background-size: 0.32rem 0.24rem !important;
+  background-position: center !important;
+}
+
+.WinningTip__C-body-l4 .acitveBtn:not(.active) {
+  opacity: 0.4 !important;
+}
+
+/* Close Icon Button (Bottom Circle) */
+.WinningTip__C .closeBtn {
+  width: 0.85rem !important;
+  height: 0.85rem !important;
+  background-image: url(/assets/png/close-84ce5e6a.png), url(../assets/png/close-84ce5e6a.png) !important;
+  background-repeat: no-repeat !important;
+  background-size: 0.85rem !important;
+  background-position: center !important;
+  position: absolute !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(100%) !important;
+  bottom: -0.32rem !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease !important;
+}
+
+.WinningTip__C .closeBtn:hover {
+  transform: translateX(-50%) translateY(100%) scale(1.1) !important;
+}
+
+.WinningTip__C .closeBtn:active {
+  transform: translateX(-50%) translateY(100%) scale(0.92) !important;
 }
 
 /* ----------------------------------------------------------
@@ -1182,4 +1480,170 @@ body {
   display: block !important;
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
+
+/* ----------------------------------------------------------
+   UNIFIED LUXURY PAGINATION (Game History, Chart, My History)
+   ---------------------------------------------------------- */
+.GameRecord__C-foot,
+.Trend__C-foot {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  padding: 0.32rem 0 !important;
+  background: transparent !important;
+  user-select: none !important;
+  margin-top: 0.2rem !important;
+}
+
+.GameRecord__C-foot-previous,
+.Trend__C-foot-previous,
+.MyHistory__C-foot-previous,
+.GameRecord__C-foot-next,
+.Trend__C-foot-next,
+.MyHistory__C-foot-next {
+  width: 0.85rem !important;
+  height: 0.85rem !important;
+  background: #FFFFFF !important;
+  border: 1px solid #DDE1E8 !important;
+  border-radius: 0.22rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.GameRecord__C-foot-previous:hover:not(.disabled),
+.Trend__C-foot-previous:hover:not(.disabled),
+.MyHistory__C-foot-previous:hover:not(.disabled),
+.GameRecord__C-foot-next:hover:not(.disabled),
+.Trend__C-foot-next:hover:not(.disabled),
+.MyHistory__C-foot-next:hover:not(.disabled) {
+  background: #FFF5F6 !important;
+  border-color: #E51837 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(229, 24, 55, 0.2) !important;
+}
+
+.GameRecord__C-foot-previous:active:not(.disabled),
+.Trend__C-foot-previous:active:not(.disabled),
+.MyHistory__C-foot-previous:active:not(.disabled),
+.GameRecord__C-foot-next:active:not(.disabled),
+.Trend__C-foot-next:active:not(.disabled),
+.MyHistory__C-foot-next:active:not(.disabled) {
+  transform: scale(0.94) !important;
+}
+
+.GameRecord__C-foot-previous.disabled,
+.Trend__C-foot-previous.disabled,
+.MyHistory__C-foot-previous.disabled,
+.GameRecord__C-foot-next.disabled,
+.Trend__C-foot-next.disabled,
+.MyHistory__C-foot-next.disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  background: #F4F5F8 !important;
+  border-color: #E2E5EC !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+.GameRecord__C-foot-previous .GameRecord__C-icon,
+.Trend__C-foot-previous .GameRecord__C-icon,
+.MyHistory__C-foot-previous .GameRecord__C-icon,
+.GameRecord__C-foot-next .GameRecord__C-icon,
+.Trend__C-foot-next .GameRecord__C-icon,
+.MyHistory__C-foot-next .GameRecord__C-icon {
+  font-size: 0.38rem !important;
+  color: #E51837 !important;
+  font-weight: bold !important;
+}
+
+.GameRecord__C-foot-previous.disabled .GameRecord__C-icon,
+.Trend__C-foot-previous.disabled .GameRecord__C-icon,
+.MyHistory__C-foot-previous.disabled .GameRecord__C-icon,
+.GameRecord__C-foot-next.disabled .GameRecord__C-icon,
+.Trend__C-foot-next.disabled .GameRecord__C-icon,
+.MyHistory__C-foot-next.disabled .GameRecord__C-icon {
+  color: #9CA3AF !important;
+}
+
+.GameRecord__C-foot-page,
+.Trend__C-foot-page,
+.MyHistory__C-foot-page {
+  font-size: 0.34rem !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+  min-width: 1.5rem !important;
+  text-align: center !important;
+  font-family: 'Outfit', sans-serif !important;
+  letter-spacing: 0.03em !important;
+  padding: 0.12rem 0.28rem !important;
+  background: #F8F9FD !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 0.2rem !important;
+}
+
+/* ----------------------------------------------------------
+   PREMIUM WALLET DEPOSIT & WITHDRAW ICONS
+   ---------------------------------------------------------- */
+.Wallet__C-balance-l3 {
+  display: flex !important;
+  gap: 0.28rem !important;
+  margin-top: 0.32rem !important;
+  width: 100% !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  z-index: 2;
+  position: relative;
+}
+
+.Wallet__C-balance-l3-item,
+.Wallet__C-balance-l3 > div {
+  flex: 1 !important;
+  height: 0.95rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.16rem !important;
+  border-radius: 0.48rem !important;
+  font-size: 0.35rem !important;
+  font-weight: 800 !important;
+  font-family: 'Outfit', sans-serif !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-transform: capitalize !important;
+  letter-spacing: 0.02em !important;
+  user-select: none !important;
+}
+
+.wallet-btn-icon {
+  width: 0.42rem !important;
+  height: 0.42rem !important;
+  flex-shrink: 0 !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+.Wallet__C-balance-l3-item.withdraw-btn,
+.wallet-withdraw-btn {
+  background: linear-gradient(135deg, #FF4B63 0%, #E51837 50%, #B80A22 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(229, 24, 55, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+}
+
+.Wallet__C-balance-l3-item.deposit-btn,
+.wallet-deposit-btn {
+  background: linear-gradient(135deg, #00E676 0%, #00C853 50%, #009624 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(0, 200, 83, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+}
+
+.Wallet__C-balance-l3-item:active {
+  transform: scale(0.96) !important;
+}
+
 

@@ -9,14 +9,15 @@ let isAutoCloseEnabled = true;
 export function showEvaluationDialog(summary) {
     if (!summary || !winDialog) return;
 
-    const { isWin, totalWon, result, lastBet } = summary;
+    const { isWin, totalWon, totalBet, result, lastBet, mode } = summary;
 
     // Reset styles
-    winDialog.style.display = 'block';
+    winDialog.style.display = 'flex';
     document.body.classList.add('van-overflow-hidden');
 
     const bodyEl = winDialog.querySelector('.WinningTip__C-body');
     const titleEl = winDialog.querySelector('.WinningTip__C-body-l1');
+    const headLabel = winDialog.querySelector('.WinningTip__C-body-l3 .head');
 
     if (bodyEl) {
         bodyEl.classList.toggle('isL', !isWin);
@@ -25,9 +26,13 @@ export function showEvaluationDialog(summary) {
         titleEl.classList.toggle('isL', !isWin);
         titleEl.textContent = isWin ? 'Congratulations' : 'Sorry';
     }
+    if (headLabel) {
+        headLabel.textContent = isWin ? 'Bonus' : 'Lose';
+    }
 
+    const modeName = mode ? (mode.toUpperCase().includes('MIN') ? mode : `${mode.toUpperCase()}`) : (lastBet?.gameType || 'Smarty91');
     if (winDetail) {
-        winDetail.textContent = `Period: ${lastBet?.gameType || 'Smarty91'} ${result.periodId}`;
+        winDetail.textContent = `Period: ${modeName} ${result.periodId}`;
     }
     if (winSmallBig) {
         winSmallBig.textContent = result.isBig ? 'Big' : 'Small';
@@ -39,7 +44,12 @@ export function showEvaluationDialog(summary) {
         winColor.textContent = result.colorName;
     }
     if (winBonus) {
-        winBonus.textContent = isWin ? `+${formatCurrency(totalWon)}` : '₹0.00';
+        if (isWin) {
+            winBonus.textContent = `+${formatCurrency(totalWon)}`;
+        } else {
+            const lostAmount = totalBet || lastBet?.betAmount || 0;
+            winBonus.textContent = `-${formatCurrency(lostAmount)}`;
+        }
     }
 
     // Update color badge class

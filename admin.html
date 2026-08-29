@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smarty91 Master Admin Console</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/svg/changlong-fd1e448e.svg">
+    <style>
+        :root {
+            --bg-main: #090d16;
+            --bg-card: #131b2e;
+            --bg-input: #1b2640;
+            --primary: #f59e0b;
+            --primary-dark: #d97706;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-violet: #8b5cf6;
+            --accent-blue: #0ea5e9;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #24324f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        .admin-header {
+            background: #101728;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #000;
+            font-size: 16px;
+        }
+
+        .brand-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #f8fafc;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-subtitle {
+            font-size: 10px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-view-game {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Bottom Tab Navigation for Mobile */
+        .admin-nav {
+            background: #101728;
+            border-top: 1px solid var(--border-color);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+            z-index: 100;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px 2px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        /* Main Container */
+        .admin-main {
+            flex: 1;
+            padding: 14px 14px 80px 14px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* KPI Metric Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        @media (min-width: 600px) {
+            .kpi-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .kpi-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .kpi-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        /* Mode Selector Chips */
+        .mode-chips {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            margin-bottom: 14px;
+        }
+
+        .mode-chip {
+            flex: 1;
+            min-width: 75px;
+            text-align: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 8px 4px;
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .mode-chip.active {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+        }
+
+        /* Section Cards */
+        .admin-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Number Outcome Matrix (0-9) */
+        .number-matrix {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .num-btn {
+            padding: 12px 0;
+            font-size: 16px;
+            font-weight: 800;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .num-btn:active {
+            transform: scale(0.95);
+        }
+
+        .num-btn.selected {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .num-btn[data-color="red"] { border-bottom: 3px solid var(--accent-red); }
+        .num-btn[data-color="green"] { border-bottom: 3px solid var(--accent-green); }
+        .num-btn[data-color="violet-red"] { border-bottom: 3px solid var(--accent-red); }
+        .num-btn[data-color="violet-green"] { border-bottom: 3px solid var(--accent-green); }
+
+        /* Form Inputs */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: 800;
+            font-size: 13px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: #24324f;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Table view */
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .admin-table th {
+            text-align: left;
+            padding: 8px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .admin-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #f1f5f9;
+        }
+
+        /* Auth Screen */
+        #admin-auth-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-main);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Authentication Screen (Shown if PIN is not verified) -->
+    <div id="admin-auth-screen">
+        <div class="auth-card">
+            <div class="brand-logo" style="margin: 0 auto 14px auto; width: 48px; height: 48px; font-size: 24px;">91</div>
+            <h2 style="font-size: 18px; color: #fff; margin-bottom: 4px;">Smarty91 Admin</h2>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 20px;">Enter Master Security PIN (Default: 919191)</p>
+            
+            <input type="password" id="auth-pin-input" class="form-input" placeholder="Enter PIN (919191)" maxlength="10" style="text-align: center; font-size: 18px; letter-spacing: 4px; margin-bottom: 14px;" />
+            
+            <div id="auth-error-msg" style="color: var(--accent-red); font-size: 11px; margin-bottom: 12px; display: none;"></div>
+
+            <button id="auth-submit-btn" class="btn-primary">ACCESS MASTER CONSOLE</button>
+            <div style="margin-top: 14px;">
+                <a href="/" style="color: var(--text-muted); font-size: 11px; text-decoration: none;">← Back to Smarty91 Game</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Admin Header -->
+    <header class="admin-header">
+        <div class="header-brand">
+            <div class="brand-logo">91</div>
+            <div>
+                <div class="brand-title">Smarty91 Admin</div>
+                <div class="brand-subtitle">Server-Authoritative Control</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="/" class="btn-view-game">
+                <span>🎮</span> Live Game
+            </a>
+            <button id="admin-logout-btn" style="background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px;">🚪</button>
+        </div>
+    </header>
+
+    <!-- Main Dynamic Content Body -->
+    <main class="admin-main">
+
+        <!-- Top Live KPI Bar -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Active Users</div>
+                <div class="kpi-value" id="kpi-users">1</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Today's Bet Volume</div>
+                <div class="kpi-value" id="kpi-volume" style="color: var(--accent-blue);">₹0.00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Payouts</div>
+                <div class="kpi-value" id="kpi-payout" style="color: var(--accent-violet);">₹0.00</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">House Gross Profit</div>
+                <div class="kpi-value" id="kpi-profit" style="color: var(--accent-green);">₹0.00</div>
+            </div>
+        </div>
+
+        <!-- Mode Chips Selector (30s, 1m, 3m, 5m) -->
+        <div class="mode-chips">
+            <div class="mode-chip active" data-mode="30s">Smarty 30s</div>
+            <div class="mode-chip" data-mode="1m">Smarty 1Min</div>
+            <div class="mode-chip" data-mode="3m">Smarty 3Min</div>
+            <div class="mode-chip" data-mode="5m">Smarty 5Min</div>
+        </div>
+
+        <!-- Dynamic Tab Views Container -->
+        <div id="tab-view-container">
+            <!-- Rendered by JS based on active tab -->
+        </div>
+
+    </main>
+
+    <!-- Bottom Mobile Nav Bar -->
+    <nav class="admin-nav">
+        <button class="nav-item active" data-tab="outcomes">
+            <span class="nav-icon">🎯</span>
+            <span class="nav-label">Outcomes</span>
+        </button>
+        <button class="nav-item" data-tab="exposure">
+            <span class="nav-icon">🔥</span>
+            <span class="nav-label">Live Bets</span>
+        </button>
+        <button class="nav-item" data-tab="users">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">Users & Wallet</span>
+        </button>
+        <button class="nav-item" data-tab="rules">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Payout Rules</span>
+        </button>
+        <button class="nav-item" data-tab="logs">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Audit Logs</span>
+        </button>
+    </nav>
+
+    <script type="module" src="/js/adminApp.js"></script>
+</body>
+</html>

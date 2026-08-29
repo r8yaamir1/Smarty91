@@ -1,8 +1,9 @@
 // gameEngine.js - Multi-Mode Lottery Engine, Statistics, Trends & Bet Ledger
 
-import { getBalance, addBalance, deductBalance, formatCurrency, showToast } from './wallet.js';
+import { getBalance, formatCurrency, showToast, setBalanceLocally, syncServerBalance } from './wallet.js';
 import { playWinChime } from './audio.js';
 import { normalizeMode, getGameInterval, generateOfflinePeriodData, calculateTotalPeriods, formatIssueNumber, MODE_DISPLAY_NAMES } from './offlineTimer.js';
+import { gameService } from './services/gameService.js';
 
 // Number property lookup
 export const NUMBER_PROPERTIES = {
@@ -149,6 +150,32 @@ export function saveMultiModeState() {
     }
 }
 
+export function updateModeHistoryFromServer(modeInput, serverItems) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
+    if (!state || !Array.isArray(serverItems) || serverItems.length === 0) return;
+
+    const normalized = serverItems.map(item => {
+        const num = Number(item.number);
+        const prop = NUMBER_PROPERTIES[num] || { isBig: num >= 5, primaryColor: 'green', secondaryColor: null, colorName: 'Green' };
+        return {
+            mode,
+            periodId: item.periodId || item.period,
+            number: num,
+            isBig: item.isBig !== undefined ? item.isBig : (item.size === 'big' || num >= 5),
+            primaryColor: item.primaryColor || (item.color === 'violet-red' ? 'red' : item.color === 'violet-green' ? 'green' : item.color),
+            secondaryColor: item.secondaryColor || (item.color?.includes('violet') ? 'violet' : null),
+            colorName: item.colorName || item.colorLabel || prop.colorName,
+            timestamp: item.timestamp || (item.settledAt ? new Date(item.settledAt).getTime() : Date.now())
+        };
+    });
+
+    state.history = normalized;
+    state.latestResult = normalized[0];
+    state.tokens = normalized.slice(0, 5).map(h => h.number);
+    saveMultiModeState();
+}
+
 // ----------------- ACCESSORS -----------------
 
 export function getActiveModeKey() {
@@ -290,7 +317,7 @@ export function evaluateModeBets(modeInput, result) {
     return evaluationSummary;
 }
 
-// Place a bet in the specified (or active) mode
+// Place a bet in the specified (or active) mode (Server-Authoritative)
 export function placeBet(betData) {
     const targetMode = normalizeMode(betData.mode || betData.gameType || activeModeKey);
     const modeState = gameModes[targetMode];
@@ -303,13 +330,10 @@ export function placeBet(betData) {
         return { success: false, message: 'Insufficient balance' };
     }
 
-    const success = deductBalance(totalAmount);
-    if (!success) {
-        return { success: false, message: 'Transaction failed' };
-    }
-
     const contractAmount = parseFloat((totalAmount * 0.98).toFixed(2));
     const fee = parseFloat((totalAmount * 0.02).toFixed(2));
+    const newBal = Number((currentBalance - totalAmount).toFixed(2));
+    setBalanceLocally(newBal);
 
     const betRecord = {
         id: 'BET' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100),
@@ -329,6 +353,25 @@ export function placeBet(betData) {
     };
 
     modeState.activeBets.push(betRecord);
+
+    // Call server betting endpoint asynchronously
+    gameService.placeBet({
+        mode: targetMode,
+        periodId: modeState.currentIssueNumber,
+        type: betData.type,
+        selection: betData.selection,
+        unitAmount: betData.balanceUnit || 1,
+        multiplier: betData.quantity || 1,
+        quantity: 1
+    }).then(res => {
+        if (res && res.success && res.newBalance !== undefined) {
+            setBalanceLocally(res.newBalance);
+        }
+    }).catch(err => {
+        console.warn('Server bet placement sync note:', err.message);
+        syncServerBalance();
+    });
+
     return { success: true, bet: betRecord };
 }
 
@@ -516,13 +559,13 @@ export function renderChartTrend(modeInput = activeModeKey) {
             <div class="Trend__C-body2" data-v-9d93d892="">
                 ${rowsHtml}
             </div>
-            <div class="Trend__C-foot" data-v-9d93d892="">
-                <div class="Trend__C-foot-previous ${state.chartPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
-                    <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-left"></use></svg>
+            <div class="Trend__C-foot GameRecord__C-foot" data-v-9d93d892="">
+                <div class="Trend__C-foot-previous GameRecord__C-foot-previous ${state.chartPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="" title="Previous Page">
+                    <i class="van-badge__wrapper van-icon van-icon-arrow-left GameRecord__C-icon" data-v-9d93d892=""></i>
                 </div>
-                <div class="Trend__C-foot-page" data-v-9d93d892="">${state.chartPage}/${totalPages}</div>
-                <div class="Trend__C-foot-next ${state.chartPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
-                    <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-right"></use></svg>
+                <div class="Trend__C-foot-page GameRecord__C-foot-page" data-v-9d93d892="">${state.chartPage}/${totalPages}</div>
+                <div class="Trend__C-foot-next GameRecord__C-foot-next ${state.chartPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="" title="Next Page">
+                    <i class="van-badge__wrapper van-icon van-icon-arrow GameRecord__C-icon" data-v-9d93d892=""></i>
                 </div>
             </div>
         </div>
@@ -669,13 +712,13 @@ export function renderMyHistory(modeInput = activeModeKey) {
     myHistoryView.innerHTML = `
         <div class="MyGameRecordList__C" data-v-8bb41fd5="">
             ${cardsHtml}
-            <div class="Trend__C-foot" data-v-9d93d892="" style="margin-top: .32rem;">
-                <div class="Trend__C-foot-previous ${state.myHistoryPage <= 1 ? 'disabled' : ''}" data-v-9d93d892="">
-                    <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-left"></use></svg>
+            <div class="Trend__C-foot GameRecord__C-foot" data-v-8bb41fd5="" style="margin-top: .32rem;">
+                <div class="Trend__C-foot-previous GameRecord__C-foot-previous ${state.myHistoryPage <= 1 ? 'disabled' : ''}" data-v-8bb41fd5="" title="Previous Page">
+                    <i class="van-badge__wrapper van-icon van-icon-arrow-left GameRecord__C-icon" data-v-8bb41fd5=""></i>
                 </div>
-                <div class="Trend__C-foot-page" data-v-9d93d892="">${state.myHistoryPage}/${totalPages}</div>
-                <div class="Trend__C-foot-next ${state.myHistoryPage >= totalPages ? 'disabled' : ''}" data-v-9d93d892="">
-                    <svg class="Trend__C-icon svg-icon" style="width: 0.4rem; height: 0.4rem;"><use xlink:href="#icon-right"></use></svg>
+                <div class="Trend__C-foot-page GameRecord__C-foot-page" data-v-8bb41fd5="">${state.myHistoryPage}/${totalPages}</div>
+                <div class="Trend__C-foot-next GameRecord__C-foot-next ${state.myHistoryPage >= totalPages ? 'disabled' : ''}" data-v-8bb41fd5="" title="Next Page">
+                    <i class="van-badge__wrapper van-icon van-icon-arrow GameRecord__C-icon" data-v-8bb41fd5=""></i>
                 </div>
             </div>
         </div>

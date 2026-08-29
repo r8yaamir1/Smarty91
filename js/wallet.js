@@ -1,51 +1,44 @@
-// wallet.js - High Roller VIP Wallet Manager
+// js/wallet.js - High Roller VIP Wallet Manager (Server-Authoritative Observable)
+import { walletService } from './services/walletService.js';
 
-const STORAGE_KEY = 'smarty91_wallet_balance';
-const DEFAULT_BALANCE = 25679.96;
+let currentBalance = 25679.96;
 
-let balance = loadBalance();
-
-export function loadBalance() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) {
-        const val = parseFloat(stored);
-        if (!isNaN(val) && val >= 0) return val;
+export async function syncServerBalance() {
+    try {
+        const res = await walletService.getBalance();
+        if (res && res.success && typeof res.balance === 'number') {
+            currentBalance = res.balance;
+            renderBalance();
+        }
+    } catch (e) {
+        // Fallback to memory balance
     }
-    return DEFAULT_BALANCE;
-}
-
-export function saveBalance(amount) {
-    balance = Math.max(0, amount);
-    localStorage.setItem(STORAGE_KEY, balance.toString());
-    renderBalance();
-    return balance;
+    return currentBalance;
 }
 
 export function getBalance() {
-    return balance;
+    return currentBalance;
 }
 
-export function addBalance(amount) {
-    if (amount <= 0) return balance;
-    return saveBalance(balance + amount);
-}
-
-export function deductBalance(amount) {
-    if (amount <= 0 || amount > balance) return false;
-    saveBalance(balance - amount);
-    return true;
+export function setBalanceLocally(newBal) {
+    currentBalance = Number(newBal);
+    renderBalance();
 }
 
 export function formatCurrency(amount) {
-    return `₹${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const num = Number(amount) || 0;
+    return `₹${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function renderBalance() {
     const moneyElements = document.querySelectorAll('.Wallet__C-balance-l1 > div, #wallet-display-balance, .current-wallet-val');
     moneyElements.forEach(el => {
-        if (el) el.textContent = formatCurrency(balance);
+        if (el) el.textContent = formatCurrency(currentBalance);
     });
 }
+
+// Global hook for other modules
+window.refreshSmartyWallet = syncServerBalance;
 
 // Show a temporary styled toast notification
 export function showToast(message, type = 'success') {
@@ -69,16 +62,48 @@ export function showToast(message, type = 'success') {
 
 // Initialize Wallet listeners
 export function initWalletModals() {
-    renderBalance();
+    syncServerBalance();
 
     const refreshBtn = document.querySelector('.Wallet__C-balance-l2 svg, .Wallet__C-balance-l2');
-
     if (refreshBtn) {
         refreshBtn.style.cursor = 'pointer';
-        refreshBtn.addEventListener('click', () => {
-            renderBalance();
+        refreshBtn.addEventListener('click', async () => {
+            await syncServerBalance();
             showToast('Wallet balance refreshed', 'success');
         });
     }
-}
 
+    const withdrawBtn = document.querySelector('.withdraw-btn');
+    if (withdrawBtn) {
+        withdrawBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const res = await walletService.withdraw(500);
+                if (res.success) {
+                    currentBalance = res.newBalance;
+                    renderBalance();
+                    showToast(res.message, 'success');
+                }
+            } catch (err) {
+                showToast(err.message || 'Withdrawal failed', 'error');
+            }
+        });
+    }
+
+    const depositBtn = document.querySelector('.deposit-btn');
+    if (depositBtn) {
+        depositBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const res = await walletService.deposit(1000);
+                if (res.success) {
+                    currentBalance = res.newBalance;
+                    renderBalance();
+                    showToast(res.message, 'success');
+                }
+            } catch (err) {
+                showToast(err.message || 'Deposit failed', 'error');
+            }
+        });
+    }
+}
