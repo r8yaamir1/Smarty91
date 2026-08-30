@@ -351,7 +351,7 @@ window.handlePasswordChange = async function(e) {
 window.openCustomerSupport = function() {
     showToast('Connecting to 24/7 VIP Dedicated Telegram Support...');
     setTimeout(() => {
-        window.open('https://t.me/smarty91_official', '_blank');
+        window.open('https://t.me/smart91prediction', '_blank');
     }, 400);
 };
 

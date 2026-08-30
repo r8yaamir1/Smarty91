@@ -7,6 +7,25 @@ let selectedChannel = 'GPAY';
 let countdownInterval = null;
 let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
+let activeMerchantUpi = '6289140468@axl';
+let activeMerchantName = 'Smarty91';
+
+// Load live merchant UPI config
+async function fetchMerchantConfig() {
+    try {
+        const res = await fetch('/api/wallet/config');
+        const data = await res.json();
+        if (data.success && data.upiId) {
+            activeMerchantUpi = data.upiId;
+            activeMerchantName = data.upiName || 'Smarty91';
+            const upiTextEl = document.getElementById('upi-merchant-id');
+            if (upiTextEl) upiTextEl.textContent = activeMerchantUpi;
+        }
+    } catch (e) {
+        console.warn('Using default merchant UPI config', e);
+    }
+}
+fetchMerchantConfig();
 
 // Toast Helper
 function showToast(msg, duration = 3000) {
@@ -255,9 +274,13 @@ window.startDepositCheckoutPhase = function() {
     if (st3Bonus) st3Bonus.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ 100% Secure & Fast Deposit';
 
     // Construct Exact Amount UPI URI
-    const upiId = '6289140468@axl';
-    const upiName = 'Smarty91';
+    const upiId = activeMerchantUpi || '6289140468@axl';
+    const upiName = activeMerchantName || 'Smarty91';
     const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(currentDepositAmount.toFixed(2))}&cu=INR&tn=VIP_DEP_${Date.now()}`;
+
+    // Update UPI text display
+    const upiTextEl = document.getElementById('upi-merchant-id');
+    if (upiTextEl) upiTextEl.textContent = upiId;
 
     // Set Dynamic QR Image URL
     const qrImg = document.getElementById('dynamic-qr-image');
@@ -306,7 +329,7 @@ function startCountdownTimer(durationSeconds) {
 
 // Copy UPI ID helper
 window.copyUpiId = function() {
-    const upiId = '6289140468@axl';
+    const upiId = activeMerchantUpi || '6289140468@axl';
     navigator.clipboard.writeText(upiId)
         .then(() => showToast('Official UPI ID copied: ' + upiId))
         .catch(() => showToast('UPI ID: ' + upiId));
@@ -346,7 +369,7 @@ window.submitDepositUTR = async function() {
             body: JSON.stringify({
                 amount: currentDepositAmount,
                 utrNumber: utr,
-                upiId: '6289140468@axl',
+                upiId: activeMerchantUpi || '6289140468@axl',
                 channel: selectedChannel
             })
         });
