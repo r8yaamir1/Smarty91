@@ -8,18 +8,20 @@ function expressApiPlugin() {
             const { apiRouter } = await import('./server/apiRouter.js');
             const app = express();
             app.use(express.json());
+            app.use(express.urlencoded({ extended: true }));
+            app.use('/api', apiRouter);
 
             // Support direct URL access to /admin7117
-            app.use((req, res, next) => {
+            server.middlewares.use((req, res, next) => {
                 if (req.url === '/admin7117' || req.url === '/admin7117/' || req.url.startsWith('/admin7117?')) {
                     req.url = '/admin.html';
+                    return next();
+                }
+                if (req.url.startsWith('/api/') || req.url === '/api') {
+                    return app(req, res, next);
                 }
                 next();
             });
-
-            app.use('/api', apiRouter);
-            
-            server.middlewares.use(app);
         }
     };
 }

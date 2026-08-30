@@ -1,12 +1,20 @@
 // js/adminApp.js - Dedicated Master Admin Dashboard Engine
 import { adminService } from './services/adminService.js';
 
-let activeTab = 'outcomes'; // 'outcomes' | 'chances' | 'transactions' | 'exposure' | 'users' | 'rules' | 'logs'
+let activeTab = 'cashier'; // 'cashier' | 'outcomes' | 'chances' | 'exposure' | 'users' | 'rules' | 'logs'
 let selectedMode = '30s';   // '30s' | '1m' | '3m' | '5m'
 let txFilterType = 'ALL';   // 'ALL' | 'DEPOSIT' | 'WITHDRAWAL'
 let txFilterStatus = 'ALL'; // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+let txSearchQuery = '';
 let liveData = null;
 let pollTimer = null;
+
+// Realtime Sound Alarm System (Web Audio API - 5-6 Second Siren Beep)
+let isAudioAlarmEnabled = localStorage.getItem('smarty91_admin_sound_enabled') !== 'false';
+let audioCtx = null;
+let isAlarmPlaying = false;
+let knownPendingTxIds = new Set();
+let isFirstSync = true;
 
 const NUMBER_PROPERTIES = {
     0: { color: 'violet-red', label: 'Red+Violet (0)' },
@@ -29,7 +37,125 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabNavigation();
     initModeChips();
     initDeveloperPortal();
+    initSoundToggle();
 });
+
+function getAudioContext() {
+    try {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    } catch (e) {
+        console.warn('AudioContext error:', e);
+    }
+    return audioCtx;
+}
+
+// 5.5-Second Loud High-Pitch Beep Alert
+export function play5SecondAlarm() {
+    if (!isAudioAlarmEnabled) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (isAlarmPlaying) return;
+    isAlarmPlaying = true;
+
+    try {
+        const now = ctx.currentTime;
+        const pulseInterval = 0.75;
+        const pulseCount = 7; // 7 bursts x 0.75s = ~5.3 - 5.5 seconds total
+
+        for (let i = 0; i < pulseCount; i++) {
+            const startTime = now + (i * pulseInterval);
+
+            // Primary High-Volume Tone
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(880, startTime);
+            osc1.frequency.exponentialRampToValueAtTime(1450, startTime + 0.35);
+
+            gain1.gain.setValueAtTime(0.001, startTime);
+            gain1.gain.linearRampToValueAtTime(0.7, startTime + 0.05);
+            gain1.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+
+            osc1.start(startTime);
+            osc1.stop(startTime + 0.45);
+
+            // Harmonic Dual-Tone Tone
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(1100, startTime + 0.08);
+            osc2.frequency.exponentialRampToValueAtTime(1760, startTime + 0.35);
+
+            gain2.gain.setValueAtTime(0.001, startTime + 0.08);
+            gain2.gain.linearRampToValueAtTime(0.4, startTime + 0.12);
+            gain2.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+
+            osc2.start(startTime + 0.08);
+            osc2.stop(startTime + 0.45);
+        }
+
+        setTimeout(() => {
+            isAlarmPlaying = false;
+        }, 5500);
+    } catch (e) {
+        console.warn('Audio alarm playback error:', e);
+        isAlarmPlaying = false;
+    }
+}
+
+function initSoundToggle() {
+    const soundBtn = document.getElementById('admin-sound-toggle-btn');
+    const soundIcon = document.getElementById('sound-icon');
+    const soundText = document.getElementById('sound-status-text');
+
+    function updateSoundUI() {
+        if (!soundBtn) return;
+        if (isAudioAlarmEnabled) {
+            soundBtn.style.background = 'rgba(16, 185, 129, 0.15)';
+            soundBtn.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            soundBtn.style.color = '#10b981';
+            if (soundIcon) soundIcon.textContent = '🔔';
+            if (soundText) soundText.textContent = 'Alarm ON';
+        } else {
+            soundBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+            soundBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            soundBtn.style.color = '#ef4444';
+            if (soundIcon) soundIcon.textContent = '🔇';
+            if (soundText) soundText.textContent = 'Muted';
+        }
+    }
+
+    updateSoundUI();
+
+    if (soundBtn) {
+        soundBtn.addEventListener('click', () => {
+            getAudioContext(); // Unlock audio context on user interaction
+            isAudioAlarmEnabled = !isAudioAlarmEnabled;
+            localStorage.setItem('smarty91_admin_sound_enabled', isAudioAlarmEnabled ? 'true' : 'false');
+            updateSoundUI();
+
+            if (isAudioAlarmEnabled) {
+                // Play a brief 1-chirp sample
+                play5SecondAlarm();
+            }
+        });
+    }
+}
 
 function initAuthFlow() {
     const authScreen = document.getElementById('admin-auth-screen');
@@ -124,6 +250,43 @@ async function fetchAndRefreshData() {
     try {
         liveData = await adminService.getOverview();
         updateTopKpis(liveData.overview);
+
+        // Realtime Cashier Notification & Alarm Check
+        const txs = (liveData && liveData.recentTransactions) || [];
+        const pendingTxs = txs.filter(t => t.status === 'PENDING');
+        const pendingCount = pendingTxs.length;
+
+        const badgeEl = document.getElementById('cashier-badge');
+        if (badgeEl) {
+            if (pendingCount > 0) {
+                badgeEl.textContent = pendingCount;
+                badgeEl.style.display = 'inline-block';
+                document.title = `🔔 (${pendingCount}) NEW CASHIER REQ - Smarty91 Admin`;
+            } else {
+                badgeEl.style.display = 'none';
+                document.title = 'Smarty91 Master Admin Console';
+            }
+        }
+
+        // Detect newly arrived pending requests
+        let hasNewRequest = false;
+        pendingTxs.forEach(t => {
+            if (!knownPendingTxIds.has(t.id)) {
+                knownPendingTxIds.add(t.id);
+                if (!isFirstSync) {
+                    hasNewRequest = true;
+                }
+            }
+        });
+
+        if (hasNewRequest) {
+            play5SecondAlarm();
+        }
+
+        if (isFirstSync) {
+            isFirstSync = false;
+        }
+
         renderActiveTab(false);
     } catch (e) {
         console.error('Admin sync error:', e);
@@ -158,14 +321,15 @@ function renderActiveTab(force = false) {
     const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA') && container.contains(activeEl);
 
     switch (activeTab) {
+        case 'cashier':
+        case 'transactions':
+            if (!isTyping || force) renderCashierView(container);
+            break;
         case 'outcomes':
             if (!isTyping || force) renderOutcomesView(container);
             break;
         case 'chances':
             if (!isTyping || force) renderChancesView(container);
-            break;
-        case 'transactions':
-            if (!isTyping || force) renderTransactionsView(container);
             break;
         case 'exposure':
             renderExposureView(container);
@@ -178,6 +342,9 @@ function renderActiveTab(force = false) {
             break;
         case 'logs':
             if (!isTyping || force) renderLogsView(container);
+            break;
+        default:
+            if (!isTyping || force) renderCashierView(container);
             break;
     }
 }
@@ -555,9 +722,9 @@ function renderChancesView(container) {
 }
 
 // -------------------------------------------------------------
-// 3. REALTIME DEPOSITS & WITHDRAWALS TRANSACTIONS MANAGEMENT
+// 3. REALTIME CASHIER & REQUESTS APPROVAL DASHBOARD (DEPOSITS & WITHDRAWALS)
 // -------------------------------------------------------------
-function renderTransactionsView(container) {
+function renderCashierView(container) {
     const txs = (liveData && liveData.recentTransactions) || [];
     const overview = liveData.overview || {};
 
@@ -568,102 +735,221 @@ function renderTransactionsView(container) {
     if (txFilterStatus !== 'ALL') {
         filtered = filtered.filter(t => t.status === txFilterStatus);
     }
+    if (txSearchQuery.trim()) {
+        const q = txSearchQuery.trim().toLowerCase();
+        filtered = filtered.filter(t => 
+            (t.id && t.id.toLowerCase().includes(q)) ||
+            (t.userId && t.userId.toLowerCase().includes(q)) ||
+            (t.utrNumber && t.utrNumber.toLowerCase().includes(q)) ||
+            (t.accountNumber && t.accountNumber.toLowerCase().includes(q)) ||
+            (t.upiId && t.upiId.toLowerCase().includes(q)) ||
+            (t.ifsc && t.ifsc.toLowerCase().includes(q)) ||
+            (t.bankName && t.bankName.toLowerCase().includes(q))
+        );
+    }
+
+    const pendingDepositsCount = overview.pendingDepositsCount || 0;
+    const pendingWithdrawalsCount = overview.pendingWithdrawalsCount || 0;
+    const totalPending = pendingDepositsCount + pendingWithdrawalsCount;
 
     container.innerHTML = `
         <div class="admin-card">
+            <!-- Active Alarm Warning Banner -->
+            ${totalPending > 0 ? `
+                <div class="alarm-banner">
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px;">
+                        <span>🚨</span>
+                        <span>${totalPending} PENDING CASHIER REQUEST${totalPending > 1 ? 'S' : ''} REQUIRING APPROVAL!</span>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" id="btn-banner-test-sound" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">
+                            🔊 Play Siren
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
+
             <div class="card-header">
                 <div>
-                    <div class="card-title">💰 Player Deposits & Withdrawals Live Dashboard</div>
+                    <div class="card-title">💰 Master Cashier & Banking Dashboard</div>
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                        Real-time pending requests review with 1-click Approval & Rejection
+                        Realtime Deposit & Withdrawal approvals, 5-6s Loud Siren Alarm & Instant Telegram alerts
                     </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" id="btn-cashier-test-alarm" class="btn-secondary" style="font-size: 11px; padding: 6px 10px; background: rgba(245, 158, 11, 0.2); color: var(--primary); font-weight: 800; border: 1px solid rgba(245, 158, 11, 0.4);" title="Play 5-6 second high volume alarm sound">
+                        🔊 Test 6s Siren
+                    </button>
                 </div>
             </div>
 
             <!-- Quick Summary Counters -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
-                <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 10px;">
-                    <div style="font-size: 10px; color: var(--accent-green); font-weight: 700; text-transform: uppercase;">Pending Deposits</div>
-                    <div style="font-size: 16px; font-weight: 800; color: #fff;">
-                        ${overview.pendingDepositsCount || 0} reqs (₹${(overview.pendingDepositsAmount || 0).toLocaleString('en-IN')})
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                <div style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.35); border-radius: 10px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 11px; color: var(--accent-green); font-weight: 800; text-transform: uppercase;">📥 Pending Deposits</div>
+                        <span style="font-size: 10px; font-weight: 800; background: rgba(16,185,129,0.25); color: #10b981; padding: 2px 6px; border-radius: 6px;">${pendingDepositsCount} REQS</span>
+                    </div>
+                    <div style="font-size: 20px; font-weight: 900; color: #fff; margin-top: 4px;">
+                        ₹${(overview.pendingDepositsAmount || 0).toLocaleString('en-IN')}
                     </div>
                 </div>
-                <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 10px;">
-                    <div style="font-size: 10px; color: var(--accent-red); font-weight: 700; text-transform: uppercase;">Pending Withdrawals</div>
-                    <div style="font-size: 16px; font-weight: 800; color: #fff;">
-                        ${overview.pendingWithdrawalsCount || 0} reqs (₹${(overview.pendingWithdrawalsAmount || 0).toLocaleString('en-IN')})
+                <div style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.35); border-radius: 10px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 11px; color: var(--accent-red); font-weight: 800; text-transform: uppercase;">📤 Pending Withdrawals</div>
+                        <span style="font-size: 10px; font-weight: 800; background: rgba(239,68,68,0.25); color: #ef4444; padding: 2px 6px; border-radius: 6px;">${pendingWithdrawalsCount} REQS</span>
+                    </div>
+                    <div style="font-size: 20px; font-weight: 900; color: #fff; margin-top: 4px;">
+                        ₹${(overview.pendingWithdrawalsAmount || 0).toLocaleString('en-IN')}
                     </div>
                 </div>
             </div>
 
-            <!-- Filter Controls -->
-            <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
-                <select id="tx-filter-type" class="form-select" style="flex: 1; min-width: 130px;">
-                    <option value="ALL" ${txFilterType === 'ALL' ? 'selected' : ''}>All Types</option>
-                    <option value="DEPOSIT" ${txFilterType === 'DEPOSIT' ? 'selected' : ''}>📥 Deposits Only</option>
-                    <option value="WITHDRAWAL" ${txFilterType === 'WITHDRAWAL' ? 'selected' : ''}>📤 Withdrawals Only</option>
-                </select>
-                <select id="tx-filter-status" class="form-select" style="flex: 1; min-width: 130px;">
-                    <option value="ALL" ${txFilterStatus === 'ALL' ? 'selected' : ''}>All Status</option>
-                    <option value="PENDING" ${txFilterStatus === 'PENDING' ? 'selected' : ''}>⏳ Pending Only</option>
-                    <option value="APPROVED" ${txFilterStatus === 'APPROVED' ? 'selected' : ''}>✅ Approved</option>
-                    <option value="REJECTED" ${txFilterStatus === 'REJECTED' ? 'selected' : ''}>❌ Rejected</option>
-                </select>
+            <!-- Telegram Bot Status & Direct Test Controller -->
+            <div style="background: #111a2e; border: 1px solid #1e2c4f; border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 15px;">🤖</span>
+                        <span style="font-weight: 800; font-size: 12px; color: #38bdf8;">TELEGRAM 24/7 INSTANT BOT ALERTS</span>
+                    </div>
+                    <span style="font-size: 10px; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(16,185,129,0.3);">
+                        ● Active (Token Loaded)
+                    </span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 10px;">
+                    Bot: <strong style="color: #fff;">@smarty91_alert_bot</strong> | Chat ID: <strong style="color: #facc15;">8282793854</strong>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" id="btn-telegram-test" class="btn-primary" style="flex: 1; min-width: 160px; font-size: 11px; padding: 8px 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>📲</span>
+                        <span>SEND TELEGRAM TEST MSG</span>
+                    </button>
+                    <a href="https://t.me/smarty91_alert_bot" target="_blank" class="btn-secondary" style="font-size: 11px; padding: 8px 12px; text-decoration: none; color: #94a3b8; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        <span>🔗</span>
+                        <span>Open Bot (Click Start)</span>
+                    </a>
+                </div>
+                <div id="telegram-test-feedback" style="display: none; font-size: 11px; margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-weight: 700;"></div>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+                <input type="text" id="tx-search-input" class="form-input" placeholder="🔍 Search by UTR / Phone / User ID / Bank A/C..." value="${txSearchQuery}" style="width: 100%; box-sizing: border-box; font-size: 12px;" />
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <select id="tx-filter-type" class="form-select" style="flex: 1; min-width: 130px; font-size: 12px;">
+                        <option value="ALL" ${txFilterType === 'ALL' ? 'selected' : ''}>All Transaction Types</option>
+                        <option value="DEPOSIT" ${txFilterType === 'DEPOSIT' ? 'selected' : ''}>📥 Deposits Only</option>
+                        <option value="WITHDRAWAL" ${txFilterType === 'WITHDRAWAL' ? 'selected' : ''}>📤 Withdrawals Only</option>
+                    </select>
+                    <select id="tx-filter-status" class="form-select" style="flex: 1; min-width: 130px; font-size: 12px;">
+                        <option value="ALL" ${txFilterStatus === 'ALL' ? 'selected' : ''}>All Statuses</option>
+                        <option value="PENDING" ${txFilterStatus === 'PENDING' ? 'selected' : ''}>⏳ Pending Only (${totalPending})</option>
+                        <option value="APPROVED" ${txFilterStatus === 'APPROVED' ? 'selected' : ''}>✅ Approved</option>
+                        <option value="REJECTED" ${txFilterStatus === 'REJECTED' ? 'selected' : ''}>❌ Rejected</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Transactions List -->
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 ${filtered.length === 0 ? `
-                    <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px; background: var(--bg-input); border-radius: 8px;">
-                        No deposit or withdrawal requests found.
+                    <div style="text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 13px; background: var(--bg-input); border-radius: 10px; border: 1px dashed var(--border-color);">
+                        No matching deposit or withdrawal records found.
                     </div>
                 ` : filtered.map(tx => {
                     const isPending = tx.status === 'PENDING';
                     const isDeposit = tx.type === 'DEPOSIT';
                     const statusColor = tx.status === 'APPROVED' ? 'var(--accent-green)' : (tx.status === 'REJECTED' ? 'var(--accent-red)' : 'var(--primary)');
+                    const formattedDate = new Date(tx.createdAt).toLocaleString('en-IN', {
+                        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    });
 
                     return `
-                        <div style="background: var(--bg-input); border-left: 4px solid ${isDeposit ? 'var(--accent-green)' : 'var(--accent-violet)'}; border-radius: 8px; padding: 12px; border-top: 1px solid var(--border-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                                <div>
-                                    <span style="font-weight: 800; font-size: 13px; color: #fff;">${isDeposit ? '📥 DEPOSIT' : '📤 WITHDRAWAL'}</span>
-                                    <span style="font-size: 10px; color: var(--text-muted); margin-left: 6px;">#${tx.id}</span>
+                        <div style="background: var(--bg-input); border-left: 4px solid ${isDeposit ? 'var(--accent-green)' : 'var(--accent-violet)'}; border-radius: 10px; padding: 14px; border-top: 1px solid var(--border-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); ${isPending ? 'box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);' : ''}">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-weight: 900; font-size: 13px; color: #fff;">
+                                        ${isDeposit ? '📥 DEPOSIT REQUEST' : '📤 WITHDRAWAL REQUEST'}
+                                    </span>
+                                    <span style="font-size: 10px; font-family: monospace; color: var(--text-muted);">#${tx.id.slice(-8)}</span>
                                 </div>
-                                <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: ${statusColor}22; color: ${statusColor};">
+                                <span style="font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 12px; background: ${statusColor}22; color: ${statusColor}; border: 1px solid ${statusColor}44;">
                                     ${tx.status}
                                 </span>
                             </div>
 
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <div>
-                                    <div style="font-size: 11px; color: var(--text-muted);">Player ID: <b style="color: #fff;">${tx.userId}</b></div>
-                                    <div style="font-size: 10px; color: var(--text-muted);">${new Date(tx.createdAt).toLocaleString()}</div>
+                                    <div style="font-size: 12px; color: var(--text-muted);">
+                                        Player: <b style="color: #fff;">${tx.userId}</b>
+                                    </div>
+                                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${formattedDate}</div>
                                 </div>
-                                <div style="font-size: 18px; font-weight: 900; color: ${isDeposit ? 'var(--accent-green)' : 'var(--primary)'};">
-                                    ₹${tx.amount.toLocaleString('en-IN')}
+                                <div style="text-align: right;">
+                                    <div style="font-size: 20px; font-weight: 900; color: ${isDeposit ? 'var(--accent-green)' : 'var(--primary)'};">
+                                        ₹${Number(tx.amount || 0).toLocaleString('en-IN')}
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Payment Details -->
-                            <div style="background: var(--bg-card); padding: 8px; border-radius: 6px; font-size: 11px; margin-bottom: 8px;">
+                            <!-- Detailed Banking / Payment Reference Box -->
+                            <div style="background: var(--bg-card); padding: 10px 12px; border-radius: 8px; font-size: 11px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.06); line-height: 1.6;">
                                 ${isDeposit ? `
-                                    <div>UTR / Ref No: <b style="color: var(--accent-blue);">${tx.utrNumber || 'N/A'}</b></div>
-                                    <div>UPI ID / Gateway: <span style="color: var(--text-muted);">${tx.upiId || 'VIP Gateway'}</span></div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>UTR / Ref No:</span>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px;">${tx.utrNumber || 'N/A'}</b>
+                                            ${tx.utrNumber ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.utrNumber}">📋 Copy</button>` : ''}
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                        <span>Gateway UPI:</span>
+                                        <span style="color: var(--text-muted);">${tx.upiId || 'VIP Merchant Gateway'}</span>
+                                    </div>
                                 ` : `
-                                    <div>Bank: <b style="color: #fff;">${tx.bankName || 'Bank Payout'}</b> | Acc: <b style="color: var(--accent-blue);">${tx.accountNumber || tx.upiId}</b></div>
-                                    <div>IFSC: <span style="color: var(--text-muted);">${tx.ifsc || 'N/A'}</span></div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>Bank & Name:</span>
+                                        <span style="color: #fff; font-weight: 700;">${tx.bankName || 'Bank Payout'} (${tx.accountHolderName || 'User'})</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                        <span>Account No:</span>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px;">${tx.accountNumber || tx.upiId || 'N/A'}</b>
+                                            ${tx.accountNumber ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.accountNumber}">📋 Copy</button>` : ''}
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                        <span>IFSC Code:</span>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <b style="color: #facc15; font-family: monospace;">${tx.ifsc || 'N/A'}</b>
+                                            ${tx.ifsc ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.ifsc}">📋 Copy</button>` : ''}
+                                        </div>
+                                    </div>
+                                    ${tx.upiId ? `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                            <span>UPI ID:</span>
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <b style="color: #a78bfa;">${tx.upiId}</b>
+                                                <button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.upiId}">📋 Copy</button>
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                 `}
-                                ${tx.adminRemarks ? `<div style="margin-top: 4px; color: var(--primary);">Remarks: ${tx.adminRemarks}</div>` : ''}
+                                ${tx.adminRemarks ? `
+                                    <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); color: var(--primary); font-weight: 700;">
+                                        Admin Remarks: ${tx.adminRemarks}
+                                    </div>
+                                ` : ''}
                             </div>
 
                             <!-- Action Buttons for Pending -->
                             ${isPending ? `
                                 <div style="display: flex; gap: 8px;">
-                                    <button class="btn-approve-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: var(--accent-green); color: #000; font-weight: 800; padding: 8px;">
-                                        ✅ Approve ${isDeposit ? '& Credit' : '& Mark Paid'}
+                                    <button class="btn-approve-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-weight: 900; padding: 10px; font-size: 12px; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                        ✅ Approve ${isDeposit ? '& Credit Balance' : '& Mark Paid'}
                                     </button>
-                                    <button class="btn-reject-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: rgba(239,68,68,0.25); color: var(--accent-red); font-weight: 700; padding: 8px;">
-                                        ❌ Reject
+                                    <button class="btn-reject-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: rgba(239,68,68,0.18); color: var(--accent-red); font-weight: 800; padding: 10px; font-size: 12px; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; cursor: pointer;">
+                                        ❌ Reject ${isDeposit ? 'Request' : '& Refund'}
                                     </button>
                                 </div>
                             ` : ''}
@@ -675,20 +961,95 @@ function renderTransactionsView(container) {
     `;
 
     // Filter Change Listeners
-    container.querySelector('#tx-filter-type').addEventListener('change', (e) => {
+    container.querySelector('#tx-filter-type')?.addEventListener('change', (e) => {
         txFilterType = e.target.value;
-        renderActiveTab();
+        renderActiveTab(true);
     });
 
-    container.querySelector('#tx-filter-status').addEventListener('change', (e) => {
+    container.querySelector('#tx-filter-status')?.addEventListener('change', (e) => {
         txFilterStatus = e.target.value;
-        renderActiveTab();
+        renderActiveTab(true);
     });
+
+    const searchInput = container.querySelector('#tx-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            txSearchQuery = e.target.value;
+            renderActiveTab(false);
+        });
+    }
+
+    // Audio Test Buttons
+    container.querySelector('#btn-cashier-test-alarm')?.addEventListener('click', () => {
+        getAudioContext();
+        play5SecondAlarm();
+    });
+
+    container.querySelector('#btn-banner-test-sound')?.addEventListener('click', () => {
+        getAudioContext();
+        play5SecondAlarm();
+    });
+
+    // 1-Click Copy Chips
+    container.querySelectorAll('.copy-trigger').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const text = btn.dataset.copy;
+            if (text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const original = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    btn.style.color = '#10b981';
+                    setTimeout(() => {
+                        btn.textContent = original;
+                        btn.style.color = '#38bdf8';
+                    }, 1500);
+                }).catch(() => {
+                    prompt('Copy text manually:', text);
+                });
+            }
+        });
+    });
+
+    // Telegram Bot Test Button
+    const tgBtn = container.querySelector('#btn-telegram-test');
+    const tgFeedback = container.querySelector('#telegram-test-feedback');
+    if (tgBtn) {
+        tgBtn.addEventListener('click', async () => {
+            tgBtn.disabled = true;
+            tgBtn.textContent = 'Sending Test Msg...';
+            if (tgFeedback) tgFeedback.style.display = 'none';
+
+            try {
+                const res = await adminService.sendTelegramTest();
+                if (tgFeedback) {
+                    tgFeedback.style.display = 'block';
+                    tgFeedback.style.background = 'rgba(16, 185, 129, 0.15)';
+                    tgFeedback.style.color = '#10b981';
+                    tgFeedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                    tgFeedback.textContent = '✅ Telegram test notification sent successfully to @smarty91_alert_bot!';
+                }
+            } catch (err) {
+                if (tgFeedback) {
+                    tgFeedback.style.display = 'block';
+                    tgFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+                    tgFeedback.style.color = '#ef4444';
+                    tgFeedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    tgFeedback.textContent = `❌ ${err.message || 'Failed to send Telegram message. Make sure you opened @smarty91_alert_bot and clicked START!'}`;
+                }
+            } finally {
+                tgBtn.disabled = false;
+                tgBtn.textContent = '📲 SEND TELEGRAM TEST MSG';
+            }
+        });
+    }
 
     // Approve & Reject Handlers
     container.querySelectorAll('.btn-approve-tx').forEach(btn => {
         btn.addEventListener('click', async () => {
             const txId = btn.dataset.id;
+            const confirmed = confirm('Are you sure you want to APPROVE this transaction? This will instantly credit the balance / mark withdrawal paid.');
+            if (!confirmed) return;
+
             try {
                 btn.textContent = 'Approving...';
                 btn.disabled = true;
@@ -696,6 +1057,8 @@ function renderTransactionsView(container) {
                 await fetchAndRefreshData();
             } catch (err) {
                 alert(err.message || 'Approval failed');
+                btn.textContent = 'Approve';
+                btn.disabled = false;
             }
         });
     });
@@ -703,7 +1066,7 @@ function renderTransactionsView(container) {
     container.querySelectorAll('.btn-reject-tx').forEach(btn => {
         btn.addEventListener('click', async () => {
             const txId = btn.dataset.id;
-            const remarks = prompt('Enter rejection reason / remarks:', 'Payment verification failed');
+            const remarks = prompt('Enter rejection reason / remarks for player:', 'Payment verification failed / Invalid UTR');
             if (remarks === null) return;
 
             try {
@@ -713,6 +1076,8 @@ function renderTransactionsView(container) {
                 await fetchAndRefreshData();
             } catch (err) {
                 alert(err.message || 'Rejection failed');
+                btn.textContent = 'Reject';
+                btn.disabled = false;
             }
         });
     });

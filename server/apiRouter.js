@@ -1,6 +1,7 @@
 import express from 'express';
 import { serverEngine, NUMBER_PROPERTIES, MODE_DISPLAY_NAMES } from './engine.js';
 import { firebaseSync } from './firebaseSync.js';
+import { sendTelegramMessage, TELEGRAM_CONFIG } from './telegramAlert.js';
 
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
@@ -637,6 +638,48 @@ apiRouter.post('/admin/transactions/process', checkAdminAuth, (req, res) => {
         const { txId, action, adminRemarks } = req.body;
         const result = serverEngine.processTransaction(txId, action, adminRemarks);
         res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/telegram/test -> Send Test Notification to Admin Telegram
+apiRouter.post('/admin/telegram/test', checkAdminAuth, async (req, res) => {
+    try {
+        const testMsg = `🔔 <b>Smarty91 Master Admin Alert Test</b>
+━━━━━━━━━━━━━━━━━━━━
+✅ <i>Telegram Notification Channel is 100% ONLINE!</i>
+⏰ <b>Time:</b> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+📱 <b>Status:</b> Ready for real-time Deposit & Withdrawal Alerts!
+━━━━━━━━━━━━━━━━━━━━
+👉 <a href="${TELEGRAM_CONFIG.adminUrl}">Open Admin Cashier</a>`;
+
+        const result = await sendTelegramMessage(testMsg);
+        if (result && result.ok) {
+            return res.json({ success: true, message: 'Test message sent successfully to your Telegram!' });
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: result?.description || 'Could not send message. Please make sure you have started the bot by clicking Start on @smarty91_alert_bot in Telegram.'
+            });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/telegram/config -> Update Bot Token or Chat ID
+apiRouter.post('/admin/telegram/config', checkAdminAuth, (req, res) => {
+    try {
+        const { botToken, chatId } = req.body;
+        if (botToken) TELEGRAM_CONFIG.botToken = botToken.trim();
+        if (chatId) TELEGRAM_CONFIG.chatId = chatId.trim();
+        res.json({
+            success: true,
+            message: 'Telegram settings updated',
+            chatId: TELEGRAM_CONFIG.chatId,
+            botTokenMasked: TELEGRAM_CONFIG.botToken ? `${TELEGRAM_CONFIG.botToken.slice(0, 8)}...` : ''
+        });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }

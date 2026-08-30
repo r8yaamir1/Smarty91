@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { firebaseSync } from './firebaseSync.js';
+import { notifyNewDeposit, notifyNewWithdrawal } from './telegramAlert.js';
 
 // Number Properties mapping (0-9)
 export const NUMBER_PROPERTIES = {
@@ -965,6 +966,18 @@ class Smarty91ServerEngine {
         this.transactions.unshift(req);
         firebaseSync.saveTransaction(req);
 
+        // Instant Telegram Alert Trigger
+        const userObj = this.users.get(userId);
+        notifyNewDeposit({
+            userId,
+            phone: userObj ? (userObj.phone || userObj.username) : userId,
+            amount: numAmount,
+            bonusAmount: bonusEligibleAmount,
+            utrNumber: req.utrNumber,
+            channel,
+            txId
+        }).catch(e => console.warn('[Telegram Deposit Alert]', e.message));
+
         return {
             success: true,
             transaction: req,
@@ -1031,6 +1044,19 @@ class Smarty91ServerEngine {
         this.transactions.unshift(req);
         firebaseSync.saveTransaction(req);
         firebaseSync.updateUserBalance(userId, user.balance, 'Withdrawal request initiated');
+
+        // Instant Telegram Alert Trigger
+        notifyNewWithdrawal({
+            userId,
+            phone: user.phone || user.username || userId,
+            amount: numAmount,
+            accountHolderName: req.accountHolderName,
+            bankName: req.bankName,
+            accountNumber: req.accountNumber,
+            ifsc: req.ifsc,
+            upiId: req.upiId,
+            txId
+        }).catch(e => console.warn('[Telegram Withdrawal Alert]', e.message));
 
         // Record in ledger
         this.ledger.unshift({

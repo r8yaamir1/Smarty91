@@ -30,6 +30,34 @@ class AdminService {
     async adjustUserBalance(userId, amount, action, remarks) {
         return await apiClient.post('/admin/users/adjust-balance', { userId, amount, action, remarks });
     }
+
+    async processTransaction(txId, action, adminRemarks) {
+        return await apiClient.post('/admin/transactions/process', { txId, action, adminRemarks });
+    }
+
+    async getTransactions(params = {}) {
+        return await apiClient.get('/admin/transactions', params);
+    }
+
+    async updateProbabilities(payload) {
+        return await apiClient.post('/admin/probabilities', payload);
+    }
+
+    async setModePauseState(mode, action) {
+        return await apiClient.post('/admin/mode-pause', { mode, action });
+    }
+
+    async resetUserPassword(userId, newPassword) {
+        return await apiClient.post('/admin/users/reset-password', { userId, newPassword });
+    }
+
+    async sendTelegramTest() {
+        return await apiClient.post('/admin/telegram/test', {});
+    }
+
+    async updateTelegramConfig(botToken, chatId) {
+        return await apiClient.post('/admin/telegram/config', { botToken, chatId });
+    }
 }
 
 export const adminService = new AdminService();
