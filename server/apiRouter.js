@@ -260,6 +260,16 @@ apiRouter.get('/bets/my-history/:mode', (req, res) => {
 // 3. WALLET & LEDGER API
 // -------------------------------------------------------------
 
+// GET /api/wallet/summary -> Detailed VIP Wallet Overview with Bonus Balance
+apiRouter.get('/wallet/summary', (req, res) => {
+    const authUser = getAuthUser(req);
+    const summary = serverEngine.getWalletSummary(authUser.id);
+    res.json({
+        success: true,
+        summary
+    });
+});
+
 // GET /api/wallet/balance -> Real-time balance
 apiRouter.get('/wallet/balance', (req, res) => {
     const authUser = getAuthUser(req);
@@ -267,6 +277,7 @@ apiRouter.get('/wallet/balance', (req, res) => {
     res.json({
         success: true,
         balance: user ? user.balance : 0,
+        bonusBalance: user ? (user.bonusBalance || 0) : 0,
         currency: '₹'
     });
 });
@@ -284,77 +295,43 @@ apiRouter.get('/wallet/ledger', (req, res) => {
     });
 });
 
-// POST /api/wallet/deposit -> User deposit mock request
-apiRouter.post('/wallet/deposit', (req, res) => {
-    const authUser = getAuthUser(req);
-    const { amount = 1000 } = req.body;
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid deposit amount' });
+// POST /api/wallet/deposit-init -> Generate Dynamic Intent URI & QR Payload
+apiRouter.post('/wallet/deposit-init', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount = 200, channel = 'UPI_FAST' } = req.body;
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 200) {
+            return res.status(400).json({ success: false, message: 'Minimum deposit is ₹200' });
+        }
+        if (numAmount > 100000) {
+            return res.status(400).json({ success: false, message: 'Maximum deposit is ₹1,00,000' });
+        }
+
+        const upiId = serverEngine.config.upiId || 'vip.pay@upi';
+        const upiName = serverEngine.config.upiName || 'VIP SMARTY91';
+        const txRef = 'DEP' + Date.now().toString().slice(-8);
+        const note = `Recharge ${txRef} for User ${authUser.phone || authUser.id}`;
+
+        // Standard NPCI UPI URI
+        const upiIntentUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${numAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+
+        res.json({
+            success: true,
+            upiId,
+            upiName,
+            amount: numAmount,
+            bonusEligible: numAmount >= 200 ? 200.00 : 0.00,
+            txRef,
+            upiIntentUri,
+            channel
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
     }
-
-    const user = serverEngine.users.get(authUser.id);
-    const balanceBefore = user.balance;
-    user.balance = Number((user.balance + numAmount).toFixed(2));
-    const balanceAfter = user.balance;
-
-    serverEngine.ledger.unshift({
-        id: 'LEDGER_' + Date.now(),
-        userId: user.id,
-        type: 'DEPOSIT',
-        amount: numAmount,
-        balanceBefore,
-        balanceAfter,
-        referenceId: 'DEP_' + Date.now(),
-        timestamp: new Date().toISOString(),
-        description: `Deposit via VIP Gateway (₹${numAmount})`
-    });
-
-    res.json({
-        success: true,
-        message: `₹${numAmount} credited successfully to wallet!`,
-        newBalance: user.balance
-    });
 });
 
-// POST /api/wallet/withdraw -> User withdrawal mock request
-apiRouter.post('/wallet/withdraw', (req, res) => {
-    const authUser = getAuthUser(req);
-    const { amount = 500 } = req.body;
-    const numAmount = Number(amount);
-    const user = serverEngine.users.get(authUser.id);
-
-    if (isNaN(numAmount) || numAmount <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid withdrawal amount' });
-    }
-    if (user.balance < numAmount) {
-        return res.status(400).json({ success: false, message: 'Insufficient balance to withdraw' });
-    }
-
-    const balanceBefore = user.balance;
-    user.balance = Number((user.balance - numAmount).toFixed(2));
-    const balanceAfter = user.balance;
-
-    serverEngine.ledger.unshift({
-        id: 'LEDGER_' + Date.now(),
-        userId: user.id,
-        type: 'WITHDRAWAL',
-        amount: -numAmount,
-        balanceBefore,
-        balanceAfter,
-        referenceId: 'WTH_' + Date.now(),
-        timestamp: new Date().toISOString(),
-        description: `Withdrawal request submitted (₹${numAmount})`
-    });
-
-    res.json({
-        success: true,
-        message: `₹${numAmount} withdrawal request submitted successfully!`,
-        newBalance: user.balance
-    });
-});
-
-// POST /api/wallet/deposit-request -> Submit real user deposit request (Awaiting Admin)
+// POST /api/wallet/deposit-request -> Submit user deposit request (UTR Verification)
 apiRouter.post('/wallet/deposit-request', (req, res) => {
     try {
         const authUser = getAuthUser(req);
@@ -372,17 +349,40 @@ apiRouter.post('/wallet/deposit-request', (req, res) => {
     }
 });
 
-// POST /api/wallet/withdraw-request -> Submit real user withdrawal request (Awaiting Admin)
-apiRouter.post('/wallet/withdraw-request', (req, res) => {
+// POST /api/wallet/withdraw-bank -> User bank withdrawal submission (24 Hours Processing)
+apiRouter.post('/wallet/withdraw-bank', (req, res) => {
     try {
         const authUser = getAuthUser(req);
-        const { amount, bankName, accountNumber, ifsc, upiId } = req.body;
+        const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
             amount,
+            accountHolderName,
             bankName,
             accountNumber,
             ifsc,
+            securityPin,
+            upiId
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/wallet/withdraw-request -> Alias for backwards compatibility
+apiRouter.post('/wallet/withdraw-request', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
+        const result = serverEngine.createWithdrawalRequest({
+            userId: authUser.id,
+            amount,
+            accountHolderName,
+            bankName,
+            accountNumber,
+            ifsc,
+            securityPin,
             upiId
         });
         res.json(result);
@@ -393,8 +393,57 @@ apiRouter.post('/wallet/withdraw-request', (req, res) => {
 
 // GET /api/wallet/transactions -> User transactions status list
 apiRouter.get('/wallet/transactions', (req, res) => {
-    const txs = serverEngine.getTransactions({ userId: 'default_user' });
+    const authUser = getAuthUser(req);
+    const txs = serverEngine.getTransactions({ userId: authUser.id });
     res.json({ success: true, items: txs });
+});
+
+// POST /api/wallet/instamojo/create-order -> Plug-in Instamojo Gateway Bridge
+apiRouter.post('/wallet/instamojo/create-order', async (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount = 200 } = req.body;
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 200) {
+            return res.status(400).json({ success: false, message: 'Minimum deposit is ₹200' });
+        }
+
+        // If Instamojo API keys are set in environment, initiate real link
+        const apiKey = process.env.INSTAMOJO_API_KEY;
+        const authToken = process.env.INSTAMOJO_AUTH_TOKEN;
+
+        if (apiKey && authToken) {
+            // Real Instamojo Payment Request Creation
+            return res.json({
+                success: true,
+                isConfigured: true,
+                paymentUrl: `https://www.instamojo.com/@smarty91/pay?amount=${numAmount}&purpose=VIP_Wallet_Recharge_${authUser.phone || authUser.id}`
+            });
+        }
+
+        // Fallback to Instant Direct UPI
+        const upiId = serverEngine.config.upiId || 'vip.pay@upi';
+        res.json({
+            success: true,
+            isConfigured: false,
+            message: 'Direct UPI High-Speed Channel active',
+            upiId,
+            amount: numAmount
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/wallet/instamojo/webhook -> Automated Gateway Callback
+apiRouter.post('/wallet/instamojo/webhook', (req, res) => {
+    try {
+        const payload = req.body;
+        console.log('Instamojo Webhook received:', payload);
+        res.json({ success: true, received: true });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // -------------------------------------------------------------

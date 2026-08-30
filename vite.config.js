@@ -23,7 +23,8 @@ export default defineConfig({
                 main: './index.html',
                 admin: './admin.html',
                 login: './login.html',
-                profile: './profile.html'
+                profile: './profile.html',
+                payment: './payment.html'
             }
         }
     },

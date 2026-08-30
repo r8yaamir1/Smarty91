@@ -126,202 +126,18 @@ export function showToast(message, type = 'success') {
     }, 2400);
 }
 
-// Interactive Deposit Modal
-function openDepositModal() {
-    let modal = document.getElementById('smarty-deposit-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'smarty-deposit-modal';
-        modal.style.cssText = `
-            position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000;
-            display: flex; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px);
-        `;
-        document.body.appendChild(modal);
-    }
-
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div style="background: #141c2e; border-top: 2px solid #f59e0b; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px; color: #fff; box-shadow: 0 -10px 25px rgba(0,0,0,0.5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <div style="font-size: 16px; font-weight: 800; color: #f59e0b; display: flex; align-items: center; gap: 8px;">
-                    <span>📥</span> Deposit Funds
-                </div>
-                <button id="close-dep-modal" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px;">✕</button>
-            </div>
-
-            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Select Quick Amount (₹)</div>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px;">
-                <button class="dep-amt-chip" data-amt="500" style="background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px 0; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;">₹500</button>
-                <button class="dep-amt-chip" data-amt="1000" style="background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #f59e0b; padding: 8px 0; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;">₹1,000</button>
-                <button class="dep-amt-chip" data-amt="5000" style="background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px 0; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;">₹5,000</button>
-                <button class="dep-amt-chip" data-amt="10000" style="background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px 0; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer;">₹10,000</button>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Deposit Amount (₹)</label>
-                <input type="number" id="dep-custom-amt" value="1000" min="100" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; font-weight: 700; outline: none;" />
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Payment UTR / Reference ID</label>
-                <input type="text" id="dep-utr-input" placeholder="e.g. UTR1234567890" value="UTR${Date.now().toString().slice(-8)}" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; outline: none;" />
-            </div>
-
-            <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px; padding: 10px; font-size: 11px; color: #10b981; margin-bottom: 16px;">
-                ✔ Instant Live Admin Sync: Your deposit request will be submitted to the Admin Panel for approval.
-            </div>
-
-            <button id="submit-dep-request" style="width: 100%; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; border: none; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer;">
-                SUBMIT DEPOSIT REQUEST
-            </button>
-        </div>
-    `;
-
-    // Modal Events
-    modal.querySelector('#close-dep-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-
-    modal.querySelectorAll('.dep-amt-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            modal.querySelectorAll('.dep-amt-chip').forEach(c => {
-                c.style.background = '#1e293b';
-                c.style.borderColor = '#334155';
-                c.style.color = '#fff';
-            });
-            chip.style.background = 'rgba(245,158,11,0.2)';
-            chip.style.borderColor = '#f59e0b';
-            chip.style.color = '#f59e0b';
-            modal.querySelector('#dep-custom-amt').value = chip.dataset.amt;
-        });
-    });
-
-    modal.querySelector('#submit-dep-request').addEventListener('click', async () => {
-        const amt = Number(modal.querySelector('#dep-custom-amt').value);
-        const utr = modal.querySelector('#dep-utr-input').value.trim() || `UTR${Date.now()}`;
-
-        if (!amt || amt < 100) {
-            showToast('Minimum deposit is ₹100', 'error');
-            return;
-        }
-
-        try {
-            if (window.SmartyLoader) window.SmartyLoader.show('Processing Deposit Request...');
-            const btn = modal.querySelector('#submit-dep-request');
-            btn.textContent = 'Submitting...';
-            btn.disabled = true;
-
-            const res = await walletService.submitDepositRequest({
-                amount: amt,
-                utrNumber: utr,
-                upiId: 'vip.pay@upi'
-            });
-
-            modal.style.display = 'none';
-            showToast(res.message || 'Deposit request submitted successfully!', 'success');
-        } catch (err) {
-            showToast(err.message || 'Deposit request failed', 'error');
-        } finally {
-            if (window.SmartyLoader) window.SmartyLoader.hide();
-        }
-    });
+// Navigation to Dedicated Cashier Hub
+export function openDepositHub() {
+    window.location.href = 'payment.html?tab=deposit';
 }
 
-// Interactive Withdrawal Modal
-function openWithdrawalModal() {
-    let modal = document.getElementById('smarty-withdraw-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'smarty-withdraw-modal';
-        modal.style.cssText = `
-            position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000;
-            display: flex; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px);
-        `;
-        document.body.appendChild(modal);
-    }
-
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div style="background: #141c2e; border-top: 2px solid #8b5cf6; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px; color: #fff; box-shadow: 0 -10px 25px rgba(0,0,0,0.5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <div style="font-size: 16px; font-weight: 800; color: #a78bfa; display: flex; align-items: center; gap: 8px;">
-                    <span>📤</span> Withdraw Funds
-                </div>
-                <button id="close-wth-modal" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px;">✕</button>
-            </div>
-
-            <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 11px; color: #94a3b8;">Available Balance:</span>
-                <span style="font-size: 15px; font-weight: 800; color: #10b981;">${formatCurrency(currentBalance)}</span>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Withdrawal Amount (₹)</label>
-                <input type="number" id="wth-amt-input" value="500" min="100" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 15px; font-weight: 700; outline: none;" />
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Bank Account / UPI ID</label>
-                <input type="text" id="wth-acc-input" value="98765432100" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; outline: none;" />
-            </div>
-
-            <div style="margin-bottom: 16px;">
-                <label style="display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">Bank Name / IFSC</label>
-                <input type="text" id="wth-bank-input" value="State Bank of India (SBIN0001234)" style="width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 13px; outline: none;" />
-            </div>
-
-            <button id="submit-wth-request" style="width: 100%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer;">
-                SUBMIT WITHDRAWAL REQUEST
-            </button>
-        </div>
-    `;
-
-    // Modal Events
-    modal.querySelector('#close-wth-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-
-    modal.querySelector('#submit-wth-request').addEventListener('click', async () => {
-        const amt = Number(modal.querySelector('#wth-amt-input').value);
-        const acc = modal.querySelector('#wth-acc-input').value.trim();
-        const bank = modal.querySelector('#wth-bank-input').value.trim();
-
-        if (!amt || amt < 100) {
-            showToast('Minimum withdrawal is ₹100', 'error');
-            return;
-        }
-        if (amt > currentBalance) {
-            showToast('Insufficient wallet balance', 'error');
-            return;
-        }
-
-        try {
-            if (window.SmartyLoader) window.SmartyLoader.show('Submitting Withdrawal Request...');
-            const btn = modal.querySelector('#submit-wth-request');
-            btn.textContent = 'Processing...';
-            btn.disabled = true;
-
-            const res = await walletService.submitWithdrawalRequest({
-                amount: amt,
-                bankName: bank,
-                accountNumber: acc,
-                ifsc: 'SBIN0001234'
-            });
-
-            if (res.newBalance !== undefined) {
-                currentBalance = res.newBalance;
-                renderBalance();
-            }
-
-            modal.style.display = 'none';
-            showToast(res.message || 'Withdrawal request submitted!', 'success');
-        } catch (err) {
-            showToast(err.message || 'Withdrawal failed', 'error');
-        } finally {
-            if (window.SmartyLoader) window.SmartyLoader.hide();
-        }
-    });
+export function openWithdrawalHub() {
+    window.location.href = 'payment.html?tab=withdraw';
 }
+
+// Global window exposure
+window.openDepositHub = openDepositHub;
+window.openWithdrawalHub = openWithdrawalHub;
 
 // Initialize Wallet listeners
 export function initWalletModals() {
@@ -340,8 +156,9 @@ export function initWalletModals() {
     withdrawBtns.forEach(btn => {
         btn.style.cursor = 'pointer';
         btn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            openWithdrawalModal();
+            openWithdrawalHub();
         });
     });
 
@@ -349,8 +166,9 @@ export function initWalletModals() {
     depositBtns.forEach(btn => {
         btn.style.cursor = 'pointer';
         btn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            openDepositModal();
+            openDepositHub();
         });
     });
 }

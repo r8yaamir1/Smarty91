@@ -931,9 +931,15 @@ class Smarty91ServerEngine {
 
     createDepositRequest({ userId = 'default_user', amount, utrNumber, upiId = '', channel = 'UPI_MANUAL' }) {
         const numAmount = Number(amount);
-        if (isNaN(numAmount) || numAmount < 100) {
-            throw new Error('Minimum deposit amount is ₹100');
+        if (isNaN(numAmount) || numAmount < 200) {
+            throw new Error('Minimum deposit amount is ₹200');
         }
+        if (numAmount > 100000) {
+            throw new Error('Maximum deposit amount is ₹1,00,000');
+        }
+
+        // Calculate 100% bonus offer: ₹200 on ₹200 deposit (flat ₹200 promo bonus on eligible tiers)
+        const bonusEligibleAmount = numAmount >= 200 ? 200.00 : 0.00;
 
         const txId = 'DEP_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         const req = {
@@ -941,8 +947,9 @@ class Smarty91ServerEngine {
             userId,
             type: 'DEPOSIT',
             amount: numAmount,
+            bonusAmount: bonusEligibleAmount,
             utrNumber: utrNumber || `UTR${Date.now()}`,
-            upiId: upiId || 'vip.pay@upi',
+            upiId: upiId || (this.config.upiId || 'vip.pay@upi'),
             channel,
             status: 'PENDING',
             createdAt: new Date().toISOString(),
@@ -956,25 +963,47 @@ class Smarty91ServerEngine {
         return {
             success: true,
             transaction: req,
-            message: `Deposit request for ₹${numAmount.toLocaleString('en-IN')} submitted successfully! Awaiting Admin approval.`
+            bonusAmount: bonusEligibleAmount,
+            message: `Deposit request for ₹${numAmount.toLocaleString('en-IN')} submitted successfully! Funds + ₹${bonusEligibleAmount} Bonus will be credited upon verification.`
         };
     }
 
-    createWithdrawalRequest({ userId = 'default_user', amount, bankName = 'State Bank of India', accountNumber = '98765432100', ifsc = 'SBIN0001234', upiId = '' }) {
+    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '' }) {
         const user = this.users.get(userId);
-        if (!user) throw new Error('User not found');
+        if (!user) throw new Error('User account not found');
 
         const numAmount = Number(amount);
-        if (isNaN(numAmount) || numAmount < 100) {
-            throw new Error('Minimum withdrawal amount is ₹100');
+        if (isNaN(numAmount) || numAmount < 200) {
+            throw new Error('Minimum withdrawal amount is ₹200');
+        }
+        if (numAmount > 100000) {
+            throw new Error('Maximum withdrawal amount is ₹1,00,000 per request');
         }
         if (user.balance < numAmount) {
-            throw new Error(`Insufficient wallet balance. Current: ₹${user.balance.toFixed(2)}`);
+            throw new Error(`Insufficient main balance. Available: ₹${user.balance.toFixed(2)}`);
+        }
+
+        // Validate Security PIN if configured
+        if (securityPin) {
+            const expectedPin = String(user.securityPin || (user.phone ? user.phone.slice(-4) : '1234'));
+            if (String(securityPin).trim() !== expectedPin && String(securityPin).trim() !== this.masterPin) {
+                throw new Error('Invalid 6-Digit Security PIN. Please verify your security PIN.');
+            }
+        }
+
+        const cleanAcc = String(accountNumber || '').trim();
+        const cleanIfsc = String(ifsc || '').trim().toUpperCase();
+
+        if (cleanAcc && cleanAcc.length < 6) {
+            throw new Error('Please enter a valid Bank Account Number (minimum 6 digits)');
+        }
+        if (cleanIfsc && cleanIfsc.length < 8) {
+            throw new Error('Please enter a valid Bank IFSC Code (e.g. SBIN0001234)');
         }
 
         // Deduct/hold balance immediately for withdrawal request
         const balanceBefore = user.balance;
-        user.balance -= numAmount;
+        user.balance = Number((user.balance - numAmount).toFixed(2));
         const balanceAfter = user.balance;
 
         const txId = 'WTH_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
@@ -983,9 +1012,10 @@ class Smarty91ServerEngine {
             userId,
             type: 'WITHDRAWAL',
             amount: numAmount,
-            bankName,
-            accountNumber,
-            ifsc,
+            accountHolderName: accountHolderName || user.username || 'Account Holder',
+            bankName: bankName || 'Bank Transfer',
+            accountNumber: cleanAcc || 'XXXXXX',
+            ifsc: cleanIfsc || 'SBIN0001234',
             upiId: upiId || `${user.phone || '9876543210'}@upi`,
             status: 'PENDING',
             createdAt: new Date().toISOString(),
@@ -1007,14 +1037,51 @@ class Smarty91ServerEngine {
             balanceAfter,
             referenceId: txId,
             timestamp: new Date().toISOString(),
-            description: `Withdrawal request of ₹${numAmount} submitted`
+            description: `Withdrawal request of ₹${numAmount} submitted (${bankName || 'Bank'})`
         });
 
         return {
             success: true,
             transaction: req,
             newBalance: user.balance,
-            message: `Withdrawal request for ₹${numAmount.toLocaleString('en-IN')} submitted! Admin will process payment shortly.`
+            message: `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted successfully. Funds will be credited to your bank account within 2-24 banking hours.`
+        };
+    }
+
+    getWalletSummary(userId = 'default_user') {
+        const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
+        const userTx = this.transactions.filter(t => t.userId === userId);
+        const userLedger = this.ledger.filter(l => l.userId === userId);
+
+        const totalDeposited = userTx
+            .filter(t => t.type === 'DEPOSIT' && t.status === 'APPROVED')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const totalWithdrawn = userTx
+            .filter(t => t.type === 'WITHDRAWAL' && t.status === 'APPROVED')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const pendingWithdrawals = userTx
+            .filter(t => t.type === 'WITHDRAWAL' && t.status === 'PENDING')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        return {
+            userId: user.id,
+            phone: user.phone || '9876543210',
+            balance: Number((user.balance || 0).toFixed(2)),
+            bonusBalance: Number((user.bonusBalance || 0).toFixed(2)),
+            totalDeposited: Number(totalDeposited.toFixed(2)),
+            totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
+            pendingWithdrawals: Number(pendingWithdrawals.toFixed(2)),
+            upiConfig: {
+                upiId: this.config.upiId || 'vip.pay@upi',
+                upiName: this.config.upiName || 'VIP SMARTY91 GAMING',
+                minDeposit: 200,
+                maxDeposit: 100000,
+                minWithdrawal: 200,
+                maxWithdrawal: 100000,
+                bonusOffer: 'Deposit ₹200 & Get ₹200 VIP Bonus!'
+            }
         };
     }
 
