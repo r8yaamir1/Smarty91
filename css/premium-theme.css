@@ -108,44 +108,56 @@ body {
 .WinGo__C-head-logo[data-v-5d71c3fd] {
   background-image: none !important;
   width: auto !important;
-  min-width: 3.6rem !important;
   height: 0.95rem !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  gap: 0.14rem !important;
   position: absolute !important;
   left: 50% !important;
   top: 50% !important;
   transform: translate(-50%, -50%) !important;
   font-family: 'Cinzel', 'Outfit', serif !important;
+  z-index: 5;
 }
 
-.navbar__content-center .headLogo[data-v-12a80a3e]::before,
-.WinGo__C-head-logo[data-v-5d71c3fd]::before {
-  content: '👑 SMARTY';
-  font-size: 0.46rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 40%, #FFD700 80%, #D4AF37 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
-  margin-right: 0.12rem;
+.header-circle-logo {
+  width: 0.65rem !important;
+  height: 0.65rem !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  border: 1.5px solid #FFD700 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 215, 0, 0.4) !important;
+  flex-shrink: 0 !important;
+  display: block !important;
 }
 
-.navbar__content-center .headLogo[data-v-12a80a3e]::after,
-.WinGo__C-head-logo[data-v-5d71c3fd]::after {
-  content: '91';
-  font-size: 0.42rem;
-  font-weight: 900;
-  font-family: 'Outfit', sans-serif;
-  color: #FFFFFF;
-  background: linear-gradient(135deg, #FF4B63 0%, #B80A22 100%);
-  padding: 0.02rem 0.16rem;
-  border-radius: 0.16rem;
-  border: 1px solid #FFD700;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.02em;
+.header-brand-name {
+  font-size: 0.42rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.04em !important;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 40%, #FFD700 80%, #D4AF37 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45)) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.08rem !important;
+  white-space: nowrap !important;
+}
+
+.header-brand-badge {
+  font-size: 0.36rem !important;
+  font-weight: 900 !important;
+  font-family: 'Outfit', sans-serif !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  background: linear-gradient(135deg, #FF4B63 0%, #B80A22 100%) !important;
+  padding: 0.02rem 0.12rem !important;
+  border-radius: 0.14rem !important;
+  border: 1px solid #FFD700 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.6) !important;
+  letter-spacing: 0.02em !important;
 }
 
 /* Head sound/service icons */
