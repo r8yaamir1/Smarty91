@@ -8,6 +8,15 @@ function expressApiPlugin() {
             const { apiRouter } = await import('./server/apiRouter.js');
             const app = express();
             app.use(express.json());
+
+            // Support direct URL access to /admin7117
+            app.use((req, res, next) => {
+                if (req.url === '/admin7117' || req.url === '/admin7117/' || req.url.startsWith('/admin7117?')) {
+                    req.url = '/admin.html';
+                }
+                next();
+            });
+
             app.use('/api', apiRouter);
             
             server.middlewares.use(app);
@@ -22,6 +31,7 @@ export default defineConfig({
             input: {
                 main: './index.html',
                 admin: './admin.html',
+                admin7117: './admin7117.html',
                 login: './login.html',
                 profile: './profile.html',
                 payment: './payment.html'

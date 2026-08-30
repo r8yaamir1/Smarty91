@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuthFlow();
     initTabNavigation();
     initModeChips();
+    initDeveloperPortal();
 });
 
 function initAuthFlow() {
@@ -1076,13 +1077,16 @@ function renderLogsView(container) {
 
     container.innerHTML = `
         <div class="admin-card">
-            <div class="card-title" style="margin-bottom: 12px;">📜 System & Admin Audit Logs</div>
+            <div class="card-title audit-log-header-trigger" style="margin-bottom: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>📜 System & Admin Audit Logs</span>
+                <span style="font-size: 10px; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 10px;">Audit Trail</span>
+            </div>
             ${logs.length === 0 ? '<div style="font-size:12px; color:var(--text-muted);">No logs recorded yet</div>' : ''}
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 ${logs.map(log => `
-                    <div style="background: var(--bg-input); border-left: 3px solid var(--primary); padding: 10px; border-radius: 6px; font-size: 11px;">
+                    <div style="background: var(--bg-input); border-left: 3px solid ${log.action.includes('DEVELOPER') ? '#10b981' : 'var(--primary)'}; padding: 10px; border-radius: 6px; font-size: 11px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <span style="font-weight: 700; color: #fff;">${log.action}</span>
+                            <span style="font-weight: 700; color: ${log.action.includes('DEVELOPER') ? '#10b981' : '#fff'};">${log.action}</span>
                             <span style="color: var(--text-muted); font-size: 10px;">${new Date(log.timestamp).toLocaleTimeString()}</span>
                         </div>
                         <div style="color: var(--text-muted);">${log.details}</div>
@@ -1091,4 +1095,158 @@ function renderLogsView(container) {
             </div>
         </div>
     `;
+
+    // Also attach tap listener to the card header
+    const headerTrigger = container.querySelector('.audit-log-header-trigger');
+    if (headerTrigger) {
+        headerTrigger.addEventListener('click', handleAuditLogTap);
+    }
+}
+
+// -------------------------------------------------------------
+// 8. SECRET DEVELOPER PORTAL (TRIPLE-TAP TRIGGER ON AUDIT LOG)
+// -------------------------------------------------------------
+let tapTimestamps = [];
+
+function handleAuditLogTap() {
+    const now = Date.now();
+    tapTimestamps.push(now);
+
+    // Keep only timestamps within 1.5 seconds
+    tapTimestamps = tapTimestamps.filter(t => now - t <= 1500);
+
+    if (tapTimestamps.length >= 3) {
+        tapTimestamps = [];
+        openDeveloperAuthModal();
+    }
+}
+
+function initDeveloperPortal() {
+    // Attach triple tap to bottom nav item "Audit Logs"
+    const logsNavItem = document.querySelector('.nav-item[data-tab="logs"]');
+    if (logsNavItem) {
+        logsNavItem.addEventListener('click', handleAuditLogTap);
+    }
+
+    // Modal elements
+    const authModal = document.getElementById('dev-portal-auth-modal');
+    const mainModal = document.getElementById('dev-portal-main-modal');
+    const closeAuthBtn = document.getElementById('close-dev-auth-modal-btn');
+    const cancelAuthBtn = document.getElementById('cancel-dev-auth-btn');
+    const submitAuthBtn = document.getElementById('submit-dev-auth-btn');
+    const passwordInput = document.getElementById('dev-portal-password-input');
+    const authError = document.getElementById('dev-portal-auth-error');
+
+    const closeMainBtn = document.getElementById('close-dev-portal-modal-btn');
+    const currentUpiEl = document.getElementById('dev-portal-current-upi');
+    const currentNameEl = document.getElementById('dev-portal-current-name');
+    const newUpiInput = document.getElementById('dev-portal-new-upi-input');
+    const newNameInput = document.getElementById('dev-portal-new-name-input');
+    const updateBtn = document.getElementById('dev-portal-update-btn');
+    const feedbackMsg = document.getElementById('dev-portal-feedback-msg');
+
+    if (closeAuthBtn) closeAuthBtn.addEventListener('click', () => authModal.style.display = 'none');
+    if (cancelAuthBtn) cancelAuthBtn.addEventListener('click', () => authModal.style.display = 'none');
+    if (closeMainBtn) closeMainBtn.addEventListener('click', () => mainModal.style.display = 'none');
+
+    // Password unlock submit
+    if (submitAuthBtn) {
+        submitAuthBtn.addEventListener('click', verifyDevPassword);
+    }
+    if (passwordInput) {
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') verifyDevPassword();
+        });
+    }
+
+    function verifyDevPassword() {
+        const entered = passwordInput.value.trim();
+        if (entered === 'Aamir@639900') {
+            authError.style.display = 'none';
+            authModal.style.display = 'none';
+            passwordInput.value = '';
+
+            // Open main developer portal
+            const activeUpi = liveData?.config?.upiId || '6289140468@axl';
+            const activeName = liveData?.config?.upiName || 'Smarty91';
+
+            if (currentUpiEl) currentUpiEl.textContent = activeUpi;
+            if (currentNameEl) currentNameEl.textContent = activeName;
+            if (newUpiInput) newUpiInput.value = activeUpi;
+            if (newNameInput) newNameInput.value = activeName;
+            if (feedbackMsg) feedbackMsg.style.display = 'none';
+
+            mainModal.style.display = 'flex';
+        } else {
+            authError.textContent = 'Invalid Master Developer Password. Access Denied.';
+            authError.style.display = 'block';
+        }
+    }
+
+    // Realtime UPI update submit
+    if (updateBtn) {
+        updateBtn.addEventListener('click', async () => {
+            const upiId = newUpiInput.value.trim();
+            const upiName = newNameInput.value.trim() || 'Smarty91';
+
+            if (!upiId || !upiId.includes('@')) {
+                showFeedback('Please enter a valid UPI ID (e.g. 6289140468@axl)', false);
+                return;
+            }
+
+            updateBtn.disabled = true;
+            updateBtn.innerHTML = '<span>⏳</span><span>UPDATING FIRESTORE...</span>';
+
+            try {
+                const res = await fetch('/api/admin/developer/update-upi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        secretKey: 'Aamir@639900',
+                        upiId,
+                        upiName
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showFeedback(`✓ Live UPI successfully updated to: ${data.upiId} in Realtime Database!`, true);
+                    if (currentUpiEl) currentUpiEl.textContent = data.upiId;
+                    if (currentNameEl) currentNameEl.textContent = data.upiName;
+                    await fetchAndRefreshData();
+                } else {
+                    showFeedback(data.message || 'Update failed', false);
+                }
+            } catch (err) {
+                showFeedback(err.message || 'Server error', false);
+            } finally {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = '<span>⚡</span><span>UPDATE UPI IN REALTIME DATABASE</span>';
+            }
+        });
+    }
+
+    function showFeedback(text, isSuccess) {
+        if (!feedbackMsg) return;
+        feedbackMsg.textContent = text;
+        feedbackMsg.style.display = 'block';
+        feedbackMsg.style.background = isSuccess ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+        feedbackMsg.style.color = isSuccess ? '#10b981' : '#ef4444';
+        feedbackMsg.style.border = `1px solid ${isSuccess ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`;
+    }
+}
+
+function openDeveloperAuthModal() {
+    const authModal = document.getElementById('dev-portal-auth-modal');
+    const passwordInput = document.getElementById('dev-portal-password-input');
+    const authError = document.getElementById('dev-portal-auth-error');
+
+    if (authModal) {
+        authModal.style.display = 'flex';
+        if (authError) authError.style.display = 'none';
+        if (passwordInput) {
+            passwordInput.value = '';
+            setTimeout(() => passwordInput.focus(), 150);
+        }
+    }
 }

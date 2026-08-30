@@ -157,15 +157,28 @@ class FirebaseSyncManager {
                 if (data.serviceFeePercent !== undefined) this.engine.config.serviceFeePercent = data.serviceFeePercent;
                 if (data.minBetAmount !== undefined) this.engine.config.minBetAmount = data.minBetAmount;
                 if (data.maxBetAmount !== undefined) this.engine.config.maxBetAmount = data.maxBetAmount;
+                if (data.upiId) this.engine.config.upiId = data.upiId;
+                if (data.upiName) this.engine.config.upiName = data.upiName;
             } else {
                 await setDoc(configRef, {
                     multipliers: this.engine.config.multipliers,
                     serviceFeePercent: this.engine.config.serviceFeePercent,
                     minBetAmount: this.engine.config.minBetAmount,
                     maxBetAmount: this.engine.config.maxBetAmount,
+                    upiId: this.engine.config.upiId || '6289140468@axl',
+                    upiName: this.engine.config.upiName || 'Smarty91',
                     updatedAt: new Date().toISOString()
                 });
             }
+
+            // Real-time listener for live updates across replicas / portal changes
+            onSnapshot(configRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const d = docSnap.data();
+                    if (d.upiId) this.engine.config.upiId = d.upiId;
+                    if (d.upiName) this.engine.config.upiName = d.upiName;
+                }
+            });
         } catch (e) {
             console.warn('[Firebase] Config sync warning:', e.message);
         }
@@ -397,6 +410,8 @@ class FirebaseSyncManager {
                 maxBetAmount: config.maxBetAmount,
                 probabilities: config.probabilities,
                 modes: config.modes,
+                upiId: config.upiId || '6289140468@axl',
+                upiName: config.upiName || 'Smarty91',
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {

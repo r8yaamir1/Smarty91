@@ -27,6 +27,15 @@ const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 app.use(express.static(__dirname));
 
+// Route /admin7117 to admin.html
+app.get(['/admin7117', '/admin7117/'], (req, res) => {
+    res.sendFile(path.join(distPath, 'admin.html'), (err) => {
+        if (err) {
+            res.sendFile(path.join(__dirname, 'admin.html'));
+        }
+    });
+});
+
 // Fallback to index.html for SPA routing
 app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'), (err) => {

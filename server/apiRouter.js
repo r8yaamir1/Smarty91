@@ -331,6 +331,61 @@ apiRouter.post('/wallet/deposit-init', (req, res) => {
     }
 });
 
+// GET /api/wallet/config -> Live Merchant UPI Config
+apiRouter.get('/wallet/config', (req, res) => {
+    res.json({
+        success: true,
+        upiId: serverEngine.config.upiId || '6289140468@axl',
+        upiName: serverEngine.config.upiName || 'Smarty91',
+        minDeposit: serverEngine.config.minDeposit || 200,
+        maxDeposit: serverEngine.config.maxDeposit || 100000,
+        minWithdrawal: serverEngine.config.minWithdrawal || 200,
+        maxWithdrawal: serverEngine.config.maxWithdrawal || 100000
+    });
+});
+
+// POST /api/admin/developer/update-upi -> Secret Developer Portal Live UPI Update (Password: Aamir@639900)
+apiRouter.post('/admin/developer/update-upi', (req, res) => {
+    try {
+        const { secretKey, upiId, upiName } = req.body;
+        if (!secretKey || secretKey !== 'Aamir@639900') {
+            return res.status(403).json({ success: false, message: 'Access Denied: Invalid Developer Key' });
+        }
+
+        if (!upiId || !upiId.includes('@')) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid UPI ID (e.g. name@bank)' });
+        }
+
+        const cleanUpiId = upiId.trim();
+        const cleanUpiName = (upiName || 'Smarty91').trim();
+
+        // 1. Update in active server memory instantly
+        serverEngine.config.upiId = cleanUpiId;
+        serverEngine.config.upiName = cleanUpiName;
+
+        const auditDetail = `Developer Portal live update Merchant UPI to: ${cleanUpiId} (${cleanUpiName})`;
+        serverEngine.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'DEVELOPER_UPDATE_UPI',
+            details: auditDetail,
+            timestamp: new Date().toISOString()
+        });
+
+        // 2. Persist in Firebase Firestore in real-time
+        firebaseSync.saveSystemConfig(serverEngine.config);
+        firebaseSync.logAdminAction('DEVELOPER_UPDATE_UPI', auditDetail);
+
+        res.json({
+            success: true,
+            message: 'Merchant UPI ID successfully updated in realtime database!',
+            upiId: cleanUpiId,
+            upiName: cleanUpiName
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // POST /api/wallet/deposit -> Submit user deposit request (UTR Verification)
 apiRouter.post('/wallet/deposit', (req, res) => {
     try {

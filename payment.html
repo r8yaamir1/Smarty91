@@ -310,68 +310,123 @@
             justify-content: center;
         }
 
+        /* --- STAGE 1: AMOUNT & BONUS CARDS (VIP OBSIDIAN BLACK SCREEN) --- */
+        .deposit-stage-1-card {
+            background: #090C15;
+            border: 1.5px solid #1E2638;
+            border-radius: 16px;
+            padding: 1.2rem 1rem;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            margin-bottom: 1rem;
+        }
+
+        .deposit-stage-1-card .card-header-title {
+            color: #FFFFFF;
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        .deposit-stage-1-card .card-header-title span:last-child {
+            background: rgba(255, 255, 255, 0.08);
+            color: #94A3B8 !important;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .amount-pill-card {
+            background: #121726;
+            border: 1.5px solid #222C42;
+            border-radius: 12px;
+            padding: 0.75rem 0.4rem;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
         .amount-pill-card:hover {
-            border-color: #CBD5E1;
+            border-color: #384869;
+            transform: translateY(-1px);
         }
 
         .amount-pill-card.selected {
-            border-color: var(--brand-red);
-            background: var(--brand-red-subtle);
-            box-shadow: 0 0 0 1px var(--brand-red);
+            border-color: #FF3855;
+            background: rgba(229, 24, 55, 0.16);
+            box-shadow: 0 0 18px rgba(229, 24, 55, 0.45), inset 0 0 12px rgba(229, 24, 55, 0.15);
+            transform: translateY(-2px);
         }
 
         .pill-amount {
-            font-size: 0.95rem;
-            font-weight: 800;
-            color: var(--text-dark);
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #FFFFFF;
+            display: block;
+            margin-top: 2px;
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: 0.2px;
         }
 
         .amount-pill-card.selected .pill-amount {
-            color: var(--brand-red);
+            color: #FFFFFF;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
         }
 
         .pill-bonus-badge {
             position: absolute;
-            top: -7px;
-            right: -2px;
-            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            top: -9px;
+            right: 4px;
+            background: linear-gradient(135deg, #FF3855 0%, #B80A22 100%);
             color: #FFFFFF;
             font-size: 0.6rem;
-            font-weight: 800;
-            padding: 1px 5px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-            letter-spacing: -0.2px;
+            font-weight: 900;
+            padding: 2px 6px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            letter-spacing: 0.2px;
+            white-space: nowrap;
         }
 
         .pill-subtext {
-            font-size: 0.65rem;
-            color: var(--accent-green);
+            font-size: 0.68rem;
+            color: #10B981;
             font-weight: 700;
             margin-top: 3px;
+            display: block;
         }
 
         /* Custom Input Box */
+        .deposit-stage-1-card .form-field-label {
+            color: #94A3B8;
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+
         .input-group-clean {
             display: flex;
             align-items: center;
-            background: #F8FAFC;
-            border: 1.5px solid var(--border-color);
-            border-radius: 10px;
+            background: #121726;
+            border: 1.5px solid #222C42;
+            border-radius: 12px;
             padding: 0.65rem 0.85rem;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
         }
 
         .input-group-clean:focus-within {
-            border-color: var(--brand-red);
-            background: #FFFFFF;
+            border-color: #FF3855;
+            background: #151C2E;
+            box-shadow: 0 0 15px rgba(229, 24, 55, 0.35);
         }
 
         .input-currency-symbol {
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: var(--text-dark);
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #FFD700;
             margin-right: 0.5rem;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
         }
 
         .clean-input {
@@ -379,64 +434,120 @@
             border: none;
             background: transparent;
             outline: none;
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--text-dark);
-            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #FFFFFF;
+            font-family: 'Outfit', sans-serif;
         }
 
         .clean-input::placeholder {
-            color: #94A3B8;
+            color: #64748B;
             font-weight: 500;
             font-size: 0.9rem;
         }
 
-        /* Bonus Highlight Card */
+        /* GLOWING ALIVE RED BONUS CARD */
         .bonus-highlight-box {
-            background: #FFFBEB;
-            border: 1px solid #FCD34D;
-            border-radius: 12px;
-            padding: 0.85rem;
-            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #B80A22 0%, #E51837 50%, #800414 100%);
+            border: 1.5px solid #FFD700;
+            border-radius: 14px;
+            padding: 0.9rem 1rem;
+            margin-top: 1rem;
+            margin-bottom: 1.1rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 28px rgba(229, 24, 55, 0.55), 0 0 18px rgba(255, 215, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+            animation: aliveBonusPulse 2.4s ease-in-out infinite alternate;
+        }
+
+        @keyframes aliveBonusPulse {
+            0% {
+                box-shadow: 0 6px 20px rgba(229, 24, 55, 0.45), 0 0 12px rgba(255, 215, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.3);
+                border-color: rgba(255, 215, 0, 0.6);
+            }
+            100% {
+                box-shadow: 0 10px 32px rgba(229, 24, 55, 0.7), 0 0 24px rgba(255, 215, 0, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.5);
+                border-color: #FFD700;
+            }
+        }
+
+        /* Alive Shimmer Sweep Beam */
+        .bonus-highlight-box::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -60%;
+            width: 50%;
+            height: 200%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+            transform: rotate(25deg);
+            animation: aliveShimmerSweep 3.2s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes aliveShimmerSweep {
+            0% { left: -60%; opacity: 0; }
+            20% { opacity: 1; }
+            60% { left: 140%; opacity: 1; }
+            100% { left: 140%; opacity: 0; }
         }
 
         .bonus-highlight-left {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            position: relative;
+            z-index: 2;
         }
 
         .bonus-gift-icon {
-            width: 36px;
-            height: 36px;
-            background: #FEF3C7;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 215, 0, 0.2);
+            border: 1px solid #FFD700;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+            animation: giftBounce 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes giftBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-3px) scale(1.06); }
         }
 
         .bonus-highlight-title {
-            font-size: 0.85rem;
-            font-weight: 800;
-            color: #92400E;
+            font-size: 0.92rem;
+            font-weight: 900;
+            color: #FFFFFF;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+            letter-spacing: 0.2px;
         }
 
         .bonus-highlight-desc {
-            font-size: 0.72rem;
-            color: #B45309;
-            margin-top: 1px;
+            font-size: 0.74rem;
+            color: #FFF3D6;
+            margin-top: 2px;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
 
         .bonus-highlight-val {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             font-weight: 900;
-            color: #B45309;
-            font-family: 'JetBrains Mono', monospace;
+            color: #FFD700;
+            font-family: 'Outfit', sans-serif;
+            text-shadow: 0 0 12px rgba(255, 215, 0, 0.7);
+            position: relative;
+            z-index: 2;
+            white-space: nowrap;
         }
 
         /* Primary Action Buttons */
@@ -845,12 +956,12 @@
                     </div>
                 </div>
 
-                <!-- STAGE 1: AMOUNT & BONUS SELECTION -->
+                <!-- STAGE 1: AMOUNT & BONUS SELECTION (BLACK SCREEN & GLOWING RED BONUS) -->
                 <div id="deposit-stage-1" style="display: block;">
-                    <div class="clean-card">
+                    <div class="clean-card deposit-stage-1-card">
                         <div class="card-header-title">
                             <span>Select Deposit Amount</span>
-                            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Min ₹200</span>
+                            <span style="font-size: 0.72rem; color: #94A3B8; font-weight: 600;">Min ₹200</span>
                         </div>
 
                         <!-- Amount Quick Select Grid with Tier Bonuses -->
