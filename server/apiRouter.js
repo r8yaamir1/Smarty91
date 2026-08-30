@@ -5,6 +5,15 @@ import { firebaseSync } from './firebaseSync.js';
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
 
+// Admin Auth Middleware
+const checkAdminAuth = (req, res, next) => {
+    const pin = req.headers['x-admin-pin'] || req.query.admin_pin || req.body.adminPin;
+    if (pin === serverEngine.masterPin || pin === '919191') {
+        return next();
+    }
+    return res.status(401).json({ success: false, message: 'Unauthorized. Invalid Admin Master PIN' });
+};
+
 // Helper to resolve current logged-in user or guest
 const getAuthUser = (req) => {
     const authHeader = req.headers.authorization;
@@ -16,14 +25,25 @@ const getAuthUser = (req) => {
 };
 
 // -------------------------------------------------------------
-// 0. AUTHENTICATION & USER MANAGEMENT (PHONE + PASSWORD + REFERRAL)
+// 0. AUTHENTICATION & USER MANAGEMENT (DIRECT FAST REGISTRATION + SECURE RECOVERY)
 // -------------------------------------------------------------
 
-// POST /api/auth/register
+// POST /api/auth/register (Direct Fast Registration - 91 Club Style)
 apiRouter.post('/auth/register', (req, res) => {
     try {
-        const { phone, password, inviteCode } = req.body;
-        const result = serverEngine.registerUser({ phone, password, inviteCode });
+        const { phone, password, inviteCode, securityPin } = req.body;
+        const result = serverEngine.registerUser({ phone, password, inviteCode, securityPin });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/auth/forgot-password (Security PIN or Master Support Reset)
+apiRouter.post('/auth/forgot-password', (req, res) => {
+    try {
+        const { phone, newPassword, securityPin, masterPin } = req.body;
+        const result = serverEngine.resetUserPassword({ phone, newPassword, securityPin, masterPin });
         res.json(result);
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -35,6 +55,17 @@ apiRouter.post('/auth/login', (req, res) => {
     try {
         const { phone, password } = req.body;
         const result = serverEngine.loginUser({ phone, password });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/users/reset-password -> Admin direct reset player password
+apiRouter.post('/admin/users/reset-password', checkAdminAuth, (req, res) => {
+    try {
+        const { userId, newPassword } = req.body;
+        const result = serverEngine.adminResetUserPassword(userId, newPassword);
         res.json(result);
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -370,15 +401,6 @@ apiRouter.get('/wallet/transactions', (req, res) => {
 // 4. ADVANCED ADMIN CONTROL APIs
 // -------------------------------------------------------------
 
-// Admin Auth Middleware
-const checkAdminAuth = (req, res, next) => {
-    const pin = req.headers['x-admin-pin'] || req.query.admin_pin || req.body.adminPin;
-    if (pin === serverEngine.masterPin || pin === '919191') {
-        return next();
-    }
-    return res.status(401).json({ success: false, message: 'Unauthorized. Invalid Admin Master PIN' });
-};
-
 // POST /api/admin/auth/login
 apiRouter.post('/admin/auth/login', (req, res) => {
     const { pin } = req.body;
@@ -478,15 +500,6 @@ apiRouter.post('/admin/transactions/process', checkAdminAuth, (req, res) => {
 });
 
 // POST /api/admin/game-control -> Manual Next Outcome Override (or Reset Auto)
-apiRouter.post('/api/admin/game-control', checkAdminAuth, (req, res) => {
-    try {
-        const { mode, targetNumber } = req.body;
-        const result = serverEngine.setAdminOverride(mode, targetNumber);
-        res.json({ success: true, result });
-    } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
-    }
-});
 apiRouter.post('/admin/game-control', checkAdminAuth, (req, res) => {
     try {
         const { mode, targetNumber } = req.body;

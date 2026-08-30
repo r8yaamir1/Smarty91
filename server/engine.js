@@ -178,7 +178,7 @@ class Smarty91ServerEngine {
         return code;
     }
 
-    registerUser({ phone, password, inviteCode }) {
+    registerUser({ phone, password, inviteCode, securityPin }) {
         const cleanPhone = String(phone).trim();
         if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
             throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
@@ -194,7 +194,7 @@ class Smarty91ServerEngine {
             }
         }
 
-        const userId = 'USR_' + cleanPhone;
+        const userId = 'usr_' + cleanPhone;
         let referrerId = null;
         if (inviteCode) {
             const cleanInvite = String(inviteCode).trim().toUpperCase();
@@ -206,11 +206,15 @@ class Smarty91ServerEngine {
             userInviteCode = this._generateInviteCode();
         }
 
+        // Optional 4-6 digit security PIN for self password reset
+        const cleanPin = securityPin ? String(securityPin).trim() : cleanPhone.slice(-4);
+
         const newUser = {
             id: userId,
-            username: `VIP_${cleanPhone.slice(-4)}`,
+            username: `usr_${cleanPhone}`,
             phone: cleanPhone,
             passwordHash: this._hashPassword(password),
+            securityPin: cleanPin,
             balance: 0.00, // Starts with exact 0 balance
             inviteCode: userInviteCode,
             referredBy: referrerId,
@@ -239,6 +243,60 @@ class Smarty91ServerEngine {
                 inviteCode: newUser.inviteCode,
                 referredBy: newUser.referredBy
             }
+        };
+    }
+
+    resetUserPassword({ phone, newPassword, securityPin, masterPin }) {
+        const cleanPhone = String(phone).trim();
+        if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+            throw new Error('Please enter a valid 10-digit Indian mobile number');
+        }
+        if (!newPassword || newPassword.length < 6) {
+            throw new Error('New password must be at least 6 characters');
+        }
+
+        let targetUser = null;
+        for (const u of this.users.values()) {
+            if (u.phone === cleanPhone) {
+                targetUser = u;
+                break;
+            }
+        }
+
+        if (!targetUser) {
+            throw new Error('No account found with this mobile number');
+        }
+
+        // Validation via Security PIN OR Master Admin PIN
+        const providedPin = String(securityPin || masterPin || '').trim();
+        const expectedPin = String(targetUser.securityPin || targetUser.phone.slice(-4));
+        const isAdminMaster = providedPin === this.masterPin || providedPin === '919191';
+
+        if (!isAdminMaster && providedPin !== expectedPin) {
+            throw new Error('Incorrect Security PIN. If you forgot your PIN, please contact 24/7 Official Support.');
+        }
+
+        targetUser.passwordHash = this._hashPassword(newPassword);
+
+        // Invalidate previous sessions
+        for (const [token, uid] of this.userTokens.entries()) {
+            if (uid === targetUser.id) {
+                this.userTokens.delete(token);
+            }
+        }
+
+        const logMsg = `Password reset successfully for user ${targetUser.phone}`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'USER_PASSWORD_RESET',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        firebaseSync.logAdminAction('USER_PASSWORD_RESET', logMsg);
+
+        return {
+            success: true,
+            message: 'Password reset successfully! Please log in with your new password'
         };
     }
 
@@ -1108,6 +1166,19 @@ class Smarty91ServerEngine {
             result = result.filter(t => t.userId === filter.userId);
         }
         return result;
+    }
+
+    adminResetUserPassword(userId, newPassword) {
+        const user = this.users.get(userId);
+        if (!user) throw new Error('User not found');
+        if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters');
+        
+        user.passwordHash = this._hashPassword(newPassword);
+        // Clear tokens
+        for (const [token, uid] of this.userTokens.entries()) {
+            if (uid === user.id) this.userTokens.delete(token);
+        }
+        return { success: true, message: `Password reset successfully for ${user.username}` };
     }
 }
 
