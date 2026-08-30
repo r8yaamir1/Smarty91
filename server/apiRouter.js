@@ -331,6 +331,45 @@ apiRouter.post('/wallet/deposit-init', (req, res) => {
     }
 });
 
+// POST /api/wallet/deposit -> Submit user deposit request (UTR Verification)
+apiRouter.post('/wallet/deposit', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount, utrNumber, upiId, channel } = req.body;
+        const result = serverEngine.createDepositRequest({
+            userId: authUser.id,
+            amount,
+            utrNumber,
+            upiId: upiId || '6289140468@axl',
+            channel: channel || 'UPI_MANUAL'
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/wallet/withdraw -> User bank withdrawal submission
+apiRouter.post('/wallet/withdraw', (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
+        const result = serverEngine.createWithdrawalRequest({
+            userId: authUser.id,
+            amount,
+            accountHolderName,
+            bankName,
+            accountNumber,
+            ifsc,
+            securityPin,
+            upiId
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 // POST /api/wallet/deposit-request -> Submit user deposit request (UTR Verification)
 apiRouter.post('/wallet/deposit-request', (req, res) => {
     try {

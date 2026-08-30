@@ -1,540 +1,562 @@
-// js/payment.js - Dedicated VIP Cashier & Payment Gateway Hub
-import { walletService } from './services/walletService.js';
-import { subscribeToUserBalance } from './services/firebaseClient.js';
+// js/payment.js - Professional 3-Stage Checkout & Cashier Controller for Smarty91
+// Direct UPI + Dynamic QR (6289140468@axl / Smarty91)
 
-let walletState = {
-    realBalance: 0.00,
-    bonusBalance: 0.00,
-    upiId: 'vip.pay@upi',
-    upiName: 'VIP SMARTY91 GAMING',
-    minDeposit: 200,
-    maxDeposit: 100000,
-    selectedDepositAmount: 200,
-    transactions: [],
-    currentFilter: 'ALL'
-};
+let currentDepositAmount = 200;
+let currentBonusAmount = 200;
+let selectedChannel = 'GPAY';
+let countdownInterval = null;
+let secondsRemaining = 600; // 10 minutes
+let currentWalletSummary = null;
 
-const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
-
-// Bank IFSC Prefix Lookup Dictionary
-const IFSC_BANKS = {
-    'SBIN': 'State Bank of India',
-    'HDFC': 'HDFC Bank',
-    'ICIC': 'ICICI Bank',
-    'PUNB': 'Punjab National Bank',
-    'BARB': 'Bank of Baroda',
-    'UTIB': 'Axis Bank',
-    'KKBK': 'Kotak Mahindra Bank',
-    'INDB': 'IndusInd Bank',
-    'CNRB': 'Canara Bank',
-    'UBIN': 'Union Bank of India',
-    'YESB': 'Yes Bank',
-    'PYTM': 'Paytm Payments Bank',
-    'AIRP': 'Airtel Payments Bank',
-    'IDFB': 'IDFC FIRST Bank',
-    'BKID': 'Bank of India',
-    'CBIN': 'Central Bank of India',
-    'IOBA': 'Indian Overseas Bank',
-    'IDIB': 'Indian Bank'
-};
-
-// UI Notification Toast
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('payment-toast');
-    const icon = document.getElementById('toast-icon');
-    const msg = document.getElementById('toast-msg');
+// Toast Helper
+function showToast(msg, duration = 3000) {
+    const toast = document.getElementById('cashier-toast');
     if (!toast) return;
-
-    icon.textContent = type === 'success' ? '✓' : (type === 'error' ? '⚠' : 'ℹ');
-    msg.textContent = message;
-    toast.style.borderColor = type === 'success' ? '#10B981' : (type === 'error' ? '#EF4444' : '#F59E0B');
-    toast.classList.add('show');
-
+    toast.innerText = msg;
+    toast.style.display = 'block';
     setTimeout(() => {
-        toast.classList.remove('show');
-    }, 2600);
+        toast.style.display = 'none';
+    }, duration);
 }
 
-// Currency Formatter
-function formatCurrency(val) {
-    const num = Number(val) || 0;
-    return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Calculate bonus for any given amount
+function computeBonusForAmount(amount) {
+    const num = Number(amount) || 0;
+    if (num >= 50000) return Math.round(num * 0.40);
+    if (num >= 10000) return Math.round(num * 0.30);
+    if (num >= 5000) return Math.round(num * 0.25);
+    if (num >= 2000) return Math.round(num * 0.20);
+    if (num >= 1000) return 250;
+    if (num >= 500) return 150;
+    if (num >= 200) return 200;
+    return 0;
 }
 
-// Format Time
-function formatTime(isoStr) {
-    if (!isoStr) return '--:--';
-    const date = new Date(isoStr);
-    return date.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-// Tab Switching
-export function switchTab(tabName) {
-    const panes = ['deposit', 'withdraw', 'history'];
-    panes.forEach(p => {
-        const paneEl = document.getElementById(`pane-${p}`);
-        const tabBtn = document.getElementById(`tab-btn-${p}`);
-        if (paneEl) paneEl.classList.toggle('active', p === tabName);
-        if (tabBtn) tabBtn.classList.toggle('active', p === tabName);
-    });
-
-    if (tabName === 'history') {
-        fetchTransactions();
-    }
-}
-window.switchTab = switchTab;
-
-// Update Balance UI
-function renderBalances() {
-    const realEl = document.getElementById('display-real-balance');
-    const bonusEl = document.getElementById('display-bonus-balance');
-    if (realEl) realEl.textContent = formatCurrency(walletState.realBalance);
-    if (bonusEl) bonusEl.textContent = formatCurrency(walletState.bonusBalance);
-}
-
-// Fetch Full Wallet Summary
-export async function refreshWalletData(silent = false) {
-    const spinner = document.getElementById('refresh-spinner');
-    if (spinner && !silent) spinner.style.transform = 'rotate(360deg)';
-
-    try {
-        const res = await walletService.getSummary();
-        if (res && res.success && res.summary) {
-            walletState.realBalance = res.summary.balance || 0;
-            walletState.bonusBalance = res.summary.bonusBalance || 0;
-            if (res.summary.upiConfig) {
-                walletState.upiId = res.summary.upiConfig.upiId || walletState.upiId;
-                walletState.upiName = res.summary.upiConfig.upiName || walletState.upiName;
-                const upiDisplay = document.getElementById('official-upi-id-display');
-                if (upiDisplay) upiDisplay.value = walletState.upiId;
-            }
-            renderBalances();
-            updateDepositGateway();
-            if (!silent) showToast('VIP Assets updated live', 'success');
-        }
-    } catch (err) {
-        console.warn('Wallet summary load error:', err);
-    } finally {
-        if (spinner && !silent) {
-            setTimeout(() => { spinner.style.transform = 'rotate(0deg)'; }, 300);
-        }
-    }
-}
-window.refreshWalletData = refreshWalletData;
-
-// Update QR Code and Deep Link URLs
-function updateDepositGateway() {
-    const amount = Number(walletState.selectedDepositAmount) || 200;
-    const upiId = walletState.upiId;
-    const upiName = walletState.upiName;
-    const txRef = 'DEP' + Date.now().toString().slice(-6);
-    const note = `Recharge ${txRef} SMARTY91`;
-
-    // Standard NPCI UPI URI
-    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
-
-    // Update QR Code Image
-    const qrImg = document.getElementById('dynamic-qr-img');
-    const qrCaption = document.getElementById('qr-amount-caption');
-    if (qrImg) {
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`;
-    }
-    if (qrCaption) {
-        qrCaption.textContent = `PAY ${formatCurrency(amount)}`;
-    }
-
-    // Update App Deep Links
-    const gpay = document.getElementById('btn-pay-gpay');
-    const phonepe = document.getElementById('btn-pay-phonepe');
-    const paytm = document.getElementById('btn-pay-paytm');
-    const bhim = document.getElementById('btn-pay-bhim');
-
-    if (gpay) gpay.href = `tez://upi/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
-    if (phonepe) phonepe.href = `phonepe://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
-    if (paytm) paytm.href = `paytmmp://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
-    if (bhim) bhim.href = upiUri;
-
-    // Update Bonus Preview
-    const bonusTag = document.getElementById('bonus-preview-tag');
-    if (bonusTag) {
-        if (amount >= 200) {
-            bonusTag.textContent = 'Bonus: +₹200.00 VIP Promo';
-            bonusTag.style.color = '#FBBF24';
-        } else {
-            bonusTag.textContent = 'Min ₹200 for ₹200 Bonus';
-            bonusTag.style.color = '#94A3B8';
-        }
-    }
-}
-
-// Deposit Amount Selection
-export function selectDepositAmount(amt) {
-    walletState.selectedDepositAmount = Number(amt);
-    const input = document.getElementById('deposit-amount-input');
-    if (input) input.value = amt;
-
-    // Toggle active chips
-    document.querySelectorAll('.amount-chip').forEach(chip => {
-        const chipAmt = Number(chip.getAttribute('data-amt'));
-        chip.classList.toggle('active', chipAmt === amt);
-    });
-
-    updateDepositGateway();
-}
-window.selectDepositAmount = selectDepositAmount;
-
-// Custom Deposit Input Handler
-export function onDepositAmountChange() {
-    const input = document.getElementById('deposit-amount-input');
-    if (!input) return;
-    const val = Number(input.value) || 0;
-    walletState.selectedDepositAmount = val;
-
-    document.querySelectorAll('.amount-chip').forEach(chip => {
-        const chipAmt = Number(chip.getAttribute('data-amt'));
-        chip.classList.toggle('active', chipAmt === val);
-    });
-
-    updateDepositGateway();
-}
-window.onDepositAmountChange = onDepositAmountChange;
-
-// Copy Merchant UPI ID
-export function copyMerchantUpi() {
-    const upiDisplay = document.getElementById('official-upi-id-display');
-    const val = upiDisplay ? upiDisplay.value : walletState.upiId;
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(val).then(() => {
-            showToast(`UPI ID "${val}" copied to clipboard!`, 'success');
-        });
-    } else {
-        showToast(`UPI ID: ${val}`, 'success');
-    }
-}
-window.copyMerchantUpi = copyMerchantUpi;
-
-// UTR Input Auto-Filter
-export function validateUtrInput() {
-    const input = document.getElementById('utr-number-input');
-    if (input) {
-        input.value = input.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    }
-}
-window.validateUtrInput = validateUtrInput;
-
-// Bank IFSC Real-time Detector
-export function onIfscLookup(ifscVal) {
-    const clean = String(ifscVal || '').trim().toUpperCase();
-    const badge = document.getElementById('bank-detected-name');
-    const label = document.getElementById('detected-bank-label');
-
-    if (!clean || clean.length < 4) {
-        if (badge) badge.style.display = 'none';
+// Load initial user wallet data
+async function loadWalletData() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    if (!token) {
+        window.location.replace('login.html');
         return;
     }
 
-    const prefix = clean.slice(0, 4);
-    const bankName = IFSC_BANKS[prefix] || (clean.length >= 8 ? 'Verified Indian Commercial Bank' : null);
+    try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Loading Cashier...');
 
-    if (bankName && badge && label) {
-        label.textContent = bankName;
-        badge.style.display = 'inline-flex';
-    } else if (badge) {
-        badge.style.display = 'none';
+        const res = await fetch('/api/wallet/summary', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to load wallet data');
+            return;
+        }
+
+        currentWalletSummary = data.summary;
+        renderHeaderWalletInfo();
+        renderTransactionsHistory();
+    } catch (err) {
+        showToast('Network error loading wallet data');
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 }
-window.onIfscLookup = onIfscLookup;
 
-// Check Matching Account Numbers
-export function checkAccountMatching() {
-    const acc1 = document.getElementById('withdraw-acc-number')?.value || '';
-    const acc2 = document.getElementById('withdraw-acc-confirm')?.value || '';
-    const badge = document.getElementById('acc-match-badge');
+// Render header balances
+function renderHeaderWalletInfo() {
+    if (!currentWalletSummary) return;
 
-    if (!badge) return;
+    const balanceEl = document.getElementById('header-user-balance');
+    const bonusEl = document.getElementById('header-user-bonus');
+    const phoneEl = document.getElementById('header-user-phone');
+    const availBalEl = document.getElementById('withdraw-available-bal');
 
-    if (acc2.length > 0) {
-        badge.style.display = 'inline-flex';
-        if (acc1 === acc2) {
-            badge.style.color = '#10B981';
-            badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-            badge.style.background = 'rgba(16, 185, 129, 0.1)';
-            badge.textContent = '✓ Account Numbers Match';
+    const bal = Number(currentWalletSummary.balance || 0);
+    const bonus = Number(currentWalletSummary.bonusBalance || 0);
+    const phone = currentWalletSummary.phone || localStorage.getItem('smarty91_user_phone') || 'VIP Player';
+
+    if (balanceEl) balanceEl.innerText = `₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (bonusEl) bonusEl.innerText = `₹${bonus.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (phoneEl) {
+        const masked = phone.length === 10 ? `+91 ${phone.slice(0, 2)}****${phone.slice(6)}` : `+91 ${phone}`;
+        phoneEl.innerText = masked;
+    }
+    if (availBalEl) availBalEl.innerText = `₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+}
+
+// Global Tab Switcher (Deposit, Withdraw, Passbook)
+window.switchCashierTab = function(tabName) {
+    const depositSec = document.getElementById('section-deposit');
+    const withdrawSec = document.getElementById('section-withdraw');
+    const historySec = document.getElementById('section-history');
+
+    const depositTabBtn = document.getElementById('tab-btn-deposit');
+    const withdrawTabBtn = document.getElementById('tab-btn-withdraw');
+    const historyTabBtn = document.getElementById('tab-btn-history');
+
+    const mainTitle = document.getElementById('page-main-title');
+
+    // Reset tab active states
+    [depositTabBtn, withdrawTabBtn, historyTabBtn].forEach(b => {
+        if (b) b.classList.remove('active');
+    });
+
+    if (tabName === 'deposit') {
+        if (depositSec) depositSec.style.display = 'block';
+        if (withdrawSec) withdrawSec.style.display = 'none';
+        if (historySec) historySec.style.display = 'none';
+        if (depositTabBtn) depositTabBtn.classList.add('active');
+        if (mainTitle) mainTitle.innerText = 'Deposit Funds';
+    } else if (tabName === 'withdraw') {
+        if (depositSec) depositSec.style.display = 'none';
+        if (withdrawSec) withdrawSec.style.display = 'block';
+        if (historySec) historySec.style.display = 'none';
+        if (withdrawTabBtn) withdrawTabBtn.classList.add('active');
+        if (mainTitle) mainTitle.innerText = 'Bank Withdrawal';
+    } else if (tabName === 'history') {
+        if (depositSec) depositSec.style.display = 'none';
+        if (withdrawSec) withdrawSec.style.display = 'none';
+        if (historySec) historySec.style.display = 'block';
+        if (historyTabBtn) historyTabBtn.classList.add('active');
+        if (mainTitle) mainTitle.innerText = 'Transaction Passbook';
+        loadWalletData();
+    }
+};
+
+// Stage Navigation for Deposit Flow (1, 2, 3)
+window.goToDepositStage = function(stageNumber) {
+    const stage1 = document.getElementById('deposit-stage-1');
+    const stage2 = document.getElementById('deposit-stage-2');
+    const stage3 = document.getElementById('deposit-stage-3');
+
+    const step1Ind = document.getElementById('wizard-step-1-indicator');
+    const step2Ind = document.getElementById('wizard-step-2-indicator');
+    const step3Ind = document.getElementById('wizard-step-3-indicator');
+
+    const line1 = document.getElementById('wizard-line-1');
+    const line2 = document.getElementById('wizard-line-2');
+
+    if (stageNumber === 1) {
+        if (stage1) stage1.style.display = 'block';
+        if (stage2) stage2.style.display = 'none';
+        if (stage3) stage3.style.display = 'none';
+
+        step1Ind.className = 'step-item active';
+        step2Ind.className = 'step-item';
+        step3Ind.className = 'step-item';
+        if (line1) line1.className = 'step-line';
+        if (line2) line2.className = 'step-line';
+        clearInterval(countdownInterval);
+    } else if (stageNumber === 2) {
+        if (currentDepositAmount < 200) {
+            showToast('Minimum deposit is ₹200');
+            return;
+        }
+        if (stage1) stage1.style.display = 'none';
+        if (stage2) stage2.style.display = 'block';
+        if (stage3) stage3.style.display = 'none';
+
+        step1Ind.className = 'step-item completed';
+        step2Ind.className = 'step-item active';
+        step3Ind.className = 'step-item';
+        if (line1) line1.className = 'step-line completed';
+        if (line2) line2.className = 'step-line';
+
+        const stage2Amount = document.getElementById('stage-2-amount-display');
+        if (stage2Amount) stage2Amount.innerText = `₹${currentDepositAmount.toLocaleString('en-IN')}`;
+    } else if (stageNumber === 3) {
+        if (stage1) stage1.style.display = 'none';
+        if (stage2) stage2.style.display = 'none';
+        if (stage3) stage3.style.display = 'block';
+
+        step1Ind.className = 'step-item completed';
+        step2Ind.className = 'step-item completed';
+        step3Ind.className = 'step-item active';
+        if (line1) line1.className = 'step-line completed';
+        if (line2) line2.className = 'step-line completed';
+    }
+};
+
+// Select Quick Amount Pill
+window.selectDepositAmount = function(amount, bonus) {
+    currentDepositAmount = Number(amount);
+    currentBonusAmount = Number(bonus);
+
+    // Update Pill active styling
+    const pills = document.querySelectorAll('.amount-pill-card');
+    pills.forEach(p => p.classList.remove('selected'));
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('selected');
+    }
+
+    const customInput = document.getElementById('custom-deposit-input');
+    if (customInput) customInput.value = amount;
+
+    updateBonusPreviewCard();
+};
+
+// Handle Custom Input
+window.handleCustomDepositChange = function(val) {
+    const num = Number(val) || 0;
+    currentDepositAmount = num;
+    currentBonusAmount = computeBonusForAmount(num);
+
+    // Remove pill selection if not exact match
+    const pills = document.querySelectorAll('.amount-pill-card');
+    pills.forEach(p => p.classList.remove('selected'));
+
+    updateBonusPreviewCard();
+};
+
+function updateBonusPreviewCard() {
+    const titleEl = document.getElementById('bonus-card-title');
+    const descEl = document.getElementById('bonus-card-desc');
+    const amtEl = document.getElementById('bonus-card-amount');
+
+    if (currentDepositAmount >= 200) {
+        if (currentBonusAmount > 0) {
+            if (titleEl) titleEl.innerText = currentDepositAmount === 200 ? '100% First Deposit Match Bonus' : 'VIP Tier Match Bonus';
+            if (descEl) descEl.innerText = `Deposit ₹${currentDepositAmount.toLocaleString('en-IN')} & get ₹${(currentDepositAmount + currentBonusAmount).toLocaleString('en-IN')} total playing credit`;
+            if (amtEl) amtEl.innerText = `+₹${currentBonusAmount.toLocaleString('en-IN')}`;
         } else {
-            badge.style.color = '#EF4444';
-            badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-            badge.style.background = 'rgba(239, 68, 68, 0.1)';
-            badge.textContent = '⚠ Account numbers do not match';
+            if (titleEl) titleEl.innerText = 'Standard Fast Deposit';
+            if (descEl) descEl.innerText = `Deposit ₹${currentDepositAmount.toLocaleString('en-IN')} instant play credit`;
+            if (amtEl) amtEl.innerText = '+₹0';
         }
     } else {
-        badge.style.display = 'none';
+        if (titleEl) titleEl.innerText = 'Minimum Deposit is ₹200';
+        if (descEl) descEl.innerText = 'Please select at least ₹200 to receive instant VIP Bonus';
+        if (amtEl) amtEl.innerText = '+₹0';
     }
 }
-window.checkAccountMatching = checkAccountMatching;
 
-// Handle Deposit Submission
-export async function handleDepositSubmit() {
-    const amt = Number(walletState.selectedDepositAmount);
+// Payment Channel Selection (Stage 2)
+window.selectPaymentChannel = function(channelCode, cardElement) {
+    selectedChannel = channelCode;
+    const cards = document.querySelectorAll('.payment-channel-card');
+    cards.forEach(c => c.classList.remove('selected'));
+    if (cardElement) cardElement.classList.add('selected');
+};
+
+// Start Stage 3 (Generate Dynamic QR and Start 10-Minute Countdown)
+window.startDepositCheckoutPhase = function() {
+    if (currentDepositAmount < 200) {
+        showToast('Minimum deposit amount is ₹200');
+        return;
+    }
+
+    goToDepositStage(3);
+
+    // Update Amount & Bonus displays
+    const st3Amt = document.getElementById('stage-3-amount-display');
+    const st3Bonus = document.getElementById('stage-3-bonus-display');
+    if (st3Amt) st3Amt.innerText = `₹${currentDepositAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (st3Bonus) st3Bonus.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ 100% Secure & Fast Deposit';
+
+    // Construct Exact Amount UPI URI
+    const upiId = '6289140468@axl';
+    const upiName = 'Smarty91';
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(currentDepositAmount.toFixed(2))}&cu=INR&tn=VIP_DEP_${Date.now()}`;
+
+    // Set Dynamic QR Image URL
+    const qrImg = document.getElementById('dynamic-qr-image');
+    if (qrImg) {
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(upiUri)}`;
+    }
+
+    // Set Direct UPI App Deep Link
+    const directLink = document.getElementById('upi-direct-app-link');
+    if (directLink) {
+        directLink.href = upiUri;
+    }
+
+    // Start 10-Minute Countdown Timer
+    startCountdownTimer(600);
+};
+
+// 10-Minute Countdown Timer Logic
+function startCountdownTimer(durationSeconds) {
+    clearInterval(countdownInterval);
+    secondsRemaining = durationSeconds;
+
+    const timerDisplay = document.getElementById('checkout-timer-display');
+
+    function tick() {
+        const minutes = Math.floor(secondsRemaining / 60);
+        const seconds = secondsRemaining % 60;
+        const formatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        if (timerDisplay) {
+            timerDisplay.innerText = formatted;
+        }
+
+        if (secondsRemaining <= 0) {
+            clearInterval(countdownInterval);
+            showToast('Payment session expired. Please start again.');
+            goToDepositStage(1);
+        } else {
+            secondsRemaining--;
+        }
+    }
+
+    tick();
+    countdownInterval = setInterval(tick, 1000);
+}
+
+// Copy UPI ID helper
+window.copyUpiId = function() {
+    const upiId = '6289140468@axl';
+    navigator.clipboard.writeText(upiId)
+        .then(() => showToast('Official UPI ID copied: ' + upiId))
+        .catch(() => showToast('UPI ID: ' + upiId));
+};
+
+// Cancel Deposit Session
+window.cancelDepositSession = function() {
+    clearInterval(countdownInterval);
+    goToDepositStage(1);
+};
+
+// Submit Deposit UTR Verification
+window.submitDepositUTR = async function() {
+    const token = localStorage.getItem('smarty91_auth_token');
     const utrInput = document.getElementById('utr-number-input');
+    const submitBtn = document.getElementById('submit-deposit-btn');
     const utr = utrInput ? utrInput.value.trim() : '';
 
-    if (!amt || amt < 200) {
-        showToast('Minimum recharge amount is ₹200', 'error');
+    if (!utr || utr.length < 6) {
+        showToast('Please enter a valid 12-digit UTR / Ref number');
         return;
-    }
-    if (amt > 100000) {
-        showToast('Maximum recharge amount is ₹1,00,000', 'error');
-        return;
-    }
-    if (!utr || utr.length < 8) {
-        showToast('Please enter a valid 12-Digit UTR / Transaction Reference Number', 'error');
-        return;
-    }
-
-    const btn = document.getElementById('btn-submit-deposit');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span>Verifying & Submitting...</span>';
     }
 
     try {
-        const res = await walletService.submitDepositRequest({
-            amount: amt,
-            utrNumber: utr,
-            upiId: walletState.upiId,
-            channel: 'UPI_FAST'
+        if (window.SmartyLoader) window.SmartyLoader.show('Submitting UTR Verification...');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting...';
+        }
+
+        const res = await fetch('/api/wallet/deposit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                amount: currentDepositAmount,
+                utrNumber: utr,
+                upiId: '6289140468@axl',
+                channel: selectedChannel
+            })
         });
 
-        if (res && res.success) {
-            // Trigger Clean Auto-Redirect Overlay
-            const overlay = document.getElementById('redirect-overlay');
-            const heading = document.getElementById('redirect-modal-heading');
-            const desc = document.getElementById('redirect-modal-message');
-            const countdown = document.getElementById('countdown-indicator');
+        const data = await res.json();
 
-            if (heading) heading.textContent = 'PAYMENT SUBMITTED';
-            if (desc) desc.textContent = `₹${amt.toLocaleString('en-IN')} recharge recorded (UTR: ${utr}). Real-time balance and ₹200 bonus will update in your game wallet.`;
-            if (overlay) overlay.classList.add('active');
-
-            let timeLeft = 3;
-            const timer = setInterval(() => {
-                timeLeft -= 1;
-                if (countdown) countdown.textContent = `Redirecting to Game in ${timeLeft}s...`;
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    window.location.href = 'index.html';
-                }
-            }, 1000);
-        } else {
-            showToast(res.message || 'Deposit submission failed', 'error');
+        if (!data.success) {
+            showToast(data.message || 'Deposit submission failed');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Submit UTR Verification';
+            }
+            return;
         }
+
+        clearInterval(countdownInterval);
+        showToast('Deposit request submitted! Credited upon verification within 2-5 minutes.');
+
+        if (utrInput) utrInput.value = '';
+
+        // Switch to History tab after short delay
+        setTimeout(() => {
+            switchCashierTab('history');
+            goToDepositStage(1);
+        }, 1200);
+
     } catch (err) {
-        showToast(err.message || 'Payment submission failed. Please retry.', 'error');
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<span>CONFIRM & SUBMIT RECHARGE</span><span>→</span>';
+        showToast('Network error during deposit submission');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Submit UTR Verification';
         }
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
-}
-window.handleDepositSubmit = handleDepositSubmit;
+};
 
-// Handle Bank Withdrawal Submission
-export async function handleWithdrawSubmit() {
-    const accName = document.getElementById('withdraw-acc-name')?.value.trim() || '';
-    const accNum = document.getElementById('withdraw-acc-number')?.value.trim() || '';
-    const accConfirm = document.getElementById('withdraw-acc-confirm')?.value.trim() || '';
-    const ifsc = document.getElementById('withdraw-ifsc')?.value.trim().toUpperCase() || '';
-    const amt = Number(document.getElementById('withdraw-amount-input')?.value) || 0;
-    const pin = document.getElementById('withdraw-security-pin')?.value.trim() || '';
+// Withdraw All helper
+window.withdrawAllBalance = function() {
+    const bal = currentWalletSummary ? Number(currentWalletSummary.balance || 0) : 0;
+    const input = document.getElementById('withdraw-amount-input');
+    if (input) input.value = Math.floor(bal);
+};
 
-    if (!accName || accName.length < 3) {
-        showToast('Please enter the Account Holder Name as in bank records', 'error');
+// Submit Withdrawal Request
+window.submitWithdrawalRequest = async function() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    const amountInput = document.getElementById('withdraw-amount-input');
+    const holderInput = document.getElementById('withdraw-holder-input');
+    const accountInput = document.getElementById('withdraw-account-input');
+    const ifscInput = document.getElementById('withdraw-ifsc-input');
+    const bankNameInput = document.getElementById('withdraw-bank-name-input');
+    const pinInput = document.getElementById('withdraw-pin-input');
+    const submitBtn = document.getElementById('submit-withdraw-btn');
+
+    const amount = Number(amountInput ? amountInput.value : 0);
+    const holderName = holderInput ? holderInput.value.trim() : '';
+    const accountNum = accountInput ? accountInput.value.trim() : '';
+    const ifsc = ifscInput ? ifscInput.value.trim().toUpperCase() : '';
+    const bankName = bankNameInput ? bankNameInput.value.trim() : 'Bank Transfer';
+    const pin = pinInput ? pinInput.value.trim() : '';
+
+    if (isNaN(amount) || amount < 200) {
+        showToast('Minimum withdrawal amount is ₹200');
         return;
     }
-    if (!accNum || accNum.length < 6) {
-        showToast('Please enter a valid Bank Account Number', 'error');
-        return;
-    }
-    if (accNum !== accConfirm) {
-        showToast('Bank Account Numbers do not match', 'error');
+    if (!accountNum || accountNum.length < 6) {
+        showToast('Please enter a valid bank account number');
         return;
     }
     if (!ifsc || ifsc.length < 8) {
-        showToast('Please enter a valid Bank IFSC Code (e.g. SBIN0001234)', 'error');
+        showToast('Please enter a valid Bank IFSC code');
         return;
-    }
-    if (!amt || amt < 200) {
-        showToast('Minimum bank withdrawal is ₹200', 'error');
-        return;
-    }
-    if (amt > 100000) {
-        showToast('Maximum withdrawal per request is ₹1,00,000', 'error');
-        return;
-    }
-    if (amt > walletState.realBalance) {
-        showToast(`Insufficient real balance. Available: ${formatCurrency(walletState.realBalance)}`, 'error');
-        return;
-    }
-
-    const btn = document.getElementById('btn-submit-withdraw');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span>Processing Request...</span>';
     }
 
     try {
-        const prefix = ifsc.slice(0, 4);
-        const bankName = IFSC_BANKS[prefix] || 'Commercial Bank';
+        if (window.SmartyLoader) window.SmartyLoader.show('Processing Withdrawal Request...');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting...';
+        }
 
-        const res = await walletService.submitBankWithdrawal({
-            amount: amt,
-            accountHolderName: accName,
-            bankName: bankName,
-            accountNumber: accNum,
-            ifsc: ifsc,
-            securityPin: pin
+        const res = await fetch('/api/wallet/withdraw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                amount,
+                accountHolderName: holderName,
+                bankName,
+                accountNumber: accountNum,
+                ifsc,
+                securityPin: pin
+            })
         });
 
-        if (res && res.success) {
-            walletState.realBalance = res.newBalance !== undefined ? res.newBalance : Math.max(0, walletState.realBalance - amt);
-            renderBalances();
+        const data = await res.json();
 
-            // Clear inputs
-            if (document.getElementById('withdraw-acc-number')) document.getElementById('withdraw-acc-number').value = '';
-            if (document.getElementById('withdraw-acc-confirm')) document.getElementById('withdraw-acc-confirm').value = '';
-            if (document.getElementById('withdraw-security-pin')) document.getElementById('withdraw-security-pin').value = '';
-
-            showToast(`Withdrawal request of ₹${amt.toLocaleString('en-IN')} submitted! Funds will credit within 2-24 hours.`, 'success');
-            setTimeout(() => {
-                switchTab('history');
-            }, 1200);
-        } else {
-            showToast(res.message || 'Withdrawal request failed', 'error');
+        if (!data.success) {
+            showToast(data.message || 'Withdrawal failed');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Submit Withdrawal Request';
+            }
+            return;
         }
+
+        showToast(data.message || 'Withdrawal request submitted successfully!');
+
+        // Clear inputs
+        if (amountInput) amountInput.value = '';
+        if (pinInput) pinInput.value = '';
+
+        // Refresh wallet
+        loadWalletData();
+
+        setTimeout(() => {
+            switchCashierTab('history');
+        }, 1200);
+
     } catch (err) {
-        showToast(err.message || 'Withdrawal request failed', 'error');
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<span>REQUEST BANK PAYOUT</span><span>→</span>';
+        showToast('Network error during withdrawal submission');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Submit Withdrawal Request';
         }
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
-}
-window.handleWithdrawSubmit = handleWithdrawSubmit;
+};
 
-// Fetch and Render Transactions Passbook
-export async function fetchTransactions() {
-    const container = document.getElementById('history-items-container');
-    const indicator = document.getElementById('tx-count-indicator');
-    if (!container) return;
+// Render Transaction History (Passbook)
+async function renderTransactionsHistory() {
+    const listContainer = document.getElementById('history-items-list');
+    if (!listContainer) return;
+
+    const token = localStorage.getItem('smarty91_auth_token');
 
     try {
-        const res = await walletService.getTransactions();
-        if (res && res.success && Array.isArray(res.items)) {
-            walletState.transactions = res.items;
-            renderTransactionList();
+        const res = await fetch('/api/wallet/ledger', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!data.success || !Array.isArray(data.items) || data.items.length === 0) {
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 2.5rem 1rem; color: #94A3B8;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
+                    <div style="font-weight: 700; color: #475569;">No Transactions Recorded Yet</div>
+                    <div style="font-size: 0.75rem; margin-top: 4px;">Your deposits and withdrawals will appear here.</div>
+                </div>
+            `;
+            return;
         }
-    } catch (e) {
-        container.innerHTML = `<div class="empty-history-box">Unable to load transactions</div>`;
-    }
-}
 
-export function filterTransactions(filterType, pillEl) {
-    walletState.currentFilter = filterType;
-    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-    if (pillEl) pillEl.classList.add('active');
-    renderTransactionList();
-}
-window.filterTransactions = filterTransactions;
+        let html = '';
+        data.items.slice(0, 30).forEach(item => {
+            const isCredit = item.amount > 0;
+            const amountFormatted = `${isCredit ? '+' : ''}₹${Math.abs(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Recent';
 
-function renderTransactionList() {
-    const container = document.getElementById('history-items-container');
-    const indicator = document.getElementById('tx-count-indicator');
-    if (!container) return;
-
-    let items = [...walletState.transactions];
-    if (walletState.currentFilter !== 'ALL') {
-        items = items.filter(t => t.type === walletState.currentFilter);
-    }
-
-    if (indicator) indicator.textContent = `${items.length} Records`;
-
-    if (items.length === 0) {
-        container.innerHTML = `
-            <div class="empty-history-box">
-                <div style="font-size: 1.8rem; margin-bottom: 6px;">📂</div>
-                <div>No ${walletState.currentFilter === 'ALL' ? '' : walletState.currentFilter.toLowerCase()} transactions found</div>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = items.map(tx => {
-        const isDep = tx.type === 'DEPOSIT';
-        const isPending = tx.status === 'PENDING';
-        const isApproved = tx.status === 'APPROVED';
-        const isRejected = tx.status === 'REJECTED';
-
-        const statusClass = isPending ? 'status-pending' : (isApproved ? 'status-approved' : 'status-rejected');
-        const statusLabel = isPending ? 'Processing (Within 24h)' : (isApproved ? 'Success / Credited' : 'Rejected');
-
-        const title = isDep ? 'Deposit (Instant UPI)' : `Bank Withdrawal (${tx.bankName || 'Bank'})`;
-        const sub = isDep ? `UTR: ${tx.utrNumber || 'N/A'}` : `A/C: •••• ${String(tx.accountNumber || '').slice(-4)}`;
-
-        return `
-            <div class="history-card">
-                <div class="tx-left">
-                    <div class="tx-icon-wrap ${isDep ? 'deposit' : 'withdraw'}">
-                        ${isDep ? '📥' : '📤'}
-                    </div>
-                    <div>
-                        <div class="tx-title">${title}</div>
-                        <div class="tx-time">${formatTime(tx.createdAt)} • ${sub}</div>
-                    </div>
-                </div>
-                <div class="tx-right">
-                    <div class="tx-amount ${isDep ? 'pos' : 'neg'}">
-                        ${isDep ? '+' : '-'}₹${Number(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </div>
-                    <span class="tx-status-badge ${statusClass}">${statusLabel}</span>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// Real-time Firestore sync
-try {
-    subscribeToUserBalance(currentUserId, (userData) => {
-        if (userData && typeof userData.balance === 'number') {
-            walletState.realBalance = userData.balance;
-            if (typeof userData.bonusBalance === 'number') {
-                walletState.bonusBalance = userData.bonusBalance;
+            let statusBadge = '';
+            if (item.type.includes('DEPOSIT')) {
+                statusBadge = `<span class="status-badge approved">Deposit</span>`;
+            } else if (item.type.includes('WITHDRAWAL')) {
+                statusBadge = `<span class="status-badge pending">Withdrawal</span>`;
+            } else if (item.type.includes('BONUS')) {
+                statusBadge = `<span class="status-badge approved">VIP Bonus</span>`;
+            } else if (item.type.includes('WIN')) {
+                statusBadge = `<span class="status-badge approved">Game Win</span>`;
+            } else {
+                statusBadge = `<span class="status-badge pending">${item.type}</span>`;
             }
-            renderBalances();
-        }
-    });
-} catch (e) {
-    console.warn('Realtime listener in payment hub:', e);
+
+            html += `
+                <div class="history-card-item">
+                    <div>
+                        <div class="history-left-title">${item.description || item.type}</div>
+                        <div class="history-time">${dateStr} • Ref: ${item.referenceId || 'N/A'}</div>
+                    </div>
+                    <div class="history-right-val">
+                        <div class="history-amount" style="color: ${isCredit ? '#10B981' : '#E51837'};">${amountFormatted}</div>
+                        <div>${statusBadge}</div>
+                    </div>
+                </div>
+            `;
+        });
+
+        listContainer.innerHTML = html;
+
+    } catch (e) {
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: #EF4444; font-size: 0.85rem;">
+                Failed to load transaction history.
+            </div>
+        `;
+    }
 }
 
-// Initial Bootstrapping
-document.addEventListener('DOMContentLoaded', () => {
-    // Check initial tab in URL hash or query params (?tab=withdraw)
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    if (tabParam && ['deposit', 'withdraw', 'history'].includes(tabParam)) {
-        switchTab(tabParam);
-    } else {
-        switchTab('deposit');
-    }
+// Initial setup on page load
+window.addEventListener('DOMContentLoaded', () => {
+    loadWalletData();
+    updateBonusPreviewCard();
 
-    refreshWalletData(true);
-    selectDepositAmount(200);
+    // Check URL query parameters for active tab (e.g. ?tab=withdraw or ?tab=history)
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedTab = urlParams.get('tab');
+    if (requestedTab && ['deposit', 'withdraw', 'history'].includes(requestedTab)) {
+        window.switchCashierTab(requestedTab);
+    }
 });

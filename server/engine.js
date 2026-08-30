@@ -52,23 +52,13 @@ class Smarty91ServerEngine {
                 '3m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 },
                 '5m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 }
             },
-            // Winning Chances & Probability Weights (Adjustable from Admin Panel)
-            probabilities: {
-                enabled: false, // Set to true when custom probabilities are active
-                // Weights for numbers 0 to 9 (Default: 10% each)
-                numbers: { 0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10 },
-                // Weights for colors
-                colors: { green: 40, red: 40, violet: 20 },
-                // Weights for sizes
-                sizes: { big: 50, small: 50 },
-                // Per-mode custom overrides
-                modeProbabilities: {
-                    '30s': null,
-                    '1m': null,
-                    '3m': null,
-                    '5m': null
-                }
-            }
+            // UPI Config & Merchant Details
+            upiId: '6289140468@axl',
+            upiName: 'Smarty91',
+            minDeposit: 200,
+            maxDeposit: 100000,
+            minWithdrawal: 200,
+            maxWithdrawal: 100000,
         };
 
         // Admin Overrides for Next Outcome: { '30s': 7, '1m': null, ... }
@@ -938,8 +928,23 @@ class Smarty91ServerEngine {
             throw new Error('Maximum deposit amount is ₹1,00,000');
         }
 
-        // Calculate 100% bonus offer: ₹200 on ₹200 deposit (flat ₹200 promo bonus on eligible tiers)
-        const bonusEligibleAmount = numAmount >= 200 ? 200.00 : 0.00;
+        // Calculate tiered bonus for all price points
+        let bonusEligibleAmount = 0;
+        if (numAmount >= 50000) {
+            bonusEligibleAmount = Math.round(numAmount * 0.40); // 40% VIP bonus
+        } else if (numAmount >= 10000) {
+            bonusEligibleAmount = Math.round(numAmount * 0.30); // 30% Bonus (e.g. ₹3,000)
+        } else if (numAmount >= 5000) {
+            bonusEligibleAmount = Math.round(numAmount * 0.25); // 25% Bonus (e.g. ₹1,250)
+        } else if (numAmount >= 2000) {
+            bonusEligibleAmount = Math.round(numAmount * 0.20); // 20% Bonus (e.g. ₹400)
+        } else if (numAmount >= 1000) {
+            bonusEligibleAmount = 250; // ₹250 Bonus (25%)
+        } else if (numAmount >= 500) {
+            bonusEligibleAmount = 150; // ₹150 Bonus (30%)
+        } else if (numAmount >= 200) {
+            bonusEligibleAmount = 200; // 100% Starter Double Bonus (₹200)
+        }
 
         const txId = 'DEP_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         const req = {
@@ -1148,6 +1153,22 @@ class Smarty91ServerEngine {
                     }
                 } else {
                     user.hasDeposited = true;
+                }
+
+                // Credit VIP bonus balance if eligible
+                if (tx.bonusAmount && tx.bonusAmount > 0) {
+                    user.bonusBalance = (user.bonusBalance || 0) + Number(tx.bonusAmount);
+                    this.ledger.unshift({
+                        id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        userId: tx.userId,
+                        type: 'BONUS_CREDIT',
+                        amount: Number(tx.bonusAmount),
+                        balanceBefore: balanceBefore,
+                        balanceAfter: user.balance,
+                        referenceId: tx.id,
+                        timestamp: new Date().toISOString(),
+                        description: `VIP Deposit Match Bonus of ₹${tx.bonusAmount} Credited`
+                    });
                 }
 
                 firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin');

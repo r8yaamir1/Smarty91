@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VIP Cashier & Wallet - Smarty91</title>
-    <meta name="description" content="Secure VIP Cashier, Instant UPI Deposits, 100% Bonus, and Bank Withdrawals">
+    <title>Deposit & Withdrawal Cashier - Smarty91</title>
+    <meta name="description" content="Official Smarty91 Clean 3-Stage Checkout & Direct Bank Withdrawal Portal">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Cinzel:wght@700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="js/loader.js"></script>
+    <script src="js/services/authGate.js"></script>
     <style>
         :root {
-            --bg-primary: #0A0C12;
-            --bg-card: #121520;
-            --bg-card-elevated: #181C2B;
-            --bg-input: #0B0E17;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-gold: rgba(212, 175, 55, 0.35);
-            --gold-primary: #D4AF37;
-            --gold-light: #F3BA2F;
-            --gold-gradient: linear-gradient(135deg, #F3BA2F 0%, #D4AF37 50%, #AA7C11 100%);
-            --red-wine: #3A0B12;
-            --red-wine-gradient: linear-gradient(135deg, #4A0E17 0%, #24050A 100%);
-            --accent-green: #10B981;
-            --accent-blue: #3B82F6;
-            --text-primary: #FFFFFF;
-            --text-secondary: #94A3B8;
+            --brand-red: #E51837;
+            --brand-red-dark: #B80A22;
+            --brand-red-light: #FF3B56;
+            --brand-red-subtle: #FFF1F3;
+            --text-dark: #0F172A;
             --text-muted: #64748B;
+            --text-light: #94A3B8;
+            --bg-page: #F8FAFC;
+            --bg-card: #FFFFFF;
+            --border-color: #E2E8F0;
+            --border-focus: #E51837;
+            --accent-green: #10B981;
+            --accent-gold: #F59E0B;
+            --accent-gold-light: #FEF3C7;
         }
 
         * {
@@ -33,1106 +33,1134 @@
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
+            background-color: var(--bg-page);
+            color: var(--text-dark);
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            background-image: 
-                radial-gradient(circle at 50% 0%, rgba(74, 14, 23, 0.35) 0%, transparent 60%),
-                radial-gradient(circle at 100% 100%, rgba(212, 175, 55, 0.08) 0%, transparent 40%);
-            background-attachment: fixed;
             overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
-        .cashier-wrapper {
+        .cashier-container {
             width: 100%;
-            max-width: 500px;
+            max-width: 480px;
             min-height: 100vh;
+            background: #FFFFFF;
             display: flex;
             flex-direction: column;
-            padding-bottom: 2rem;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
             position: relative;
         }
 
-        /* Top App Bar */
-        .top-navbar {
+        /* Top Red Header */
+        .cashier-header {
+            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
+            color: #FFFFFF;
+            padding: 0.85rem 1rem 1.1rem 1rem;
             position: sticky;
             top: 0;
             z-index: 50;
-            background: rgba(10, 12, 18, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-subtle);
-            padding: 0.75rem 1rem;
+            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.2);
+        }
+
+        .header-nav {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            margin-bottom: 0.85rem;
         }
 
-        .nav-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
+        .back-circle-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.25);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--text-secondary);
+            color: #FFFFFF;
             cursor: pointer;
-            transition: all 0.2s ease;
             text-decoration: none;
+            transition: background 0.15s, transform 0.1s;
         }
-
-        .nav-btn:active {
+        .back-circle-btn:active {
             transform: scale(0.92);
-            background: var(--bg-card-elevated);
-            color: #FFFFFF;
+            background: rgba(255, 255, 255, 0.3);
         }
 
-        .navbar-title {
-            font-family: 'Cinzel', serif;
-            font-size: 1rem;
+        .header-title {
+            font-size: 1.05rem;
             font-weight: 800;
-            letter-spacing: 0.05em;
-            background: var(--gold-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            letter-spacing: 0.3px;
         }
 
-        /* Dual Balance Header Box */
-        .balance-hero {
-            margin: 1rem 1rem 0.75rem;
-            background: var(--red-wine-gradient);
-            border: 1px solid var(--border-gold);
-            border-radius: 16px;
-            padding: 1.25rem 1.25rem 1rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-
-        .balance-hero::before {
-            content: '';
-            position: absolute;
-            top: -40px;
-            right: -40px;
-            width: 140px;
-            height: 140px;
-            background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, transparent 70%);
+        .support-link-btn {
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .balance-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .balance-tag {
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            color: #E2E8F0;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.25);
             display: flex;
             align-items: center;
-            gap: 6px;
-        }
-
-        .refresh-btn {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.75rem;
-            color: var(--gold-light);
-            background: rgba(0, 0, 0, 0.3);
-            padding: 4px 10px;
-            border-radius: 20px;
-            border: 1px solid rgba(212, 175, 55, 0.25);
+            justify-content: center;
+            color: #FFFFFF;
             cursor: pointer;
-            transition: transform 0.2s ease;
         }
 
-        .refresh-btn:active {
-            transform: scale(0.92);
+        /* Balance summary in header */
+        .header-balance-card {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 12px;
+            padding: 0.75rem 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
-        .balance-values-grid {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 0.75rem;
-            margin-top: 0.5rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        .balance-label {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .balance-col-main .val-title {
-            font-size: 0.7rem;
-            color: #CBD5E1;
-            margin-bottom: 2px;
-        }
-
-        .balance-col-main .val-amount {
-            font-size: 1.5rem;
-            font-weight: 800;
+        .balance-amount {
+            font-size: 1.4rem;
+            font-weight: 900;
             color: #FFFFFF;
             font-family: 'JetBrains Mono', monospace;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.5px;
         }
 
-        .balance-col-bonus .val-title {
-            font-size: 0.7rem;
-            color: #FCD34D;
-            margin-bottom: 2px;
+        .balance-sub-row {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 8px;
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 2px;
         }
 
-        .balance-col-bonus .val-amount {
-            font-size: 1.25rem;
+        .bonus-tag-inline {
+            background: #FEF3C7;
+            color: #B45309;
             font-weight: 700;
-            color: #FBBF24;
-            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: 4px;
         }
 
-        /* Segmented Tabs */
-        .tabs-container {
+        /* Top Segment Navigation Tabs (Deposit, Withdraw, History) */
+        .cashier-tab-bar {
             display: flex;
-            margin: 0.75rem 1rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            padding: 4px;
-            gap: 4px;
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 136px;
+            z-index: 40;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 10px 0;
-            background: transparent;
-            border: none;
-            border-radius: 8px;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
+            padding: 0.85rem 0;
+            text-align: center;
+            font-size: 0.88rem;
             font-weight: 700;
+            color: var(--text-muted);
+            border-bottom: 2.5px solid transparent;
             cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            transition: all 0.2s ease;
         }
 
         .tab-btn.active {
-            background: var(--bg-card-elevated);
-            color: #FFFFFF;
-            border: 1px solid var(--border-gold);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            color: var(--brand-red);
+            border-bottom-color: var(--brand-red);
+            background: var(--brand-red-subtle);
         }
 
-        .tab-btn.active .tab-icon {
-            color: var(--gold-light);
-        }
-
-        /* Tab Content Panels */
-        .tab-pane {
-            display: none;
-            padding: 0 1rem;
-            animation: fadeIn 0.25s ease forwards;
-        }
-
-        .tab-pane.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Section Cards */
-        .section-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 1.1rem;
-            margin-bottom: 1rem;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.9rem;
-        }
-
-        .section-title {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: #E2E8F0;
-            letter-spacing: 0.03em;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .section-subtitle {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-        }
-
-        /* Offer Banner */
-        .bonus-offer-box {
-            background: linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(74, 14, 23, 0.25) 100%);
-            border: 1px dashed var(--gold-primary);
-            border-radius: 12px;
-            padding: 0.75rem 0.9rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .bonus-offer-icon {
-            font-size: 1.6rem;
-            line-height: 1;
-        }
-
-        .bonus-offer-text h4 {
-            font-size: 0.82rem;
-            font-weight: 800;
-            color: var(--gold-light);
-            margin-bottom: 2px;
-        }
-
-        .bonus-offer-text p {
-            font-size: 0.72rem;
-            color: #CBD5E1;
-            line-height: 1.3;
-        }
-
-        /* Quick Amount Chips Grid */
-        .amount-chips-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .amount-chip {
-            background: var(--bg-card-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 10px 4px;
-            color: #FFFFFF;
-            font-size: 0.85rem;
-            font-weight: 700;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.15s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .amount-chip:active {
-            transform: scale(0.95);
-        }
-
-        .amount-chip.active {
-            background: rgba(212, 175, 55, 0.15);
-            border-color: var(--gold-primary);
-            color: var(--gold-light);
-        }
-
-        .amount-chip .chip-bonus-badge {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: #EF4444;
-            color: #FFFFFF;
-            font-size: 0.55rem;
-            font-weight: 800;
-            padding: 1px 4px;
-            border-bottom-left-radius: 6px;
-            line-height: 1;
-        }
-
-        /* Input Controls */
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #94A3B8;
-            margin-bottom: 6px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        .input-prefix {
-            position: absolute;
-            left: 12px;
-            color: var(--gold-primary);
-            font-weight: 700;
-            font-size: 0.95rem;
-            pointer-events: none;
-        }
-
-        .form-input {
-            width: 100%;
-            background: var(--bg-input);
-            border: 1.5px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 12px 12px 12px 28px;
-            color: #FFFFFF;
-            font-size: 0.95rem;
-            font-weight: 600;
-            outline: none;
-            transition: border-color 0.2s ease;
-        }
-
-        .form-input.no-prefix {
-            padding-left: 12px;
-        }
-
-        .form-input:focus {
-            border-color: var(--gold-primary);
-            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
-        }
-
-        .input-action-btn {
-            position: absolute;
-            right: 8px;
-            background: rgba(212, 175, 55, 0.15);
-            border: 1px solid var(--gold-primary);
-            color: var(--gold-light);
-            font-size: 0.72rem;
-            font-weight: 700;
-            padding: 5px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .input-action-btn:active {
-            transform: scale(0.92);
-        }
-
-        /* Payment QR Display */
-        .qr-display-card {
-            background: #FFFFFF;
-            border-radius: 14px;
+        /* Main Content Container */
+        .cashier-content {
+            flex: 1;
             padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1rem;
-            width: 220px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            background: var(--bg-page);
         }
 
-        .qr-image {
-            width: 180px;
-            height: 180px;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-
-        .qr-amount-text {
-            margin-top: 6px;
-            font-size: 0.95rem;
-            font-weight: 800;
-            color: #0F172A;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* UPI App Quick Intent Launchers */
-        .upi-apps-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
+        /* --- 3-STAGE STEP WIZARD BAR FOR DEPOSIT --- */
+        .wizard-steps-container {
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.75rem 0.5rem;
             margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
         }
 
-        .upi-app-btn {
-            background: var(--bg-card-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 8px 4px;
+        .step-item {
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
-            color: #E2E8F0;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.15s ease;
+            position: relative;
         }
 
-        .upi-app-btn:active {
-            transform: scale(0.94);
-            border-color: var(--gold-primary);
-        }
-
-        .upi-app-icon {
+        .step-circle {
             width: 28px;
             height: 28px;
-            border-radius: 6px;
+            border-radius: 50%;
+            background: #E2E8F0;
+            color: #64748B;
+            font-size: 0.75rem;
+            font-weight: 800;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 800;
-            font-size: 0.75rem;
-        }
-
-        .upi-app-name {
-            font-size: 0.68rem;
-            font-weight: 600;
-            color: #94A3B8;
-        }
-
-        /* Bank Detection Badge */
-        .bank-badge {
-            display: none;
-            align-items: center;
-            gap: 6px;
-            margin-top: 6px;
-            padding: 4px 8px;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.25);
-            border-radius: 6px;
-            font-size: 0.72rem;
-            color: #10B981;
-            font-weight: 600;
-        }
-
-        /* Action Buttons */
-        .btn-primary-action {
-            width: 100%;
-            background: var(--gold-gradient);
-            color: #0A0C12;
-            border: none;
-            border-radius: 12px;
-            padding: 14px;
-            font-size: 0.95rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            cursor: pointer;
-            box-shadow: 0 4px 18px rgba(212, 175, 55, 0.3);
+            margin-bottom: 4px;
             transition: all 0.2s ease;
+        }
+
+        .step-item.active .step-circle {
+            background: var(--brand-red);
+            color: #FFFFFF;
+            box-shadow: 0 2px 6px rgba(229, 24, 55, 0.35);
+        }
+
+        .step-item.completed .step-circle {
+            background: var(--accent-green);
+            color: #FFFFFF;
+        }
+
+        .step-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748B;
+        }
+
+        .step-item.active .step-label {
+            color: var(--brand-red);
+        }
+
+        .step-line {
+            height: 2px;
+            flex: 0.6;
+            background: #E2E8F0;
+            margin-top: -16px;
+        }
+
+        .step-line.completed {
+            background: var(--accent-green);
+        }
+
+        /* Cards & Section Boxes */
+        .clean-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+        }
+
+        .card-header-title {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+        }
+
+        /* Grid for Amount Selection */
+        .amount-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
+            margin-bottom: 1rem;
         }
 
-        .btn-primary-action:active {
-            transform: scale(0.98);
-            box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
-        }
-
-        .btn-primary-action:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* SLA Notice Box */
-        .sla-notice-box {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            background: rgba(59, 130, 246, 0.08);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+        .amount-pill-card {
+            background: #FFFFFF;
+            border: 1.5px solid var(--border-color);
             border-radius: 10px;
-            padding: 0.75rem 0.85rem;
-            margin-top: 1rem;
-        }
-
-        .sla-notice-box .notice-icon {
-            color: var(--accent-blue);
-            font-size: 1rem;
-            line-height: 1.2;
-        }
-
-        .sla-notice-box .notice-text {
-            font-size: 0.72rem;
-            color: #93C5FD;
-            line-height: 1.4;
-        }
-
-        /* Passbook / History List */
-        .filter-pills-row {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 0.9rem;
-        }
-
-        .filter-pill {
-            background: var(--bg-card-elevated);
-            border: 1px solid var(--border-subtle);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-secondary);
+            padding: 0.75rem 0.25rem;
+            text-align: center;
             cursor: pointer;
+            position: relative;
             transition: all 0.15s ease;
-        }
-
-        .filter-pill.active {
-            background: rgba(212, 175, 55, 0.15);
-            border-color: var(--gold-primary);
-            color: var(--gold-light);
-        }
-
-        .history-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-        }
-
-        .history-card {
-            background: var(--bg-card-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            padding: 0.85rem 1rem;
-            display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: center;
         }
 
-        .tx-left {
+        .amount-pill-card:hover {
+            border-color: #CBD5E1;
+        }
+
+        .amount-pill-card.selected {
+            border-color: var(--brand-red);
+            background: var(--brand-red-subtle);
+            box-shadow: 0 0 0 1px var(--brand-red);
+        }
+
+        .pill-amount {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .amount-pill-card.selected .pill-amount {
+            color: var(--brand-red);
+        }
+
+        .pill-bonus-badge {
+            position: absolute;
+            top: -7px;
+            right: -2px;
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            color: #FFFFFF;
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 1px 5px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            letter-spacing: -0.2px;
+        }
+
+        .pill-subtext {
+            font-size: 0.65rem;
+            color: var(--accent-green);
+            font-weight: 700;
+            margin-top: 3px;
+        }
+
+        /* Custom Input Box */
+        .input-group-clean {
+            display: flex;
+            align-items: center;
+            background: #F8FAFC;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.65rem 0.85rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-group-clean:focus-within {
+            border-color: var(--brand-red);
+            background: #FFFFFF;
+        }
+
+        .input-currency-symbol {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-right: 0.5rem;
+        }
+
+        .clean-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            font-family: inherit;
+        }
+
+        .clean-input::placeholder {
+            color: #94A3B8;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        /* Bonus Highlight Card */
+        .bonus-highlight-box {
+            background: #FFFBEB;
+            border: 1px solid #FCD34D;
+            border-radius: 12px;
+            padding: 0.85rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .bonus-highlight-left {
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .tx-icon-wrap {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-        }
-
-        .tx-icon-wrap.deposit {
-            background: rgba(16, 185, 129, 0.12);
-            color: #10B981;
-            border: 1px solid rgba(16, 185, 129, 0.25);
-        }
-
-        .tx-icon-wrap.withdraw {
-            background: rgba(239, 68, 68, 0.12);
-            color: #EF4444;
-            border: 1px solid rgba(239, 68, 68, 0.25);
-        }
-
-        .tx-title {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: #E2E8F0;
-            margin-bottom: 2px;
-        }
-
-        .tx-time {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .tx-right {
-            text-align: right;
-        }
-
-        .tx-amount {
-            font-size: 0.95rem;
-            font-weight: 800;
-            font-family: 'JetBrains Mono', monospace;
-            margin-bottom: 3px;
-        }
-
-        .tx-amount.pos {
-            color: #10B981;
-        }
-
-        .tx-amount.neg {
-            color: #E2E8F0;
-        }
-
-        .tx-status-badge {
-            display: inline-block;
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-        }
-
-        .status-pending {
-            background: rgba(245, 158, 11, 0.15);
-            color: #F59E0B;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .status-approved {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10B981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .status-rejected {
-            background: rgba(239, 68, 68, 0.15);
-            color: #EF4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .empty-history-box {
-            text-align: center;
-            padding: 2.5rem 1rem;
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        /* Success & Redirect Overlay */
-        .redirect-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 12, 18, 0.92);
-            backdrop-filter: blur(8px);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-
-        .redirect-overlay.active {
-            display: flex;
-        }
-
-        .redirect-modal-card {
-            background: var(--bg-card);
-            border: 1.5px solid var(--border-gold);
-            border-radius: 20px;
-            padding: 1.75rem 1.5rem;
-            text-align: center;
-            max-width: 380px;
-            width: 100%;
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0.85); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .success-tick-circle {
-            width: 64px;
-            height: 64px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 2px solid #10B981;
+        .bonus-gift-icon {
+            width: 36px;
+            height: 36px;
+            background: #FEF3C7;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
-            color: #10B981;
-            margin: 0 auto 1rem;
+            font-size: 1.2rem;
         }
 
-        .redirect-modal-title {
-            font-family: 'Cinzel', serif;
-            font-size: 1.25rem;
+        .bonus-highlight-title {
+            font-size: 0.85rem;
             font-weight: 800;
+            color: #92400E;
+        }
+
+        .bonus-highlight-desc {
+            font-size: 0.72rem;
+            color: #B45309;
+            margin-top: 1px;
+        }
+
+        .bonus-highlight-val {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #B45309;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Primary Action Buttons */
+        .primary-action-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
             color: #FFFFFF;
-            margin-bottom: 0.5rem;
+            border: none;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.25);
+            transition: all 0.15s ease;
         }
 
-        .redirect-modal-desc {
-            font-size: 0.82rem;
-            color: #94A3B8;
-            line-height: 1.5;
-            margin-bottom: 1.25rem;
+        .primary-action-btn:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 6px rgba(229, 24, 55, 0.2);
         }
 
-        .redirect-countdown-badge {
-            display: inline-block;
-            background: rgba(212, 175, 55, 0.15);
-            border: 1px solid var(--gold-primary);
-            color: var(--gold-light);
-            font-size: 0.8rem;
+        .secondary-btn-clean {
+            width: 100%;
+            background: #F1F5F9;
+            color: #475569;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            font-size: 0.88rem;
             font-weight: 700;
-            padding: 6px 14px;
-            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 0.6rem;
+            transition: background 0.15s;
+        }
+
+        /* Payment Channel Cards (Stage 2) with Official Logos */
+        .payment-channel-card {
+            background: #FFFFFF;
+            border: 1.5px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .payment-channel-card:hover {
+            border-color: #CBD5E1;
+        }
+
+        .payment-channel-card.selected {
+            border-color: var(--brand-red);
+            background: var(--brand-red-subtle);
+            box-shadow: 0 0 0 1px var(--brand-red);
+        }
+
+        .channel-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .channel-logo-img {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            padding: 2px;
+        }
+
+        .channel-info-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .channel-info-desc {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .channel-radio {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #CBD5E1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .payment-channel-card.selected .channel-radio {
+            border-color: var(--brand-red);
+        }
+
+        .payment-channel-card.selected .channel-radio::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--brand-red);
+        }
+
+        /* --- STAGE 3: 10-MINUTE COUNTDOWN TIMER & QR --- */
+        .timer-header-banner {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            border-radius: 12px;
+            padding: 0.85rem;
+            text-align: center;
             margin-bottom: 1rem;
         }
 
-        /* Toast notifications */
-        .toast-box {
-            position: fixed;
-            top: 70px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-20px);
-            background: #181C2B;
-            border: 1px solid var(--border-gold);
-            color: #FFFFFF;
-            padding: 10px 18px;
-            border-radius: 25px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 200;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        .timer-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #991B1B;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .toast-box.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
+        .countdown-digits {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--brand-red);
+            font-family: 'JetBrains Mono', monospace;
+            margin: 4px 0;
+            letter-spacing: 1px;
+        }
+
+        .timer-sub-warning {
+            font-size: 0.72rem;
+            color: #7F1D1D;
+        }
+
+        /* Clean QR display card */
+        .qr-display-box {
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.2rem 1rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .qr-code-img {
+            width: 190px;
+            height: 190px;
+            margin: 0.5rem auto;
+            display: block;
+            border-radius: 10px;
+            border: 1px solid #E2E8F0;
+            padding: 6px;
+            background: #FFFFFF;
+        }
+
+        .upi-copy-row {
+            background: #F8FAFC;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+        }
+
+        .upi-id-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: var(--text-dark);
+        }
+
+        .copy-pill-btn {
+            background: var(--brand-red);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .copy-pill-btn:active {
+            background: var(--brand-red-dark);
+        }
+
+        /* Form input labels */
+        .form-field-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 0.35rem;
+            display: block;
+        }
+
+        .form-group-spaced {
+            margin-bottom: 0.85rem;
+        }
+
+        /* Instructions Accordion / Step List */
+        .step-guide-list {
+            background: #F8FAFC;
+            border-radius: 10px;
+            padding: 0.75rem 0.9rem;
+            margin-bottom: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .step-guide-list ol {
+            padding-left: 1.1rem;
+        }
+
+        .step-guide-list li {
+            margin-bottom: 4px;
+        }
+
+        /* History Table & Cards */
+        .history-card-item {
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.85rem;
+            margin-bottom: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .history-left-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .history-time {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            margin-top: 2px;
+        }
+
+        .history-right-val {
+            text-align: right;
+        }
+
+        .history-amount {
+            font-size: 0.95rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 2px;
+            text-transform: uppercase;
+        }
+
+        .status-badge.pending {
+            background: #FEF3C7;
+            color: #B45309;
+        }
+
+        .status-badge.approved {
+            background: #DCFCE7;
+            color: #15803D;
+        }
+
+        .status-badge.rejected {
+            background: #FEE2E2;
+            color: #B91C1C;
+        }
+
+        /* Floating Toast */
+        #cashier-toast {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0F172A;
+            color: #FFFFFF;
+            padding: 0.65rem 1.2rem;
+            border-radius: 30px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            z-index: 9999;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            text-align: center;
+            max-width: 90%;
         }
     </style>
 </head>
 <body>
-
-    <!-- Toast Notification -->
-    <div id="payment-toast" class="toast-box">
-        <span id="toast-icon">✓</span>
-        <span id="toast-msg">Operation completed successfully</span>
-    </div>
-
-    <!-- Success & Auto Redirect Modal -->
-    <div id="redirect-overlay" class="redirect-overlay">
-        <div class="redirect-modal-card">
-            <div class="success-tick-circle">✓</div>
-            <h3 id="redirect-modal-heading" class="redirect-modal-title">DEPOSIT SUBMITTED</h3>
-            <p id="redirect-modal-message" class="redirect-modal-desc">Your payment reference has been recorded. Your wallet balance and ₹200 bonus will update automatically.</p>
-            <div id="countdown-indicator" class="redirect-countdown-badge">Redirecting to Game in 3s...</div>
-            <button id="btn-instant-play" class="btn-primary-action" onclick="window.location.href='index.html'">
-                PLAY SMARTY91 NOW
-            </button>
-        </div>
-    </div>
-
-    <div class="cashier-wrapper">
-        <!-- Top App Bar -->
-        <div class="top-navbar">
-            <a id="btn-back-game" class="nav-btn" href="index.html" title="Back to Game">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                </svg>
-            </a>
-            <h1 class="navbar-title">VIP CASHIER & WALLET</h1>
-            <a id="btn-vip-support" class="nav-btn" href="profile.html" title="VIP Support">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-            </a>
-        </div>
-
-        <!-- Dual Wallet Overview Hero -->
-        <div class="balance-hero">
-            <div class="balance-header-row">
-                <div class="balance-tag">
-                    <span>👑</span>
-                    <span>VIP ACCOUNT ASSETS</span>
-                </div>
-                <div id="btn-refresh-balance" class="refresh-btn" onclick="window.refreshWalletData()">
-                    <span id="refresh-spinner">🔄</span>
-                    <span>Sync</span>
-                </div>
-            </div>
-            <div class="balance-values-grid">
-                <div class="balance-col-main">
-                    <div class="val-title">Real Cash (Withdrawable)</div>
-                    <div id="display-real-balance" class="val-amount">₹0.00</div>
-                </div>
-                <div class="balance-col-bonus">
-                    <div class="val-title">🎁 VIP Bonus</div>
-                    <div id="display-bonus-balance" class="val-amount">₹0.00</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Segmented Tab Switcher -->
-        <div class="tabs-container">
-            <button id="tab-btn-deposit" class="tab-btn active" onclick="window.switchTab('deposit')">
-                <span class="tab-icon">📥</span>
-                <span>Deposit</span>
-            </button>
-            <button id="tab-btn-withdraw" class="tab-btn" onclick="window.switchTab('withdraw')">
-                <span class="tab-icon">📤</span>
-                <span>Withdraw</span>
-            </button>
-            <button id="tab-btn-history" class="tab-btn" onclick="window.switchTab('history')">
-                <span class="tab-icon">📜</span>
-                <span>Passbook</span>
-            </button>
-        </div>
-
-        <!-- ==================================================== -->
-        <!-- 1. DEPOSIT HUB -->
-        <!-- ==================================================== -->
-        <div id="pane-deposit" class="tab-pane active">
-            <!-- 100% Match Bonus Banner -->
-            <div class="bonus-offer-box">
-                <div class="bonus-offer-icon">🎁</div>
-                <div class="bonus-offer-text">
-                    <h4>100% RECHARGE BONUS OFFER</h4>
-                    <p>Recharge ₹200 or more & get an instant ₹200 VIP Bonus balance credited upon verification!</p>
-                </div>
+    <div class="cashier-container">
+        <!-- TOP RED HEADER -->
+        <header class="cashier-header">
+            <div class="header-nav">
+                <a href="index.html" class="back-circle-btn" title="Back to Game">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                </a>
+                <div class="header-title" id="page-main-title">VIP Cashier</div>
+                <a href="profile.html" class="support-link-btn" title="Profile">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </a>
             </div>
 
-            <!-- Quick Amount Presets -->
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">⚡ Select Deposit Amount</span>
-                    <span class="section-subtitle">Min ₹200 - Max ₹1,00,000</span>
+            <!-- Header Balance Display -->
+            <div class="header-balance-card">
+                <div>
+                    <div class="balance-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <line x1="6" y1="12" x2="18" y2="12"></line>
+                        </svg>
+                        Main Balance
+                    </div>
+                    <div class="balance-amount" id="header-user-balance">₹0.00</div>
                 </div>
-
-                <div class="amount-chips-grid">
-                    <button class="amount-chip active" data-amt="200" onclick="window.selectDepositAmount(200)">
-                        <span class="chip-bonus-badge">+₹200</span>
-                        ₹200
-                    </button>
-                    <button class="amount-chip" data-amt="500" onclick="window.selectDepositAmount(500)">
-                        <span class="chip-bonus-badge">+₹200</span>
-                        ₹500
-                    </button>
-                    <button class="amount-chip" data-amt="1000" onclick="window.selectDepositAmount(1000)">
-                        <span class="chip-bonus-badge">+₹200</span>
-                        ₹1,000
-                    </button>
-                    <button class="amount-chip" data-amt="2000" onclick="window.selectDepositAmount(2000)">
-                        ₹2,000
-                    </button>
-                    <button class="amount-chip" data-amt="5000" onclick="window.selectDepositAmount(5000)">
-                        ₹5,000
-                    </button>
-                    <button class="amount-chip" data-amt="10000" onclick="window.selectDepositAmount(10000)">
-                        ₹10,000
-                    </button>
-                    <button class="amount-chip" data-amt="25000" onclick="window.selectDepositAmount(25000)">
-                        ₹25,000
-                    </button>
-                    <button class="amount-chip" data-amt="50000" onclick="window.selectDepositAmount(50000)">
-                        ₹50,000
-                    </button>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="deposit-amount-input">
-                        <span>Custom Deposit Amount</span>
-                        <span id="bonus-preview-tag" style="color: #FBBF24; font-weight: 700;">Bonus: +₹200.00</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <span class="input-prefix">₹</span>
-                        <input id="deposit-amount-input" class="form-input" type="number" value="200" min="200" max="100000" step="50" oninput="window.onDepositAmountChange()">
+                <div style="text-align: right;">
+                    <div class="balance-sub-row">
+                        Bonus: <span id="header-user-bonus" class="bonus-tag-inline">₹0.00</span>
+                    </div>
+                    <div style="font-size: 0.68rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="header-user-phone">
+                        VIP User
                     </div>
                 </div>
             </div>
+        </header>
 
-            <!-- Dynamic UPI Payment Gateway Card -->
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">📲 Step 1: Scan QR or Open UPI App</span>
+        <!-- TOP TAB SWITCHER (Deposit, Withdraw, History) -->
+        <nav class="cashier-tab-bar">
+            <div class="tab-btn active" id="tab-btn-deposit" onclick="switchCashierTab('deposit')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Deposit
+            </div>
+            <div class="tab-btn" id="tab-btn-withdraw" onclick="switchCashierTab('withdraw')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Withdraw
+            </div>
+            <div class="tab-btn" id="tab-btn-history" onclick="switchCashierTab('history')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Passbook
+            </div>
+        </nav>
+
+        <!-- CASHIER MAIN CONTENT -->
+        <main class="cashier-content">
+
+            <!-- ============================================================ -->
+            <!-- TAB 1: DEPOSIT SECTION (3-STAGE WIZARD FLOW) -->
+            <!-- ============================================================ -->
+            <section id="section-deposit" style="display: block;">
+                <!-- 3-STAGE PROGRESS BAR -->
+                <div class="wizard-steps-container">
+                    <div class="step-item active" id="wizard-step-1-indicator">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">Amount</div>
+                    </div>
+                    <div class="step-line" id="wizard-line-1"></div>
+                    <div class="step-item" id="wizard-step-2-indicator">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Payment Type</div>
+                    </div>
+                    <div class="step-line" id="wizard-line-2"></div>
+                    <div class="step-item" id="wizard-step-3-indicator">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Pay & Verify</div>
+                    </div>
                 </div>
 
-                <!-- Live Dynamic QR Code -->
-                <div class="qr-display-card">
-                    <img id="dynamic-qr-img" class="qr-image" src="" alt="Payment QR Code" />
-                    <div id="qr-amount-caption" class="qr-amount-text">PAY ₹200.00</div>
-                </div>
+                <!-- STAGE 1: AMOUNT & BONUS SELECTION -->
+                <div id="deposit-stage-1" style="display: block;">
+                    <div class="clean-card">
+                        <div class="card-header-title">
+                            <span>Select Deposit Amount</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Min ₹200</span>
+                        </div>
 
-                <!-- UPI Intent Quick Launchers for Mobile Users -->
-                <div class="upi-apps-row">
-                    <a id="btn-pay-gpay" class="upi-app-btn" href="#" target="_blank">
-                        <div class="upi-app-icon" style="background: #4285F4; color: #FFF;">G</div>
-                        <span class="upi-app-name">GPay</span>
-                    </a>
-                    <a id="btn-pay-phonepe" class="upi-app-btn" href="#" target="_blank">
-                        <div class="upi-app-icon" style="background: #5F259F; color: #FFF;">Pe</div>
-                        <span class="upi-app-name">PhonePe</span>
-                    </a>
-                    <a id="btn-pay-paytm" class="upi-app-btn" href="#" target="_blank">
-                        <div class="upi-app-icon" style="background: #00BAF2; color: #FFF;">PT</div>
-                        <span class="upi-app-name">Paytm</span>
-                    </a>
-                    <a id="btn-pay-bhim" class="upi-app-btn" href="#" target="_blank">
-                        <div class="upi-app-icon" style="background: #008850; color: #FFF;">BH</div>
-                        <span class="upi-app-name">BHIM</span>
-                    </a>
-                </div>
+                        <!-- Amount Quick Select Grid with Tier Bonuses -->
+                        <div class="amount-grid">
+                            <div class="amount-pill-card selected" onclick="selectDepositAmount(200, 200)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount">₹200</span>
+                                <span class="pill-subtext">+₹200 Bonus</span>
+                            </div>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(500, 150)">
+                                <span class="pill-bonus-badge">+₹150</span>
+                                <span class="pill-amount">₹500</span>
+                                <span class="pill-subtext">+30% Extra</span>
+                            </div>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(1000, 250)">
+                                <span class="pill-bonus-badge">+₹250</span>
+                                <span class="pill-amount">₹1,000</span>
+                                <span class="pill-subtext">+25% Extra</span>
+                            </div>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(2000, 400)">
+                                <span class="pill-bonus-badge">+₹400</span>
+                                <span class="pill-amount">₹2,000</span>
+                                <span class="pill-subtext">+20% Extra</span>
+                            </div>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(5000, 1250)">
+                                <span class="pill-bonus-badge">+₹1,250</span>
+                                <span class="pill-amount">₹5,000</span>
+                                <span class="pill-subtext">+25% VIP</span>
+                            </div>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(10000, 3000)">
+                                <span class="pill-bonus-badge">+₹3,000</span>
+                                <span class="pill-amount">₹10,000</span>
+                                <span class="pill-subtext">+30% High Roller</span>
+                            </div>
+                        </div>
 
-                <!-- Official UPI ID & 1-Click Copy -->
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="official-upi-id-display">Merchant Official UPI VPA</label>
-                    <div class="input-wrapper">
-                        <input id="official-upi-id-display" class="form-input no-prefix" type="text" value="vip.pay@upi" readonly>
-                        <button id="btn-copy-upi" class="input-action-btn" onclick="window.copyMerchantUpi()">
-                            📋 Copy UPI
+                        <!-- Custom Amount Input -->
+                        <div class="form-group-spaced">
+                            <label class="form-field-label">Or Enter Custom Amount (₹200 - ₹1,00,000)</label>
+                            <div class="input-group-clean">
+                                <span class="input-currency-symbol">₹</span>
+                                <input type="number" id="custom-deposit-input" class="clean-input" placeholder="e.g. 500" value="200" min="200" max="100000" oninput="handleCustomDepositChange(this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Highlighted Bonus Preview Card -->
+                        <div class="bonus-highlight-box" id="bonus-preview-box">
+                            <div class="bonus-highlight-left">
+                                <div class="bonus-gift-icon">🎁</div>
+                                <div>
+                                    <div class="bonus-highlight-title" id="bonus-card-title">100% First Deposit Match Bonus</div>
+                                    <div class="bonus-highlight-desc" id="bonus-card-desc">Deposit ₹200 and receive total ₹400 play credit</div>
+                                </div>
+                            </div>
+                            <div class="bonus-highlight-val" id="bonus-card-amount">+₹200</div>
+                        </div>
+
+                        <button type="button" class="primary-action-btn" onclick="goToDepositStage(2)">
+                            <span>Proceed to Payment Type</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Step 2: UTR Reference Submission -->
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">🧾 Step 2: Submit 12-Digit UTR Number</span>
-                    <span class="section-subtitle">Found in payment receipt</span>
-                </div>
+                <!-- STAGE 2: PAYMENT TYPE SELECTION (Official Logos) -->
+                <div id="deposit-stage-2" style="display: none;">
+                    <div class="clean-card">
+                        <div class="card-header-title">
+                            <span>Select UPI Payment Channel</span>
+                            <span style="font-size: 0.85rem; font-weight: 800; color: var(--brand-red);" id="stage-2-amount-display">₹200</span>
+                        </div>
 
-                <div class="form-group">
-                    <div class="input-wrapper">
-                        <input id="utr-number-input" class="form-input no-prefix" type="text" placeholder="e.g. 423589123456" maxlength="22" oninput="window.validateUtrInput()">
+                        <!-- Channel 1: Google Pay -->
+                        <div class="payment-channel-card selected" onclick="selectPaymentChannel('GPAY', this)">
+                            <div class="channel-left">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="Google Pay" class="channel-logo-img">
+                                <div>
+                                    <div class="channel-info-title">Google Pay (GPay)</div>
+                                    <div class="channel-info-desc">Instant 0% fee deposit via GPay UPI</div>
+                                </div>
+                            </div>
+                            <div class="channel-radio"></div>
+                        </div>
+
+                        <!-- Channel 2: PhonePe -->
+                        <div class="payment-channel-card" onclick="selectPaymentChannel('PHONEPE', this)">
+                            <div class="channel-left">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" class="channel-logo-img">
+                                <div>
+                                    <div class="channel-info-title">PhonePe</div>
+                                    <div class="channel-info-desc">Fast UPI auto-redirect / QR</div>
+                                </div>
+                            </div>
+                            <div class="channel-radio"></div>
+                        </div>
+
+                        <!-- Channel 3: Paytm -->
+                        <div class="payment-channel-card" onclick="selectPaymentChannel('PAYTM', this)">
+                            <div class="channel-left">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" class="channel-logo-img">
+                                <div>
+                                    <div class="channel-info-title">Paytm UPI</div>
+                                    <div class="channel-info-desc">Pay directly from Paytm Wallet/UPI</div>
+                                </div>
+                            </div>
+                            <div class="channel-radio"></div>
+                        </div>
+
+                        <!-- Channel 4: BHIM & All UPI Apps -->
+                        <div class="payment-channel-card" onclick="selectPaymentChannel('BHIM_UPI', this)">
+                            <div class="channel-left">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" class="channel-logo-img">
+                                <div>
+                                    <div class="channel-info-title">Any UPI / QR Scan</div>
+                                    <div class="channel-info-desc">BHIM, CRED, Amazon Pay & Bank UPI</div>
+                                </div>
+                            </div>
+                            <div class="channel-radio"></div>
+                        </div>
+
+                        <button type="button" class="primary-action-btn" onclick="startDepositCheckoutPhase()">
+                            <span>Generate QR & Pay Now</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </button>
+
+                        <button type="button" class="secondary-btn-clean" onclick="goToDepositStage(1)">
+                            ← Change Amount
+                        </button>
                     </div>
                 </div>
 
-                <button id="btn-submit-deposit" class="btn-primary-action" onclick="window.handleDepositSubmit()">
-                    <span>CONFIRM & SUBMIT RECHARGE</span>
-                    <span>→</span>
-                </button>
-            </div>
-        </div>
+                <!-- STAGE 3: 10-MINUTE COUNTDOWN & DYNAMIC QR -->
+                <div id="deposit-stage-3" style="display: none;">
+                    <!-- 10 Minute Countdown Banner -->
+                    <div class="timer-header-banner">
+                        <div class="timer-label">Payment Session Expires In</div>
+                        <div class="countdown-digits" id="checkout-timer-display">10:00</div>
+                        <div class="timer-sub-warning">Please complete UPI payment before this timer reaches 00:00</div>
+                    </div>
 
-        <!-- ==================================================== -->
-        <!-- 2. BANK WITHDRAWAL HUB -->
-        <!-- ==================================================== -->
-        <div id="pane-withdraw" class="tab-pane">
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">🏧 Direct Bank Withdrawal</span>
-                    <span class="section-subtitle">2-24 Hours Payout</span>
-                </div>
+                    <!-- Clean QR & Payment Details Box -->
+                    <div class="qr-display-box">
+                        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Amount Payable</div>
+                        <div style="font-size: 1.6rem; font-weight: 900; color: var(--brand-red); font-family: 'JetBrains Mono', monospace;" id="stage-3-amount-display">
+                            ₹200.00
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--accent-green); font-weight: 700;" id="stage-3-bonus-display">
+                            + Includes ₹200 VIP Bonus
+                        </div>
 
-                <!-- Account Holder Name -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-acc-name">Account Holder Name</label>
-                    <div class="input-wrapper">
-                        <input id="withdraw-acc-name" class="form-input no-prefix" type="text" placeholder="Full name as in bank passbook">
+                        <!-- Dynamic QR generated for exact amount -->
+                        <img id="dynamic-qr-image" src="" alt="Scan & Pay UPI QR" class="qr-code-img">
+
+                        <!-- Direct App Deep Link Button (On Mobile) -->
+                        <a id="upi-direct-app-link" href="#" class="primary-action-btn" style="margin-top: 0.75rem; text-decoration: none;">
+                            <span>Open In UPI App</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>
+
+                        <!-- UPI ID Copy Card -->
+                        <div class="upi-copy-row">
+                            <div>
+                                <div style="font-size: 0.65rem; color: var(--text-light); text-align: left;">Official UPI ID</div>
+                                <div class="upi-id-text" id="upi-merchant-id">6289140468@axl</div>
+                            </div>
+                            <button type="button" class="copy-pill-btn" onclick="copyUpiId()">Copy UPI ID</button>
+                        </div>
+                    </div>
+
+                    <!-- Step Guide List -->
+                    <div class="step-guide-list">
+                        <div style="font-weight: 800; color: var(--text-dark); margin-bottom: 4px;">📌 How to complete deposit:</div>
+                        <ol>
+                            <li>Scan QR code with GPay, PhonePe, Paytm or any UPI app.</li>
+                            <li>Pay exact amount shown above.</li>
+                            <li>Copy the <b>12-digit UTR / Ref Number</b> from transaction details.</li>
+                            <li>Paste UTR below and tap <b>Submit UTR Verification</b>.</li>
+                        </ol>
+                    </div>
+
+                    <!-- UTR Submission Card -->
+                    <div class="clean-card">
+                        <div class="form-group-spaced">
+                            <label class="form-field-label">Enter 12-Digit UPI Reference / UTR Number <span style="color: var(--brand-red);">*</span></label>
+                            <div class="input-group-clean">
+                                <input type="text" id="utr-number-input" class="clean-input" maxlength="20" placeholder="e.g. 423589123456" autocomplete="off">
+                            </div>
+                            <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
+                                UTR is found in your UPI app receipt under 'UPI Transaction ID' or 'Ref No.'
+                            </div>
+                        </div>
+
+                        <button type="button" id="submit-deposit-btn" class="primary-action-btn" onclick="submitDepositUTR()">
+                            <span>Submit UTR Verification</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </button>
+
+                        <button type="button" class="secondary-btn-clean" onclick="cancelDepositSession()">
+                            Cancel & Return
+                        </button>
                     </div>
                 </div>
+            </section>
 
-                <!-- Bank Account Number -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-acc-number">Bank Account Number</label>
-                    <div class="input-wrapper">
-                        <input id="withdraw-acc-number" class="form-input no-prefix" type="password" placeholder="Enter bank account number" oninput="window.checkAccountMatching()">
+            <!-- ============================================================ -->
+            <!-- TAB 2: WITHDRAWAL SECTION (CLEAN WHITE & RED) -->
+            <!-- ============================================================ -->
+            <section id="section-withdraw" style="display: none;">
+                <div class="clean-card">
+                    <div class="card-header-title">
+                        <span>Withdraw to Bank Account</span>
+                        <span style="font-size: 0.72rem; color: var(--accent-green); font-weight: 700;">2-24 Hrs Payout</span>
+                    </div>
+
+                    <!-- Withdrawal Amount -->
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">Withdrawal Amount (₹200 - ₹1,00,000)</label>
+                        <div class="input-group-clean">
+                            <span class="input-currency-symbol">₹</span>
+                            <input type="number" id="withdraw-amount-input" class="clean-input" placeholder="Min ₹200" min="200" max="100000">
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
+                            <span>Available: <b id="withdraw-available-bal">₹0.00</b></span>
+                            <span style="color: var(--brand-red); cursor: pointer; font-weight: 700;" onclick="withdrawAllBalance()">Withdraw All</span>
+                        </div>
+                    </div>
+
+                    <!-- Bank Account Details -->
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">Bank Account Holder Name</label>
+                        <div class="input-group-clean">
+                            <input type="text" id="withdraw-holder-input" class="clean-input" placeholder="Name as in Bank Passbook">
+                        </div>
+                    </div>
+
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">Bank Account Number</label>
+                        <div class="input-group-clean">
+                            <input type="tel" id="withdraw-account-input" class="clean-input" placeholder="Enter bank account number">
+                        </div>
+                    </div>
+
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">Bank IFSC Code</label>
+                        <div class="input-group-clean">
+                            <input type="text" id="withdraw-ifsc-input" class="clean-input" placeholder="e.g. SBIN0001234" style="text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">Bank Name</label>
+                        <div class="input-group-clean">
+                            <input type="text" id="withdraw-bank-name-input" class="clean-input" placeholder="e.g. State Bank of India / HDFC">
+                        </div>
+                    </div>
+
+                    <!-- Security PIN -->
+                    <div class="form-group-spaced">
+                        <label class="form-field-label">6-Digit Security PIN</label>
+                        <div class="input-group-clean">
+                            <input type="password" id="withdraw-pin-input" class="clean-input" maxlength="6" placeholder="Enter Security PIN (or last 4 digits of phone)">
+                        </div>
+                    </div>
+
+                    <button type="button" id="submit-withdraw-btn" class="primary-action-btn" onclick="submitWithdrawalRequest()">
+                        <span>Submit Withdrawal Request</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ============================================================ -->
+            <!-- TAB 3: PASSBOOK & TRANSACTION HISTORY -->
+            <!-- ============================================================ -->
+            <section id="section-history" style="display: none;">
+                <div class="card-header-title" style="margin-bottom: 0.5rem;">
+                    <span>Recent Transactions</span>
+                    <button type="button" onclick="loadWalletData()" style="background: transparent; border: none; color: var(--brand-red); font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+                        🔄 Refresh
+                    </button>
+                </div>
+
+                <!-- History items container -->
+                <div id="history-items-list">
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+                        Loading transaction passbook...
                     </div>
                 </div>
+            </section>
+        </main>
 
-                <!-- Confirm Bank Account Number -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-acc-confirm">Confirm Bank Account Number</label>
-                    <div class="input-wrapper">
-                        <input id="withdraw-acc-confirm" class="form-input no-prefix" type="text" placeholder="Re-enter bank account number" oninput="window.checkAccountMatching()">
-                    </div>
-                    <div id="acc-match-badge" class="bank-badge" style="display: none;"></div>
-                </div>
-
-                <!-- Bank IFSC Code -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-ifsc">Bank IFSC Code</label>
-                    <div class="input-wrapper">
-                        <input id="withdraw-ifsc" class="form-input no-prefix" type="text" placeholder="e.g. SBIN0001234, HDFC0000128" maxlength="11" oninput="window.onIfscLookup(this.value)">
-                    </div>
-                    <div id="bank-detected-name" class="bank-badge">
-                        <span>🏛️</span>
-                        <span id="detected-bank-label">State Bank of India</span>
-                    </div>
-                </div>
-
-                <!-- Withdrawal Amount -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-amount-input">
-                        <span>Withdrawal Amount (₹)</span>
-                        <span style="color: #94A3B8;">Min ₹200 • Max ₹1,00,000</span>
-                    </label>
-                    <div class="input-wrapper">
-                        <span class="input-prefix">₹</span>
-                        <input id="withdraw-amount-input" class="form-input" type="number" min="200" max="100000" value="500" placeholder="500">
-                    </div>
-                </div>
-
-                <!-- 6-Digit VIP Security PIN -->
-                <div class="form-group">
-                    <label class="form-label" for="withdraw-security-pin">VIP Security PIN (4-6 Digits)</label>
-                    <div class="input-wrapper">
-                        <input id="withdraw-security-pin" class="form-input no-prefix" type="password" maxlength="6" placeholder="Enter your withdrawal security PIN">
-                    </div>
-                </div>
-
-                <button id="btn-submit-withdraw" class="btn-primary-action" onclick="window.handleWithdrawSubmit()">
-                    <span>REQUEST BANK PAYOUT</span>
-                    <span>→</span>
-                </button>
-
-                <!-- SLA Information Notice (Zero mention of Admin Panel!) -->
-                <div class="sla-notice-box">
-                    <div class="notice-icon">⚡</div>
-                    <div class="notice-text">
-                        <strong>Official Banking SLA:</strong> Payout requests are verified securely and settled directly into your linked bank account within 2 to 24 banking hours.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ==================================================== -->
-        <!-- 3. PASSBOOK & TRANSACTION RECORDS -->
-        <!-- ==================================================== -->
-        <div id="pane-history" class="tab-pane">
-            <div class="section-card">
-                <div class="section-header">
-                    <span class="section-title">📜 Financial Ledger & History</span>
-                    <span id="tx-count-indicator" class="section-subtitle">0 Records</span>
-                </div>
-
-                <!-- Filter Pills -->
-                <div class="filter-pills-row">
-                    <button class="filter-pill active" onclick="window.filterTransactions('ALL', this)">All</button>
-                    <button class="filter-pill" onclick="window.filterTransactions('DEPOSIT', this)">Deposits</button>
-                    <button class="filter-pill" onclick="window.filterTransactions('WITHDRAWAL', this)">Withdrawals</button>
-                </div>
-
-                <!-- Transactions History Container -->
-                <div id="history-items-container" class="history-list">
-                    <div class="empty-history-box">
-                        <span>Loading transactions...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <!-- Notification Toast -->
+        <div id="cashier-toast"></div>
     </div>
 
-    <!-- Payment Module Logic -->
-    <script type="module" src="/js/payment.js"></script>
+    <script type="module" src="js/payment.js"></script>
 </body>
 </html>
