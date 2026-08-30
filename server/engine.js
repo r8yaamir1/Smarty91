@@ -112,6 +112,9 @@ class Smarty91ServerEngine {
 
         // Start Server Clock Daemon Loop (100ms high-precision interval)
         this.intervalId = setInterval(() => this._tick(), 100);
+        if (this.intervalId && typeof this.intervalId.unref === 'function') {
+            this.intervalId.unref();
+        }
 
         // Connect Firebase Firestore Cloud Sync
         firebaseSync.init(this);

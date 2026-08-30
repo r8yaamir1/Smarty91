@@ -1,11 +1,11 @@
 import { defineConfig } from 'vite';
-import { apiRouter } from './server/apiRouter.js';
-import express from 'express';
 
 function expressApiPlugin() {
     return {
         name: 'express-api-plugin',
-        configureServer(server) {
+        async configureServer(server) {
+            const express = (await import('express')).default;
+            const { apiRouter } = await import('./server/apiRouter.js');
             const app = express();
             app.use(express.json());
             app.use('/api', apiRouter);
@@ -21,7 +21,8 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: './index.html',
-                admin: './admin.html'
+                admin: './admin.html',
+                login: './login.html'
             }
         }
     },
@@ -34,3 +35,4 @@ export default defineConfig({
         host: '0.0.0.0'
     }
 });
+
