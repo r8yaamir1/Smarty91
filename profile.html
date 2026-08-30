@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en" translate="no" class="notranslate" data-dpr="1">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Smarty91 - VIP Profile</title>
+    <link rel="stylesheet" href="css/page-home.css" />
+    <link rel="stylesheet" href="css/module.css" />
+    <link rel="stylesheet" href="css/module-critical.css" />
+    <link rel="stylesheet" href="css/index.css" />
+    <link rel="stylesheet" href="css/premium-theme.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            function setRem() {
+                const html = document.documentElement;
+                let width = html.clientWidth || window.innerWidth;
+                if (width > 540) width = 540;
+                if (width < 320) width = 320;
+                const rem = (width / 10);
+                html.style.fontSize = rem + "px";
+            }
+            setRem();
+            window.addEventListener("resize", setRem);
+            window.addEventListener("orientationchange", setRem);
+            document.addEventListener("DOMContentLoaded", setRem);
+        })();
+    </script>
+    <script src="js/loader.js"></script>
+    <style>
+        :root {
+            --red-primary: #E51837;
+            --red-deep: #800414;
+            --red-dark: #B80A22;
+            --gold-accent: #FFD700;
+            --gold-light: #FFF099;
+            --bg-dark: #0D0E15;
+            --card-bg: #151722;
+            --card-border: rgba(229, 24, 55, 0.25);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .profile-container {
+            width: 100%;
+            max-width: 540px;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #181A26 0%, #0D0E15 100%);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-sizing: border-box;
+            padding: 0 0 1.2rem 0;
+        }
+
+        /* Top Header */
+        .profile-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.35rem 0.4rem;
+            background: linear-gradient(180deg, #800414 0%, #B80A22 100%);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+
+        .profile-back-btn {
+            width: 0.85rem;
+            height: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #ffffff;
+            background: rgba(0,0,0,0.25);
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.15s;
+        }
+        .profile-back-btn:active {
+            transform: scale(0.92);
+        }
+
+        .profile-header-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.46rem;
+            font-weight: 800;
+            letter-spacing: 0.04rem;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 40%, #FFD700 80%, #D4AF37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            margin: 0;
+        }
+
+        .profile-support-btn {
+            width: 0.85rem;
+            height: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #FFD700;
+            background: rgba(0,0,0,0.25);
+            border-radius: 50%;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        /* VIP Banner & Avatar Card */
+        .vip-hero-card {
+            background: linear-gradient(135deg, #A8081E 0%, #6E020E 100%);
+            border: 1.5px solid rgba(255, 215, 0, 0.4);
+            border-radius: 0.45rem;
+            margin: 0.35rem 0.35rem 0.25rem 0.35rem;
+            padding: 0.45rem 0.4rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vip-hero-card::after {
+            content: '👑';
+            position: absolute;
+            right: -0.2rem;
+            top: -0.15rem;
+            font-size: 2.2rem;
+            opacity: 0.12;
+            pointer-events: none;
+        }
+
+        .vip-user-info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .vip-avatar-wrap {
+            position: relative;
+            width: 1.6rem;
+            height: 1.6rem;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FFE082 0%, #FFD700 50%, #B8860B 100%);
+            padding: 0.05rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .vip-avatar-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #14151E;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
+        .vip-badge-tag {
+            position: absolute;
+            bottom: -0.1rem;
+            background: linear-gradient(135deg, #FFE082 0%, #FFD700 100%);
+            color: #000;
+            font-size: 0.22rem;
+            font-weight: 900;
+            padding: 0.04rem 0.16rem;
+            border-radius: 0.3rem;
+            border: 1px solid #7c0000;
+            font-family: 'Cinzel', serif;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+
+        .vip-details-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .vip-phone-title {
+            font-size: 0.48rem;
+            font-weight: 800;
+            color: #FFFFFF;
+            letter-spacing: 0.02rem;
+            margin-bottom: 0.08rem;
+        }
+
+        .vip-tier-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.28rem;
+            font-weight: 800;
+            color: #FFD700;
+            display: flex;
+            align-items: center;
+            gap: 0.1rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .vip-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.15rem;
+        }
+
+        .vip-copy-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.1rem;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,215,0,0.25);
+            border-radius: 0.25rem;
+            padding: 0.08rem 0.2rem;
+            font-size: 0.24rem;
+            color: #E2E8F0;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .vip-copy-chip:active {
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        /* VIP Tier Progress Bar */
+        .vip-progress-box {
+            margin-top: 0.35rem;
+            background: rgba(0,0,0,0.35);
+            border-radius: 0.2rem;
+            padding: 0.2rem 0.25rem;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .vip-progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.22rem;
+            color: #D1D5DB;
+            margin-bottom: 0.1rem;
+        }
+
+        .vip-progress-track {
+            height: 0.14rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 0.1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .vip-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF6B81 0%, #FFD700 100%);
+            border-radius: 0.1rem;
+            transition: width 0.4s ease;
+        }
+
+        /* Wallet Red & Gold Balance Box */
+        .wallet-luxury-box {
+            background: linear-gradient(135deg, #181A26 0%, #11131C 100%);
+            border: 1.5px solid rgba(255, 215, 0, 0.35);
+            border-radius: 0.45rem;
+            margin: 0.25rem 0.35rem;
+            padding: 0.45rem 0.4rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45), 0 0 20px rgba(229, 24, 55, 0.15);
+        }
+
+        .wallet-bal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #9CA3AF;
+            font-size: 0.28rem;
+            font-weight: 600;
+        }
+
+        .wallet-refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.08rem;
+            color: #FFD700;
+            cursor: pointer;
+            font-size: 0.24rem;
+            background: rgba(255, 215, 0, 0.1);
+            padding: 0.06rem 0.18rem;
+            border-radius: 0.25rem;
+            border: 1px solid rgba(255, 215, 0, 0.25);
+        }
+
+        .wallet-bal-display {
+            font-size: 0.76rem;
+            font-weight: 900;
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF4B8 50%, #FFD700 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+            letter-spacing: 0.02em;
+            margin: 0.15rem 0 0.35rem 0;
+        }
+
+        .wallet-action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.25rem;
+        }
+
+        .wallet-main-btn {
+            height: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.12rem;
+            border-radius: 0.25rem;
+            font-size: 0.34rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s, filter 0.15s;
+            text-decoration: none;
+        }
+        .wallet-main-btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-deposit {
+            background: linear-gradient(135deg, #FF3855 0%, #E51837 50%, #B80A22 100%);
+            color: #FFFFFF;
+            border: 1px solid #FF8E9E;
+            box-shadow: 0 4px 15px rgba(229, 24, 55, 0.4);
+        }
+
+        .btn-withdraw {
+            background: linear-gradient(135deg, #2D3043 0%, #1A1C28 100%);
+            color: #FFD700;
+            border: 1px solid rgba(255, 215, 0, 0.35);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+
+        /* Performance Analytics Dashboard */
+        .analytics-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.45rem;
+            margin: 0.25rem 0.35rem;
+            padding: 0.4rem;
+        }
+
+        .section-header {
+            font-family: 'Cinzel', serif;
+            font-size: 0.36rem;
+            font-weight: 800;
+            color: #FFD700;
+            letter-spacing: 0.02rem;
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .perf-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .win-rate-circle-wrap {
+            position: relative;
+            width: 2.2rem;
+            height: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .win-rate-circle-wrap svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .win-rate-text-center {
+            position: absolute;
+            text-align: center;
+        }
+
+        .win-rate-val {
+            font-size: 0.44rem;
+            font-weight: 900;
+            color: #FFD700;
+            line-height: 1;
+        }
+
+        .win-rate-lbl {
+            font-size: 0.2rem;
+            color: #9CA3AF;
+            margin-top: 0.04rem;
+        }
+
+        .perf-metrics-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.2rem;
+        }
+
+        .perf-metric-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 0.2rem;
+            padding: 0.18rem;
+        }
+
+        .perf-metric-label {
+            font-size: 0.22rem;
+            color: #9CA3AF;
+            margin-bottom: 0.04rem;
+        }
+
+        .perf-metric-val {
+            font-size: 0.36rem;
+            font-weight: 800;
+            color: #FFFFFF;
+        }
+
+        /* Financial Passbook / Ledger Card */
+        .ledger-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.45rem;
+            margin: 0.25rem 0.35rem;
+            padding: 0.4rem;
+        }
+
+        .ledger-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .ledger-item:last-child {
+            border-bottom: none;
+        }
+
+        .ledger-left {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .ledger-icon {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.4rem;
+        }
+
+        .ledger-title {
+            font-size: 0.3rem;
+            font-weight: 700;
+            color: #E2E8F0;
+        }
+
+        .ledger-time {
+            font-size: 0.22rem;
+            color: #6B7280;
+            margin-top: 0.04rem;
+        }
+
+        .ledger-right {
+            text-align: right;
+        }
+
+        .ledger-amount {
+            font-size: 0.32rem;
+            font-weight: 800;
+        }
+
+        .ledger-bal {
+            font-size: 0.2rem;
+            color: #6B7280;
+            margin-top: 0.02rem;
+        }
+
+        /* Account Settings Menu */
+        .menu-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.45rem;
+            margin: 0.25rem 0.35rem;
+            padding: 0.15rem 0.4rem;
+        }
+
+        .menu-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.32rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .menu-row:last-child {
+            border-bottom: none;
+        }
+        .menu-row:active {
+            opacity: 0.7;
+        }
+
+        .menu-left {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.32rem;
+            font-weight: 600;
+            color: #E2E8F0;
+        }
+
+        .menu-right-arrow {
+            color: #6B7280;
+            font-size: 0.32rem;
+        }
+
+        .logout-btn-wrap {
+            margin: 0.4rem 0.35rem 0.5rem 0.35rem;
+        }
+
+        .logout-btn {
+            width: 100%;
+            height: 1.05rem;
+            background: linear-gradient(135deg, #7F1D1D 0%, #450A0A 100%);
+            border: 1px solid #EF4444;
+            color: #FCA5A5;
+            font-size: 0.34rem;
+            font-weight: 800;
+            border-radius: 0.3rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.15s;
+        }
+        .logout-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Toast notification */
+        #profile-toast {
+            display: none;
+            position: fixed;
+            top: 1.2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(184, 10, 34, 0.95);
+            color: #FFFFFF;
+            border: 1px solid #FFD700;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.4rem;
+            font-size: 0.28rem;
+            font-weight: 700;
+            z-index: 10005;
+            text-align: center;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Spinning animation for refresh icon */
+        .spinning {
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Security PIN Modal */
+        .security-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10002;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+        }
+
+        .security-modal-box {
+            background: #181A26;
+            border: 1.5px solid rgba(255, 215, 0, 0.35);
+            border-radius: 0.45rem;
+            width: 90%;
+            max-width: 420px;
+            padding: 0.5rem 0.45rem;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.8);
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div id="profile-toast">Message</div>
+
+    <!-- Main Container -->
+    <div class="profile-container">
+        <!-- Top Nav Bar -->
+        <div class="profile-top-bar">
+            <div class="profile-back-btn" onclick="window.location.href='index.html'" title="Back to Game">
+                <svg viewBox="0 0 24 24" width="0.45rem" height="0.45rem" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </div>
+            <h1 class="profile-header-title">VIP PROFILE</h1>
+            <div class="profile-support-btn" onclick="window.openCustomerSupport()" title="VIP Support">
+                <svg viewBox="0 0 24 24" width="0.45rem" height="0.45rem" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <!-- VIP Hero Card -->
+        <div class="vip-hero-card">
+            <div class="vip-user-info-row">
+                <div class="vip-avatar-wrap">
+                    <div class="vip-avatar-inner">👑</div>
+                    <span class="vip-badge-tag" id="user-vip-badge-icon">👑 VIP 1</span>
+                </div>
+                <div class="vip-details-wrap">
+                    <div class="vip-phone-title" id="user-phone-display">+91 ••••••••••</div>
+                    <div class="vip-tier-title">
+                        <span id="user-vip-title">VIP Pioneer</span>
+                    </div>
+                    <div class="vip-chip-row">
+                        <div class="vip-copy-chip" onclick="window.copyUID()" title="Click to copy UID">
+                            <span id="user-uid-display">UID 910001</span>
+                            <span style="color: #FFD700; font-size: 0.22rem;">📋</span>
+                        </div>
+                        <div class="vip-copy-chip" onclick="window.copyInvite()" title="Click to copy Referral Link">
+                            <span>Invite: <b id="user-invite-display" style="color: #FFD700;">SM91VIP</b></span>
+                            <span style="color: #FFD700; font-size: 0.22rem;">🔗</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIP Progress Bar -->
+            <div class="vip-progress-box">
+                <div class="vip-progress-header">
+                    <span id="user-vip-level">VIP 1</span>
+                    <span id="vip-progress-text">Progress to VIP 2: 0%</span>
+                </div>
+                <div class="vip-progress-track">
+                    <div class="vip-progress-fill" id="vip-progress-bar" style="width: 10%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallet Balance Card (Luxury Red & Gold) -->
+        <div class="wallet-luxury-box">
+            <div class="wallet-bal-head">
+                <span>TOTAL WALLET BALANCE</span>
+                <div class="wallet-refresh-btn" onclick="window.refreshBalance()">
+                    <span id="balance-refresh-icon">🔄</span>
+                    <span>Refresh</span>
+                </div>
+            </div>
+            <div class="wallet-bal-display" id="user-balance-val">₹0.00</div>
+
+            <div class="wallet-action-grid">
+                <a class="wallet-main-btn btn-deposit" href="index.html" onclick="window.handleUserProfileClick ? null : null">
+                    <span>💳</span>
+                    <span>Deposit</span>
+                </a>
+                <a class="wallet-main-btn btn-withdraw" href="index.html">
+                    <span>🏧</span>
+                    <span>Withdraw</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Gaming Performance Analytics -->
+        <div class="analytics-card">
+            <div class="section-header">
+                <span>PLAYER PERFORMANCE</span>
+                <span style="font-size: 0.24rem; color: #9CA3AF; font-family: 'Outfit', sans-serif;">Live Stats</span>
+            </div>
+            <div class="perf-grid">
+                <!-- SVG Radial Progress Ring -->
+                <div class="win-rate-circle-wrap">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"></circle>
+                        <circle id="stat-win-rate-ring" cx="50" cy="50" r="40" fill="none" stroke="url(#goldGradient)" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="251.2" stroke-linecap="round"></circle>
+                        <defs>
+                            <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#FF3855" />
+                                <stop offset="50%" stop-color="#FFD700" />
+                                <stop offset="100%" stop-color="#FFA500" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="win-rate-text-center">
+                        <div class="win-rate-val" id="stat-win-rate">0.0%</div>
+                        <div class="win-rate-lbl">WIN RATE</div>
+                    </div>
+                </div>
+
+                <!-- 2x2 Metric Grid -->
+                <div class="perf-metrics-list">
+                    <div class="perf-metric-box">
+                        <div class="perf-metric-label">Total Bets</div>
+                        <div class="perf-metric-val" id="stat-total-bets">0</div>
+                    </div>
+                    <div class="perf-metric-box">
+                        <div class="perf-metric-label">Rounds Won</div>
+                        <div class="perf-metric-val" id="stat-total-wins" style="color: #FFD700;">0</div>
+                    </div>
+                    <div class="perf-metric-box">
+                        <div class="perf-metric-label">Total Deposits</div>
+                        <div class="perf-metric-val" id="stat-total-deposit" style="font-size: 0.28rem;">₹0.00</div>
+                    </div>
+                    <div class="perf-metric-box">
+                        <div class="perf-metric-label">Net Profit/Loss</div>
+                        <div class="perf-metric-val" id="stat-net-profit" style="font-size: 0.28rem;">₹0.00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Transaction Ledger / Passbook -->
+        <div class="ledger-card">
+            <div class="section-header">
+                <span>RECENT TRANSACTIONS</span>
+                <span style="font-size: 0.24rem; color: #FFD700; cursor: pointer;" onclick="window.location.href='index.html'">Game Board ›</span>
+            </div>
+            <div id="ledger-history-list">
+                <div style="text-align: center; padding: 0.6rem 0.2rem; color: #6b7280; font-size: 0.32rem;">
+                    Loading transaction records...
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Security & Service Actions -->
+        <div class="menu-card">
+            <div class="menu-row" onclick="window.openSecurityModal()">
+                <div class="menu-left">
+                    <span>🛡️</span>
+                    <span>Security PIN & Password</span>
+                </div>
+                <div class="menu-right-arrow">›</div>
+            </div>
+            <div class="menu-row" onclick="window.copyInvite()">
+                <div class="menu-left">
+                    <span>🎁</span>
+                    <span>Refer Friends & Earn ₹100</span>
+                </div>
+                <div class="menu-right-arrow">›</div>
+            </div>
+            <div class="menu-row" onclick="window.openCustomerSupport()">
+                <div class="menu-left">
+                    <span>💬</span>
+                    <span>24/7 VIP Customer Support</span>
+                </div>
+                <div class="menu-right-arrow">›</div>
+            </div>
+        </div>
+
+        <!-- Log Out Button -->
+        <div class="logout-btn-wrap">
+            <button class="logout-btn" onclick="window.handleLogout()">🚪 Log Out VIP Account</button>
+        </div>
+    </div>
+
+    <!-- Security Change Password Modal -->
+    <div class="security-modal-overlay" id="security-modal">
+        <div class="security-modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <h3 style="margin: 0; font-family: 'Cinzel', serif; color: #FFD700; font-size: 0.4rem;">SECURITY SETTINGS</h3>
+                <span style="cursor: pointer; font-size: 0.45rem; color: #9ca3af;" onclick="window.closeSecurityModal()">✕</span>
+            </div>
+            <form onsubmit="window.handlePasswordChange(event)">
+                <div style="margin-bottom: 0.3rem;">
+                    <label style="display: block; font-size: 0.24rem; color: #9ca3af; margin-bottom: 0.08rem;">6-Digit Security PIN (Used during Registration)</label>
+                    <input type="password" id="security-pin-input" required maxlength="6" placeholder="Enter your 6-digit PIN" style="width: 100%; height: 0.85rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,215,0,0.3); border-radius: 0.2rem; color: #fff; padding: 0 0.25rem; font-size: 0.3rem; box-sizing: border-box;" />
+                </div>
+                <div style="margin-bottom: 0.3rem;">
+                    <label style="display: block; font-size: 0.24rem; color: #9ca3af; margin-bottom: 0.08rem;">New Password (Min 6 chars)</label>
+                    <input type="password" id="new-password-input" required minlength="6" placeholder="Enter new password" style="width: 100%; height: 0.85rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,215,0,0.3); border-radius: 0.2rem; color: #fff; padding: 0 0.25rem; font-size: 0.3rem; box-sizing: border-box;" />
+                </div>
+                <div style="margin-bottom: 0.4rem;">
+                    <label style="display: block; font-size: 0.24rem; color: #9ca3af; margin-bottom: 0.08rem;">Confirm New Password</label>
+                    <input type="password" id="confirm-password-input" required minlength="6" placeholder="Confirm new password" style="width: 100%; height: 0.85rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,215,0,0.3); border-radius: 0.2rem; color: #fff; padding: 0 0.25rem; font-size: 0.3rem; box-sizing: border-box;" />
+                </div>
+                <div style="display: flex; gap: 0.25rem;">
+                    <button type="button" onclick="window.closeSecurityModal()" style="flex: 1; height: 0.9rem; background: #374151; color: #fff; border: none; border-radius: 0.2rem; font-weight: 700; font-size: 0.3rem; cursor: pointer;">Cancel</button>
+                    <button type="submit" style="flex: 1; height: 0.9rem; background: linear-gradient(135deg, #FF3855 0%, #E51837 100%); color: #fff; border: 1px solid #FFD700; border-radius: 0.2rem; font-weight: 800; font-size: 0.3rem; cursor: pointer;">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="js/profile.js"></script>
+</body>
+</html>

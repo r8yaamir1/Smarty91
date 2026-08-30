@@ -50,7 +50,7 @@ export function renderWinningTokensForActiveMode() {
     if (!tokenParent) return;
     const state = getActiveModeState();
     tokenParent.innerHTML = '';
-    const tokens = state.tokens && state.tokens.length > 0 ? state.tokens.slice(0, 5) : [1, 5, 8, 3, 0];
+    const tokens = state.tokens && state.tokens.length > 0 ? state.tokens.slice(0, 5) : [];
     tokens.forEach(number => {
         const newDiv = document.createElement('div');
         newDiv.setAttribute("data-v-3e4c6499", "");
@@ -113,7 +113,7 @@ export async function syncServerGameState() {
 
 async function handlePeriodSettledFromServer(mode, settledPeriodId) {
     try {
-        const historyRes = await gameService.getGameHistory(mode, 1, 20);
+        const historyRes = await gameService.getGameHistory(mode, 1, 50);
         if (historyRes && historyRes.success && historyRes.items) {
             updateModeHistoryFromServer(mode, historyRes.items);
 
@@ -145,7 +145,7 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId) {
 export async function initializeServerHistories() {
     for (const mode of SUPPORTED_MODES) {
         try {
-            const res = await gameService.getGameHistory(mode, 1, 30);
+            const res = await gameService.getGameHistory(mode, 1, 50);
             if (res && res.success && res.items && res.items.length > 0) {
                 updateModeHistoryFromServer(mode, res.items);
             }
@@ -247,7 +247,7 @@ export function startMasterScheduler() {
 }
 
 // Switch game mode (30s, 1Min, 3Min, 5Min)
-export function switchGameMode(newGameType) {
+export async function switchGameMode(newGameType) {
     const targetMode = normalizeMode(newGameType);
     setActiveModeKey(targetMode);
 
@@ -287,10 +287,29 @@ export function switchGameMode(newGameType) {
         popupHeadTitle.textContent = state.displayName;
     }
 
-    renderWinningTokensForActiveMode();
-    renderGameHistory(targetMode);
-    renderChartTrend(targetMode);
-    renderMyHistory(targetMode);
+    // Show clean circular loader during mode switch sync
+    if (window.SmartyLoader) {
+        window.SmartyLoader.show(`Loading ${state.displayName}...`);
+    }
+
+    try {
+        // Fetch fresh history and state for newly active mode
+        const res = await gameService.getGameHistory(targetMode, 1, 50);
+        if (res && res.success && res.items) {
+            updateModeHistoryFromServer(targetMode, res.items);
+        }
+    } catch (err) {
+        console.warn('Mode history sync error:', err);
+    } finally {
+        renderWinningTokensForActiveMode();
+        renderGameHistory(targetMode);
+        renderChartTrend(targetMode);
+        renderMyHistory(targetMode);
+
+        if (window.SmartyLoader) {
+            window.SmartyLoader.hide();
+        }
+    }
 }
 
 // Initialize on page load
@@ -308,14 +327,14 @@ export async function initGameRecord() {
         timeLeftName.textContent = state.displayName;
     }
 
+    // Initial server sync for real history and period clock
+    await syncServerGameState();
+    await initializeServerHistories();
+
     renderWinningTokensForActiveMode();
     renderGameHistory(initialMode);
     renderChartTrend(initialMode);
     renderMyHistory(initialMode);
-
-    // Initial server sync
-    await syncServerGameState();
-    await initializeServerHistories();
 
     // Setup Real-time Firebase Firestore Listeners for zero-latency sync
     try {

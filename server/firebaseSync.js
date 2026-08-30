@@ -74,7 +74,13 @@ class FirebaseSyncManager {
             // 2. Listen in real-time to Admin Overrides from Firestore
             this._listenToAdminOverrides();
 
-            // 3. Sync default user
+            // 3. Hydrate all registered users from Firestore into server memory
+            await this._hydrateUsersFromFirestore();
+
+            // 4. Hydrate real game history from Firestore for all 4 modes
+            await this._hydrateHistoryFromFirestore();
+
+            // 5. Sync default user if not already existing
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
 
             this.isInitialized = true;
@@ -82,6 +88,62 @@ class FirebaseSyncManager {
         } catch (err) {
             this._handleQuotaError(err);
             console.error('[Firebase] Init error (will retry in background):', err.message);
+        }
+    }
+
+    async _hydrateHistoryFromFirestore() {
+        try {
+            const modes = ['30s', '1m', '3m', '5m'];
+            for (const mode of modes) {
+                try {
+                    const summaryRef = doc(db, 'game_history_summary', mode);
+                    const snap = await getDoc(summaryRef);
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        if (data && Array.isArray(data.rounds) && data.rounds.length > 0) {
+                            this.engine.modes[mode].history = data.rounds.slice(0, 50);
+                            console.log(`[Firebase] Hydrated ${this.engine.modes[mode].history.length} real history rounds for mode ${mode}`);
+                        }
+                    }
+                } catch (e) {
+                    // Non-blocking fallback
+                }
+            }
+        } catch (err) {
+            console.warn('[Firebase] History hydration warning:', err.message);
+        }
+    }
+
+    async _hydrateUsersFromFirestore() {
+        try {
+            const usersCol = collection(db, 'users');
+            const querySnap = await getDocs(usersCol);
+            let count = 0;
+            querySnap.forEach(docSnap => {
+                const u = docSnap.data();
+                if (u && u.id && u.id !== 'default_user') {
+                    this.engine.users.set(u.id, {
+                        id: u.id,
+                        username: u.username || `usr_${u.phone || 'VIP'}`,
+                        phone: u.phone || '',
+                        passwordHash: u.passwordHash || '',
+                        securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                        balance: Number(u.balance !== undefined ? u.balance : 0),
+                        inviteCode: u.inviteCode || '',
+                        referredBy: u.referredBy || null,
+                        hasDeposited: !!u.hasDeposited,
+                        isBlocked: !!u.isBlocked,
+                        createdAt: u.createdAt || new Date().toISOString()
+                    });
+                    if (u.inviteCode) {
+                        this.engine.referralCodes.set(u.inviteCode, u.id);
+                    }
+                    count++;
+                }
+            });
+            console.log(`[Firebase] Successfully hydrated ${count} permanent users from Firestore into server memory.`);
+        } catch (err) {
+            console.warn('[Firebase] User hydration warning:', err.message);
         }
     }
 
@@ -168,6 +230,15 @@ class FirebaseSyncManager {
                 isOverridden: !!roundRecord.isOverridden
             });
 
+            // Maintain latest 50 rounds summary document for instant 1-read retrieval
+            const summaryRef = doc(db, 'game_history_summary', mode);
+            const currentHistory = (this.engine.modes[mode] && this.engine.modes[mode].history) ? this.engine.modes[mode].history.slice(0, 50) : [roundRecord];
+            await setDoc(summaryRef, {
+                mode,
+                rounds: currentHistory,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+
             // If this round was overridden, clear the override document in Firestore
             if (roundRecord.isOverridden) {
                 const overrideRef = doc(db, 'game_overrides', mode);
@@ -213,16 +284,22 @@ class FirebaseSyncManager {
         }
     }
 
-    async _syncUserToFirestore(user) {
+    async saveUser(user) {
         if (!user || !this._checkQuota()) return;
         try {
             const userRef = doc(db, 'users', user.id);
             await setDoc(userRef, {
                 id: user.id,
                 username: user.username,
-                phone: user.phone || '9876543210',
-                balance: user.balance,
+                phone: user.phone || '',
+                passwordHash: user.passwordHash || '',
+                securityPin: user.securityPin || '',
+                balance: Number(user.balance !== undefined ? user.balance : 0),
+                inviteCode: user.inviteCode || '',
+                referredBy: user.referredBy || null,
+                hasDeposited: !!user.hasDeposited,
                 isBlocked: !!user.isBlocked,
+                createdAt: user.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {
@@ -230,15 +307,20 @@ class FirebaseSyncManager {
         }
     }
 
+    async _syncUserToFirestore(user) {
+        return this.saveUser(user);
+    }
+
     async updateUserBalance(userId, newBalance, reason = '') {
         if (!this._checkQuota()) return;
         try {
             const userRef = doc(db, 'users', userId);
-            await updateDoc(userRef, {
-                balance: newBalance,
+            await setDoc(userRef, {
+                id: userId,
+                balance: Number(newBalance),
                 lastUpdatedReason: reason,
                 updatedAt: new Date().toISOString()
-            });
+            }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
         }

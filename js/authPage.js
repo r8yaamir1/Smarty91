@@ -1,4 +1,4 @@
-// Authentication & Fast2SMS OTP Page Script for Smarty91 VIP
+// Authentication & Secure VIP Direct Access Script for Smarty91 VIP
 
 function showToast(msg, duration = 3000) {
     const toast = document.getElementById('auth-toast');
@@ -77,82 +77,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Cooldown Timers for OTP
-let otpTimers = {
-    reg: null,
-    forgot: null
-};
-
-function startOtpCountdown(context, seconds = 60) {
-    const btn = document.getElementById(`${context}-send-otp-btn`);
-    if (!btn) return;
-
-    if (otpTimers[context]) {
-        clearInterval(otpTimers[context]);
-    }
-
-    let remaining = seconds;
-    btn.disabled = true;
-    btn.innerText = `Resend (${remaining}s)`;
-
-    otpTimers[context] = setInterval(() => {
-        remaining -= 1;
-        if (remaining <= 0) {
-            clearInterval(otpTimers[context]);
-            otpTimers[context] = null;
-            btn.disabled = false;
-            btn.innerText = 'Resend OTP';
-        } else {
-            btn.innerText = `Resend (${remaining}s)`;
-        }
-    }, 1000);
-}
-
-// Send OTP Handler (via Fast2SMS)
-window.handleSendOtp = async function(context) {
-    const phoneInput = document.getElementById(context === 'reg' ? 'reg-phone' : 'forgot-phone');
-    const sendBtn = document.getElementById(`${context}-send-otp-btn`);
-    if (!phoneInput || !sendBtn) return;
-
-    const phone = phoneInput.value.trim();
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-        showToast('Please enter a valid 10-digit mobile number (starts with 6-9)');
-        phoneInput.focus();
-        return;
-    }
-
-    try {
-        sendBtn.disabled = true;
-        sendBtn.innerText = 'Sending...';
-
-        const otpType = context === 'reg' ? 'REGISTER' : 'FORGOT_PASSWORD';
-        const res = await fetch('/api/auth/send-otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, type: otpType })
-        });
-        const data = await res.json();
-
-        if (!data.success) {
-            showToast(data.message || 'Failed to send OTP');
-            sendBtn.disabled = false;
-            sendBtn.innerText = 'Send OTP';
-            return;
-        }
-
-        showToast(data.message || 'OTP sent successfully to your mobile number!');
-        startOtpCountdown(context, data.cooldownSeconds || 60);
-
-        // Auto-focus OTP input
-        const otpInput = document.getElementById(context === 'reg' ? 'reg-otp' : 'forgot-otp');
-        if (otpInput) otpInput.focus();
-    } catch (err) {
-        showToast('Network error while requesting OTP');
-        sendBtn.disabled = false;
-        sendBtn.innerText = 'Send OTP';
-    }
-};
-
 // Handle Login Submit
 window.handleLoginSubmit = async function(e) {
     e.preventDefault();
@@ -170,6 +94,7 @@ window.handleLoginSubmit = async function(e) {
     }
 
     try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Verifying VIP Credentials...');
         btn.disabled = true;
         btn.innerText = 'Logging in...';
 
@@ -202,6 +127,8 @@ window.handleLoginSubmit = async function(e) {
         showToast('Network error during login');
         btn.disabled = false;
         btn.innerText = 'Log In';
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 };
 
@@ -229,6 +156,7 @@ window.handleRegisterSubmit = async function(e) {
     }
 
     try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Creating VIP Account...');
         btn.disabled = true;
         btn.innerText = 'Creating VIP account...';
 
@@ -261,6 +189,8 @@ window.handleRegisterSubmit = async function(e) {
         showToast('Network error during registration');
         btn.disabled = false;
         btn.innerText = 'Register & Play';
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 };
 
@@ -291,6 +221,7 @@ window.handleForgotPasswordSubmit = async function(e) {
     }
 
     try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Resetting Password...');
         btn.disabled = true;
         btn.innerText = 'Updating password...';
 
@@ -320,5 +251,7 @@ window.handleForgotPasswordSubmit = async function(e) {
         showToast('Network error during password reset');
         btn.disabled = false;
         btn.innerText = 'Update Password';
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 };

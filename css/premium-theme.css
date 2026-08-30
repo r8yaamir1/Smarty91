@@ -1646,4 +1646,35 @@ body {
   transform: scale(0.96) !important;
 }
 
+/* Realtime FIFO History Fade & Entry Transitions */
+.fifo-new-item {
+  animation: fifoFadeSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.fifo-fade-item {
+  animation: fifoFadeOut 0.3s ease-out forwards;
+}
+
+@keyframes fifoFadeSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fifoFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
 

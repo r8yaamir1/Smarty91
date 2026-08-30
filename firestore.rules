@@ -27,6 +27,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    match /game_history_summary/{mode} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow write: if true;

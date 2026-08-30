@@ -35,76 +35,7 @@ window.handleUserProfileClick = function() {
         window.location.href = 'login.html';
         return;
     }
-
-    const phone = localStorage.getItem('smarty91_user_phone') || 'User';
-    const invite = localStorage.getItem('smarty91_invite_code') || 'N/A';
-    
-    let modal = document.getElementById('user-profile-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'user-profile-modal';
-        modal.style.cssText = `
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10005;
-            display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);
-        `;
-        document.body.appendChild(modal);
-    }
-
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div style="background: #181920; border: 1px solid rgba(255,215,0,0.3); border-radius: 16px; width: 90%; max-width: 380px; padding: 22px; color: #fff; box-shadow: 0 10px 40px rgba(0,0,0,0.7); text-align: center;">
-            <div style="font-size: 18px; font-weight: 800; color: #FFD700; margin-bottom: 6px;">VIP PLAYER ACCOUNT</div>
-            <div style="font-size: 14px; color: #9ca3af; margin-bottom: 16px;">📱 +91 ${phone}</div>
-
-            <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 10px; margin-bottom: 14px; text-align: left;">
-                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 4px;">Your Referral Invite Code:</div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 18px; font-weight: 800; color: #f59e0b; letter-spacing: 1px;">${invite}</span>
-                    <button id="copy-ref-code-btn" style="background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;">Copy Link</button>
-                </div>
-            </div>
-
-            <div style="background: rgba(16,185,129,0.1); border: 1px dashed rgba(16,185,129,0.3); border-radius: 8px; padding: 10px; font-size: 11px; color: #10b981; margin-bottom: 18px;">
-                🎁 Earn ₹100 instant balance every time an invited friend makes their first deposit!
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                <button id="close-profile-modal" style="flex: 1; background: #374151; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Close</button>
-                <button id="logout-user-btn" style="flex: 1; background: #dc2626; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Log Out</button>
-            </div>
-        </div>
-    `;
-
-    modal.querySelector('#close-profile-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-
-    modal.querySelector('#copy-ref-code-btn').addEventListener('click', () => {
-        const refUrl = `${window.location.origin}/login.html?ref=${invite}`;
-        navigator.clipboard.writeText(refUrl).then(() => {
-            showToast('Referral link copied to clipboard!');
-        }).catch(() => {
-            showToast(`Code: ${invite}`);
-        });
-    });
-
-    modal.querySelector('#logout-user-btn').addEventListener('click', async () => {
-        try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-        } catch (e) {}
-        localStorage.removeItem('smarty91_auth_token');
-        localStorage.removeItem('smarty91_user_id');
-        localStorage.removeItem('smarty91_user_phone');
-        localStorage.removeItem('smarty91_invite_code');
-        localStorage.removeItem('smarty91_cached_balance');
-        showToast('Logged out');
-        setTimeout(() => {
-            window.location.href = 'login.html';
-        }, 500);
-    });
+    window.location.href = 'profile.html';
 };
 
 // Subscribe to real-time Firestore balance updates
@@ -120,7 +51,8 @@ try {
     console.warn('Realtime balance listener warning:', e);
 }
 
-export async function syncServerBalance() {
+export async function syncServerBalance(showLoader = false) {
+    if (showLoader && window.SmartyLoader) window.SmartyLoader.show('Updating VIP Wallet...');
     try {
         const res = await walletService.getBalance();
         if (res && res.success && typeof res.balance === 'number') {
@@ -129,6 +61,8 @@ export async function syncServerBalance() {
         }
     } catch (e) {
         // Fallback to memory balance
+    } finally {
+        if (showLoader && window.SmartyLoader) window.SmartyLoader.hide();
     }
     return currentBalance;
 }
@@ -272,6 +206,7 @@ function openDepositModal() {
         }
 
         try {
+            if (window.SmartyLoader) window.SmartyLoader.show('Processing Deposit Request...');
             const btn = modal.querySelector('#submit-dep-request');
             btn.textContent = 'Submitting...';
             btn.disabled = true;
@@ -286,6 +221,8 @@ function openDepositModal() {
             showToast(res.message || 'Deposit request submitted successfully!', 'success');
         } catch (err) {
             showToast(err.message || 'Deposit request failed', 'error');
+        } finally {
+            if (window.SmartyLoader) window.SmartyLoader.hide();
         }
     });
 }
@@ -359,6 +296,7 @@ function openWithdrawalModal() {
         }
 
         try {
+            if (window.SmartyLoader) window.SmartyLoader.show('Submitting Withdrawal Request...');
             const btn = modal.querySelector('#submit-wth-request');
             btn.textContent = 'Processing...';
             btn.disabled = true;
@@ -379,6 +317,8 @@ function openWithdrawalModal() {
             showToast(res.message || 'Withdrawal request submitted!', 'success');
         } catch (err) {
             showToast(err.message || 'Withdrawal failed', 'error');
+        } finally {
+            if (window.SmartyLoader) window.SmartyLoader.hide();
         }
     });
 }
@@ -391,7 +331,7 @@ export function initWalletModals() {
     if (refreshBtn) {
         refreshBtn.style.cursor = 'pointer';
         refreshBtn.addEventListener('click', async () => {
-            await syncServerBalance();
+            await syncServerBalance(true);
             showToast('Wallet balance refreshed', 'success');
         });
     }

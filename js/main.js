@@ -1,5 +1,15 @@
 // main.js - Application Entrypoint
 
+// Clean legacy localStorage keys to permanently eliminate fake/stale history on reload
+try {
+    localStorage.removeItem('smarty91_multi_game_state');
+    localStorage.removeItem('smarty91_game_history');
+    localStorage.removeItem('smarty91_seed_history');
+    localStorage.removeItem('smarty91_user_bets');
+} catch (e) {
+    // Ignore in restricted environments
+}
+
 import { initAudio } from './audio.js';
 import { initWalletModals, updateHeaderUserUI, renderBalance } from './wallet.js';
 import { initGameRecord } from './gameRecord.js';

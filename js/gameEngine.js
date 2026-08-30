@@ -23,38 +23,9 @@ export const SUPPORTED_MODES = ["30s", "1m", "3m", "5m"];
 const ITEMS_PER_PAGE = 10;
 const STORAGE_KEY_STATE = 'smarty91_multi_game_state';
 
-// Generate realistic deterministic seed history for a given mode
-function generateModeSeedHistory(mode, count = 50) {
-    const history = [];
-    const interval = getGameInterval(mode);
-    const now = Date.now();
-
-    for (let i = 0; i < count; i++) {
-        const itemTime = new Date(now - ((i + 1) * interval));
-        const totalPeriods = calculateTotalPeriods(itemTime, interval);
-        const periodId = formatIssueNumber(itemTime, totalPeriods);
-        const num = Math.floor(Math.random() * 10);
-        const prop = NUMBER_PROPERTIES[num];
-
-        history.push({
-            mode,
-            periodId,
-            number: num,
-            isBig: prop.isBig,
-            primaryColor: prop.primaryColor,
-            secondaryColor: prop.secondaryColor,
-            colorName: prop.colorName,
-            timestamp: itemTime.getTime()
-        });
-    }
-    return history;
-}
-
-// Create independent initial state for a single mode
+// Create independent initial state for a single mode with clean real data
 function createModeState(mode) {
     const periodData = generateOfflinePeriodData(mode);
-    const seedHistory = generateModeSeedHistory(mode, 50);
-    const initialTokens = seedHistory.slice(0, 5).map(h => h.number);
 
     return {
         mode,
@@ -65,14 +36,14 @@ function createModeState(mode) {
         remainingSeconds: periodData.remainingSeconds,
         isLockoutActive: false,
         lastTickSecond: -1,
-        tokens: initialTokens.length === 5 ? initialTokens : [1, 5, 8, 3, 0],
-        history: seedHistory,
+        tokens: [],
+        history: [], // Pure real history from server/firestore
         activeBets: [],
         userBets: [],
         historyPage: 1,
         chartPage: 1,
         myHistoryPage: 1,
-        latestResult: seedHistory[0] || null,
+        latestResult: null,
         settledRounds: new Set()
     };
 }
@@ -88,66 +59,19 @@ export const gameModes = {
 
 let activeModeKey = "30s";
 
-// Load persisted state and migrate legacy single-mode storage safely
+// Load persisted state (Direct cloud / server integration - no stale local mock data)
 export function loadPersistedState() {
+    // Clear any legacy localStorage keys to ensure zero stale local state reliance
     try {
-        const storedMulti = localStorage.getItem(STORAGE_KEY_STATE);
-        if (storedMulti) {
-            const parsed = JSON.parse(storedMulti);
-            SUPPORTED_MODES.forEach(mode => {
-                if (parsed[mode]) {
-                    if (Array.isArray(parsed[mode].history) && parsed[mode].history.length > 0) {
-                        gameModes[mode].history = parsed[mode].history;
-                        gameModes[mode].latestResult = parsed[mode].history[0] || null;
-                    }
-                    if (Array.isArray(parsed[mode].userBets)) {
-                        gameModes[mode].userBets = parsed[mode].userBets;
-                    }
-                    if (Array.isArray(parsed[mode].tokens) && parsed[mode].tokens.length > 0) {
-                        gameModes[mode].tokens = parsed[mode].tokens.slice(0, 5);
-                    }
-                }
-            });
-        }
-
-        // Migrate legacy single-mode bets from smarty91_user_bets if present
-        const legacyBetsRaw = localStorage.getItem('smarty91_user_bets');
-        if (legacyBetsRaw) {
-            const legacyBets = JSON.parse(legacyBetsRaw);
-            if (Array.isArray(legacyBets) && legacyBets.length > 0) {
-                legacyBets.forEach(bet => {
-                    const mode = normalizeMode(bet.mode || bet.gameType || "30s");
-                    if (gameModes[mode] && !gameModes[mode].userBets.some(b => b.id === bet.id)) {
-                        gameModes[mode].userBets.push({
-                            ...bet,
-                            mode
-                        });
-                    }
-                });
-                // Remove legacy flat key after successful migration to prevent duplicate confusion
-                localStorage.removeItem('smarty91_user_bets');
-                saveMultiModeState();
-            }
-        }
+        localStorage.removeItem(STORAGE_KEY_STATE);
+        localStorage.removeItem('smarty91_user_bets');
     } catch (err) {
-        console.warn('Could not load stored game state, using defaults', err);
+        // Ignore in restricted environments
     }
 }
 
 export function saveMultiModeState() {
-    try {
-        const serializeData = {};
-        SUPPORTED_MODES.forEach(mode => {
-            serializeData[mode] = {
-                history: gameModes[mode].history.slice(0, 100),
-                userBets: gameModes[mode].userBets.slice(0, 100),
-                tokens: gameModes[mode].tokens.slice(0, 5)
-            };
-        });
-        localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify(serializeData));
-    } catch (err) {
-        console.warn('Could not save multi mode state to localStorage', err);
-    }
+    // Zero localStorage reliance for game state - All persisted directly in Firebase Firestore / server
 }
 
 // ----------------- ACCESSORS -----------------
@@ -192,9 +116,9 @@ export function drawNextResult(modeInput, periodId) {
         timestamp: Date.now()
     };
 
-    // Prepend exclusively to this mode's history
+    // Prepend exclusively to this mode's history (capped at max 50)
     state.history.unshift(result);
-    if (state.history.length > 200) state.history.pop();
+    if (state.history.length > 50) state.history.length = 50;
     state.latestResult = result;
 
     // Update this mode's winning tokens
@@ -366,14 +290,28 @@ export function renderGameHistory(modeInput = activeModeKey) {
     if (state.historyPage > totalPages) state.historyPage = totalPages;
     if (state.historyPage < 1) state.historyPage = 1;
 
+    if (state.history.length === 0) {
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem 0; color: var(--text_color_L2);">
+                <div style="font-size: 1.2rem; margin-bottom: 0.2rem;">🎲</div>
+                <div style="font-size: 0.38rem; font-weight: bold;">Syncing Live Rounds...</div>
+                <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">${state.displayName} rounds updating in real-time</div>
+            </div>
+        `;
+        if (pageDisplay) pageDisplay.textContent = '1/1';
+        if (prevBtn) prevBtn.classList.add('disabled');
+        if (nextBtn) nextBtn.classList.add('disabled');
+        return;
+    }
+
     const startIndex = (state.historyPage - 1) * ITEMS_PER_PAGE;
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     container.innerHTML = '';
 
-    items.forEach(item => {
+    items.forEach((item, index) => {
         const row = document.createElement('div');
-        row.className = 'van-row';
+        row.className = `van-row ${index === 0 && state.historyPage === 1 ? 'fifo-new-item' : ''}`;
         row.setAttribute('data-v-481307ec', '');
 
         let numClass = 'greenColor';
@@ -812,7 +750,7 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
     });
 
     if (formatted.length > 0) {
-        state.history = formatted;
+        state.history = formatted.slice(0, 50);
         state.latestResult = formatted[0];
         state.tokens = formatted.slice(0, 5).map(h => h.number);
         saveMultiModeState();

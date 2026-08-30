@@ -233,7 +233,8 @@ class Smarty91ServerEngine {
         const token = 'JWT_' + crypto.randomBytes(24).toString('hex');
         this.userTokens.set(token, userId);
 
-        firebaseSync.updateUserBalance(userId, 0.00, 'User registered (0 balance)');
+        // Permanently persist full new user profile into Firestore
+        firebaseSync.saveUser(newUser);
 
         return {
             success: true,
@@ -280,6 +281,9 @@ class Smarty91ServerEngine {
         }
 
         targetUser.passwordHash = this._hashPassword(newPassword);
+
+        // Permanently update user document in Firestore
+        firebaseSync.saveUser(targetUser);
 
         // Invalidate previous sessions
         for (const [token, uid] of this.userTokens.entries()) {
@@ -352,31 +356,15 @@ class Smarty91ServerEngine {
     }
 
     _seedInitialHistory() {
-        const now = Date.now();
         ['30s', '1m', '3m', '5m'].forEach(mode => {
-            const interval = MODE_INTERVALS[mode];
             const state = this.modes[mode];
-            state.history = [];
-
-            for (let i = 25; i >= 1; i--) {
-                const roundTime = now - (i * interval);
-                const periodId = this._calculatePeriodId(roundTime, interval);
-                const number = Math.floor(Math.random() * 10);
-                const props = NUMBER_PROPERTIES[number];
-                
-                state.history.unshift({
-                    period: periodId,
-                    number,
-                    color: props.color,
-                    size: props.size,
-                    colorLabel: props.label,
-                    settledAt: new Date(roundTime).toISOString()
-                });
+            if (!state.history) {
+                state.history = [];
             }
         });
     }
 
-    _calculatePeriodId(timestamp, interval) {
+    _calculatePeriodId(timestamp, interval, mode = '30s') {
         const date = new Date(timestamp);
         const y = date.getUTCFullYear();
         const m = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -385,9 +373,14 @@ class Smarty91ServerEngine {
         const midnight = Date.UTC(y, date.getUTCMonth(), date.getUTCDate());
         const elapsed = timestamp - midnight;
         const totalPeriods = Math.floor(elapsed / interval);
-        const periodOffset = 50001 + totalPeriods;
         
-        return `${y}${m}${d}1000${periodOffset}`;
+        let modeCode = '30';
+        if (mode === '1m') modeCode = '01';
+        else if (mode === '3m') modeCode = '03';
+        else if (mode === '5m') modeCode = '05';
+
+        const periodOffset = String(totalPeriods + 1).padStart(4, '0');
+        return `${y}${m}${d}${modeCode}${periodOffset}`;
     }
 
     _calculateRoundTimes(timestamp, interval) {
@@ -485,7 +478,7 @@ class Smarty91ServerEngine {
 
             const interval = MODE_INTERVALS[mode];
             const times = this._calculateRoundTimes(now, interval);
-            const currentPeriodId = this._calculatePeriodId(now, interval);
+            const currentPeriodId = this._calculatePeriodId(now, interval, mode);
             const remainingSec = Math.max(0, Math.ceil(times.timeLeftMs / 1000));
 
             // Period Boundary Transition Check:
@@ -547,9 +540,9 @@ class Smarty91ServerEngine {
             isOverridden
         };
 
-        // Prepend to mode history
+        // Prepend to mode history (strictly capped at max 50 rounds)
         state.history.unshift(roundRecord);
-        if (state.history.length > 200) state.history.pop();
+        if (state.history.length > 50) state.history.length = 50;
 
         // Persist settled round to Firestore
         firebaseSync.saveSettledRound(mode, roundRecord);
@@ -1177,6 +1170,7 @@ class Smarty91ServerEngine {
         if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters');
         
         user.passwordHash = this._hashPassword(newPassword);
+        firebaseSync.saveUser(user);
         // Clear tokens
         for (const [token, uid] of this.userTokens.entries()) {
             if (uid === user.id) this.userTokens.delete(token);

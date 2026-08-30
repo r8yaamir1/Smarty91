@@ -35,11 +35,18 @@ export function calculateTotalPeriods(date, interval) {
     return Math.floor(msSinceMidnight / interval);
 }
 
-export function formatIssueNumber(date, totalPeriods) {
+export function formatIssueNumber(date, totalPeriods, mode = "30s") {
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${year}${month}${day}1000${50001 + totalPeriods}`;
+    
+    let modeCode = '30';
+    if (mode === '1m') modeCode = '01';
+    else if (mode === '3m') modeCode = '03';
+    else if (mode === '5m') modeCode = '05';
+
+    const periodOffset = String(totalPeriods + 1).padStart(4, '0');
+    return `${year}${month}${day}${modeCode}${periodOffset}`;
 }
 
 export function generateOfflinePeriodData(gameType, targetTime = new Date()) {
@@ -51,7 +58,7 @@ export function generateOfflinePeriodData(gameType, targetTime = new Date()) {
     const endTime = new Date(nextIntervalTime);
 
     const totalPeriods = calculateTotalPeriods(targetTime, interval);
-    const issueNumber = formatIssueNumber(targetTime, totalPeriods);
+    const issueNumber = formatIssueNumber(targetTime, totalPeriods, mode);
 
     return {
         mode,
