@@ -1020,4 +1020,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (requestedTab && ['deposit', 'withdraw', 'history'].includes(requestedTab)) {
         window.switchCashierTab(requestedTab);
     }
+
+    // Start background syncing on cashier page every 4 seconds
+    setInterval(() => {
+        loadWalletData().catch(() => {});
+    }, 4000);
 });

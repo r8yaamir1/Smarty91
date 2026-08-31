@@ -378,7 +378,27 @@ window.handleLogout = async function() {
     }, 400);
 };
 
+// Silent Background Refresh for Real-time Balance updates
+async function silentRefreshBalance() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    if (!token) return;
+    try {
+        const res = await fetch('/api/wallet/balance', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && typeof data.balance === 'number') {
+            currentBalance = data.balance;
+            localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+            const balanceEl = document.getElementById('user-balance-val');
+            if (balanceEl) balanceEl.textContent = `₹${currentBalance.toFixed(2)}`;
+        }
+    } catch (e) {}
+}
+
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
     loadUserProfile();
+    // Start background syncing on profile screen every 4 seconds
+    setInterval(silentRefreshBalance, 4000);
 });

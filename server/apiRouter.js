@@ -15,11 +15,11 @@ const checkAdminAuth = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Unauthorized. Invalid Admin Master PIN' });
 };
 
-// Helper to resolve current logged-in user or guest
-const getAuthUser = async (req) => {
+// Helper to resolve current logged-in user or guest synchronously
+const getAuthUser = (req) => {
     const authHeader = req.headers.authorization;
     if (authHeader) {
-        const user = await serverEngine.resolveUserFromToken(authHeader);
+        const user = serverEngine.getUserFromToken(authHeader);
         if (user) return user;
     }
     return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
