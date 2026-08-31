@@ -255,8 +255,17 @@
         }
     };
 
+    let lastNavClickTime = 0;
+
     window.navigateToPage = function(url, msg) {
         if (!url) return;
+
+        // Navigation Switch Throttle (1.2s gap between tab switches to avoid glitches)
+        const now = Date.now();
+        if (now - lastNavClickTime < 1200) {
+            return;
+        }
+
         const currentPath = window.location.pathname;
         const isCurrentHome = (url === 'index.html' || url === '/') && (currentPath === '/' || currentPath.endsWith('index.html'));
         const isSamePage = currentPath.endsWith(url) || isCurrentHome;
@@ -269,6 +278,8 @@
             }
             return;
         }
+
+        lastNavClickTime = now;
 
         // Show single clean VIP loader with appropriate subtitle
         if (window.SmartyLoader) {

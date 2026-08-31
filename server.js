@@ -27,6 +27,30 @@ const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 app.use(express.static(__dirname));
 
+// Direct HTML page routing
+const sendPage = (pageName, res) => {
+    const filePathInDist = path.join(distPath, pageName);
+    const filePathInRoot = path.join(__dirname, pageName);
+    res.sendFile(filePathInDist, (err) => {
+        if (err) {
+            res.sendFile(filePathInRoot);
+        }
+    });
+};
+
+app.get('/admin', (req, res) => sendPage('admin.html', res));
+app.get('/admin.html', (req, res) => sendPage('admin.html', res));
+app.get('/payment', (req, res) => sendPage('payment.html', res));
+app.get('/payment.html', (req, res) => sendPage('payment.html', res));
+app.get('/profile', (req, res) => sendPage('profile.html', res));
+app.get('/profile.html', (req, res) => sendPage('profile.html', res));
+app.get('/referral', (req, res) => sendPage('referral.html', res));
+app.get('/referral.html', (req, res) => sendPage('referral.html', res));
+app.get('/checkin', (req, res) => sendPage('checkin.html', res));
+app.get('/checkin.html', (req, res) => sendPage('checkin.html', res));
+app.get('/login', (req, res) => sendPage('login.html', res));
+app.get('/login.html', (req, res) => sendPage('login.html', res));
+
 // Fallback to index.html for SPA routing (Express 5 compatible)
 app.use((req, res) => {
     res.sendFile(path.join(distPath, 'index.html'), (err) => {

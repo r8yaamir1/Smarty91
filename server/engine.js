@@ -68,6 +68,16 @@ class Smarty91ServerEngine {
             maxDeposit: 100000,
             minWithdrawal: 200,
             maxWithdrawal: 100000,
+            profitStars: {
+                rank1: { first2: '98', last2: '71', amount: '₹1,84,500' },
+                rank2: { first2: '91', last2: '04', amount: '₹1,12,800' },
+                rank3: { first2: '88', last2: '51', amount: '₹76,400' }
+            },
+            referralStars: {
+                rank1: { first2: '98', last2: '12', amount: '₹1,48,500' },
+                rank2: { first2: '91', last2: '88', amount: '₹92,400' },
+                rank3: { first2: '88', last2: '45', amount: '₹64,200' }
+            }
         };
 
         // Cache set to prevent duplicate USDT txhash processing
@@ -318,7 +328,60 @@ class Smarty91ServerEngine {
         };
     }
 
-    resetUserPassword({ phone, newPassword, securityPin, masterPin }) {
+    getProfitStars() {
+        if (!this.config.profitStars) {
+            this.config.profitStars = {
+                rank1: { first2: '98', last2: '71', amount: '₹1,84,500' },
+                rank2: { first2: '91', last2: '04', amount: '₹1,12,800' },
+                rank3: { first2: '88', last2: '51', amount: '₹76,400' }
+            };
+        }
+        return this.config.profitStars;
+    }
+
+    updateProfitStars(stars) {
+        if (!stars || typeof stars !== 'object') {
+            throw new Error('Invalid profit stars data');
+        }
+        const current = this.getProfitStars();
+        const updated = {
+            rank1: {
+                first2: String(stars.rank1?.first2 !== undefined ? stars.rank1.first2 : current.rank1.first2).trim().slice(0, 4),
+                last2: String(stars.rank1?.last2 !== undefined ? stars.rank1.last2 : current.rank1.last2).trim().slice(0, 4),
+                amount: String(stars.rank1?.amount !== undefined ? stars.rank1.amount : current.rank1.amount).trim()
+            },
+            rank2: {
+                first2: String(stars.rank2?.first2 !== undefined ? stars.rank2.first2 : current.rank2.first2).trim().slice(0, 4),
+                last2: String(stars.rank2?.last2 !== undefined ? stars.rank2.last2 : current.rank2.last2).trim().slice(0, 4),
+                amount: String(stars.rank2?.amount !== undefined ? stars.rank2.amount : current.rank2.amount).trim()
+            },
+            rank3: {
+                first2: String(stars.rank3?.first2 !== undefined ? stars.rank3.first2 : current.rank3.first2).trim().slice(0, 4),
+                last2: String(stars.rank3?.last2 !== undefined ? stars.rank3.last2 : current.rank3.last2).trim().slice(0, 4),
+                amount: String(stars.rank3?.amount !== undefined ? stars.rank3.amount : current.rank3.amount).trim()
+            }
+        };
+
+        this.config.profitStars = updated;
+        firebaseSync.saveProfitStars(updated);
+
+        const logMsg = `Updated Today's Profit Stars (Rank 1: ${updated.rank1.first2}***${updated.rank1.last2} - ${updated.rank1.amount}, Rank 2: ${updated.rank2.first2}***${updated.rank2.last2} - ${updated.rank2.amount}, Rank 3: ${updated.rank3.first2}***${updated.rank3.last2} - ${updated.rank3.amount})`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'ADMIN_UPDATE_PROFIT_STARS',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        firebaseSync.logAdminAction('ADMIN_UPDATE_PROFIT_STARS', logMsg);
+
+        return {
+            success: true,
+            profitStars: updated,
+            message: "Today's Profit Stars updated successfully!"
+        };
+    }
+
+    async resetUserPassword({ phone, newPassword, securityPin, masterPin }) {
         const cleanPhone = String(phone).trim();
         if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
             throw new Error('Please enter a valid 10-digit Indian mobile number');
@@ -334,6 +397,10 @@ class Smarty91ServerEngine {
                 targetUser = u;
                 break;
             }
+        }
+
+        if (!targetUser) {
+            targetUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
         }
 
         if (!targetUser) {
@@ -377,7 +444,7 @@ class Smarty91ServerEngine {
         };
     }
 
-    loginUser({ phone, password }) {
+    async loginUser({ phone, password }) {
         const cleanPhone = String(phone).trim();
         this._loadUsersFromDisk();
         let targetUser = null;
@@ -386,6 +453,11 @@ class Smarty91ServerEngine {
                 targetUser = u;
                 break;
             }
+        }
+
+        if (!targetUser) {
+            // Check Firestore directly (essential after server restart or redeploy)
+            targetUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
         }
 
         if (!targetUser) {
@@ -456,6 +528,35 @@ class Smarty91ServerEngine {
             }
         }
 
+        return null;
+    }
+
+    async resolveUserFromToken(token) {
+        let user = this.getUserFromToken(token);
+        if (user) return user;
+
+        if (!token) return null;
+        const cleanToken = token.replace('Bearer ', '').trim();
+        if (cleanToken.startsWith('JWT_') && cleanToken.includes('.')) {
+            try {
+                const body = cleanToken.slice(4);
+                const [payloadB64, sig] = body.split('.');
+                if (payloadB64 && sig) {
+                    const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(payloadB64).digest('hex');
+                    if (sig === expectedSig) {
+                        const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
+                        const data = JSON.parse(payloadJson);
+                        if (data && data.uid) {
+                            user = await firebaseSync.fetchUserFromFirestore(data.uid);
+                            if (user) {
+                                this.userTokens.set(cleanToken, user.id);
+                                return user;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
         return null;
     }
 
@@ -1761,6 +1862,47 @@ class Smarty91ServerEngine {
             totalCommissionEarned: totalBonusEarned,
             rewardPerDeposit: 100,
             referrals: referredList.reverse()
+        };
+    }
+
+    getReferralStars() {
+        return this.config.referralStars || {
+            rank1: { first2: '98', last2: '12', amount: '₹1,48,500' },
+            rank2: { first2: '91', last2: '88', amount: '₹92,400' },
+            rank3: { first2: '88', last2: '45', amount: '₹64,200' }
+        };
+    }
+
+    updateReferralStars(payload) {
+        if (!payload || typeof payload !== 'object') {
+            throw new Error('Invalid payload for referral stars update');
+        }
+
+        const current = this.getReferralStars();
+        this.config.referralStars = {
+            rank1: {
+                first2: String(payload.rank1?.first2 !== undefined ? payload.rank1.first2 : current.rank1.first2).trim().slice(0, 4),
+                last2: String(payload.rank1?.last2 !== undefined ? payload.rank1.last2 : current.rank1.last2).trim().slice(0, 4),
+                amount: String(payload.rank1?.amount !== undefined ? payload.rank1.amount : (payload.rank1?.earnings || current.rank1.amount)).trim()
+            },
+            rank2: {
+                first2: String(payload.rank2?.first2 !== undefined ? payload.rank2.first2 : current.rank2.first2).trim().slice(0, 4),
+                last2: String(payload.rank2?.last2 !== undefined ? payload.rank2.last2 : current.rank2.last2).trim().slice(0, 4),
+                amount: String(payload.rank2?.amount !== undefined ? payload.rank2.amount : (payload.rank2?.earnings || current.rank2.amount)).trim()
+            },
+            rank3: {
+                first2: String(payload.rank3?.first2 !== undefined ? payload.rank3.first2 : current.rank3.first2).trim().slice(0, 4),
+                last2: String(payload.rank3?.last2 !== undefined ? payload.rank3.last2 : current.rank3.last2).trim().slice(0, 4),
+                amount: String(payload.rank3?.amount !== undefined ? payload.rank3.amount : (payload.rank3?.earnings || current.rank3.amount)).trim()
+            }
+        };
+
+        firebaseSync.syncConfigToFirestore();
+
+        return {
+            success: true,
+            referralStars: this.config.referralStars,
+            message: 'Top 3 Referral Stars updated and synced successfully!'
         };
     }
 }

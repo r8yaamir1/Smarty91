@@ -71,11 +71,17 @@ class FirebaseSyncManager {
             // 1. Sync & Listen to Game Config
             await this._initSystemConfig();
 
+            // 1.1 Sync & Listen to Today's Profit Stars
+            await this._initProfitStars();
+
             // 2. Listen in real-time to Admin Overrides from Firestore
             this._listenToAdminOverrides();
 
             // 3. Hydrate all registered users from Firestore into server memory
             await this._hydrateUsersFromFirestore();
+
+            // 3.1 Listen in real-time to User Account additions & updates
+            this._listenToUsers();
 
             // 4. Hydrate real game history from Firestore for all 4 modes
             await this._hydrateHistoryFromFirestore();
@@ -185,6 +191,168 @@ class FirebaseSyncManager {
         } catch (e) {
             console.warn('[Firebase] Config sync warning:', e.message);
         }
+    }
+
+    async _initProfitStars() {
+        try {
+            const starsRef = doc(db, 'game_config', 'profit_stars');
+            const snap = await getDoc(starsRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                if (data && data.stars) {
+                    this.engine.config.profitStars = { ...this.engine.config.profitStars, ...data.stars };
+                    console.log("[Firebase] Loaded Today's Profit Stars from Firestore:", this.engine.config.profitStars);
+                }
+            } else {
+                const defaultStars = this.engine.config.profitStars || {
+                    rank1: { first2: '98', last2: '71', amount: '₹1,84,500' },
+                    rank2: { first2: '91', last2: '04', amount: '₹1,12,800' },
+                    rank3: { first2: '88', last2: '51', amount: '₹76,400' }
+                };
+                await setDoc(starsRef, {
+                    stars: defaultStars,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
+            // Real-time listener for Profit Stars updates
+            onSnapshot(starsRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const d = docSnap.data();
+                    if (d && d.stars) {
+                        this.engine.config.profitStars = d.stars;
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn('[Firebase] Profit stars init warning:', e.message);
+        }
+    }
+
+    async saveProfitStars(stars) {
+        if (!this._checkQuota()) return;
+        try {
+            const starsRef = doc(db, 'game_config', 'profit_stars');
+            await setDoc(starsRef, {
+                stars,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        } catch (e) {
+            this._handleQuotaError(e);
+        }
+    }
+
+    _listenToUsers() {
+        try {
+            const usersCol = collection(db, 'users');
+            onSnapshot(usersCol, (snapshot) => {
+                let updatedCount = 0;
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added' || change.type === 'modified') {
+                        const u = change.doc.data();
+                        if (u && u.id && u.id !== 'default_user') {
+                            this.engine.users.set(u.id, {
+                                id: u.id,
+                                username: u.username || `usr_${u.phone || 'VIP'}`,
+                                phone: u.phone || '',
+                                passwordHash: u.passwordHash || '',
+                                securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                                balance: Number(u.balance !== undefined ? u.balance : 0),
+                                inviteCode: u.inviteCode || '',
+                                referredBy: u.referredBy || null,
+                                hasDeposited: !!u.hasDeposited,
+                                isBlocked: !!u.isBlocked,
+                                createdAt: u.createdAt || new Date().toISOString()
+                            });
+                            if (u.inviteCode) {
+                                this.engine.referralCodes.set(u.inviteCode, u.id);
+                            }
+                            updatedCount++;
+                        }
+                    }
+                });
+                if (updatedCount > 0 && typeof this.engine._saveUsersToDisk === 'function') {
+                    this.engine._saveUsersToDisk();
+                }
+            }, (err) => {
+                console.warn('[Firebase] Users snapshot listener error:', err.message);
+            });
+        } catch (e) {
+            console.warn('[Firebase] Users listener setup error:', e.message);
+        }
+    }
+
+    async fetchUserFromFirestore(userId) {
+        if (!userId) return null;
+        try {
+            const userRef = doc(db, 'users', userId);
+            const snap = await getDoc(userRef);
+            if (snap.exists()) {
+                const u = snap.data();
+                const userData = {
+                    id: u.id,
+                    username: u.username || `usr_${u.phone || 'VIP'}`,
+                    phone: u.phone || '',
+                    passwordHash: u.passwordHash || '',
+                    securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                    balance: Number(u.balance !== undefined ? u.balance : 0),
+                    inviteCode: u.inviteCode || '',
+                    referredBy: u.referredBy || null,
+                    hasDeposited: !!u.hasDeposited,
+                    isBlocked: !!u.isBlocked,
+                    createdAt: u.createdAt || new Date().toISOString()
+                };
+                this.engine.users.set(userData.id, userData);
+                if (userData.inviteCode) {
+                    this.engine.referralCodes.set(userData.inviteCode, userData.id);
+                }
+                if (typeof this.engine._saveUsersToDisk === 'function') {
+                    this.engine._saveUsersToDisk();
+                }
+                return userData;
+            }
+        } catch (e) {
+            console.warn('[Firebase] fetchUserFromFirestore error:', e.message);
+        }
+        return null;
+    }
+
+    async fetchUserByPhoneFromFirestore(phone) {
+        if (!phone) return null;
+        try {
+            const cleanPhone = String(phone).trim();
+            const usersCol = collection(db, 'users');
+            const q = query(usersCol, where('phone', '==', cleanPhone), limit(1));
+            const querySnap = await getDocs(q);
+            if (!querySnap.empty) {
+                const docSnap = querySnap.docs[0];
+                const u = docSnap.data();
+                const userData = {
+                    id: u.id,
+                    username: u.username || `usr_${u.phone || 'VIP'}`,
+                    phone: u.phone || '',
+                    passwordHash: u.passwordHash || '',
+                    securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                    balance: Number(u.balance !== undefined ? u.balance : 0),
+                    inviteCode: u.inviteCode || '',
+                    referredBy: u.referredBy || null,
+                    hasDeposited: !!u.hasDeposited,
+                    isBlocked: !!u.isBlocked,
+                    createdAt: u.createdAt || new Date().toISOString()
+                };
+                this.engine.users.set(userData.id, userData);
+                if (userData.inviteCode) {
+                    this.engine.referralCodes.set(userData.inviteCode, userData.id);
+                }
+                if (typeof this.engine._saveUsersToDisk === 'function') {
+                    this.engine._saveUsersToDisk();
+                }
+                return userData;
+            }
+        } catch (e) {
+            console.warn('[Firebase] fetchUserByPhoneFromFirestore error:', e.message);
+        }
+        return null;
     }
 
     _listenToAdminOverrides() {

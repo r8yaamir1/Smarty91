@@ -5,10 +5,11 @@
     <link rel="icon" type="image/png" href="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" />
     <link rel="apple-touch-icon" href="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>VIP Referral & Agent Hub - Smarty91</title>
+    <title>VIP Million Dollar Agent Hub - Smarty91</title>
+    <meta name="description" content="Smarty91 Million Dollar Agent Hub - Earn 10% Instant Deposit Bonus + 1% Lifetime Betting Commission!">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/premium-theme.css">
     <script src="js/loader.js"></script>
     <script src="js/services/authGate.js"></script>
@@ -21,6 +22,7 @@
             --gold-light: #FFF099;
             --bg-dark: #080A10;
             --card-bg: #121522;
+            --card-elevated: #1a1e30;
             --card-border: rgba(229, 24, 55, 0.3);
             --border-subtle: rgba(255, 255, 255, 0.08);
         }
@@ -51,85 +53,63 @@
             display: flex;
             flex-direction: column;
             position: relative;
-            padding-bottom: 70px;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            padding-bottom: 75px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.85);
         }
 
-        /* Top Sticky Header */
+        /* Top Sticky Red/Gold Header */
         .referral-header {
             position: sticky;
             top: 0;
             z-index: 100;
             height: 52px;
-            background: linear-gradient(135deg, #FF2E4D 0%, #E51837 50%, #900516 100%);
+            background: linear-gradient(135deg, var(--red-deep) 0%, var(--red-dark) 100%);
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 16px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+            border-bottom: 1.5px solid rgba(255, 215, 0, 0.35);
         }
 
-        .header-back-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #FFF;
-            cursor: pointer;
-            transition: transform 0.15s ease;
-        }
-        .header-back-btn:active { transform: scale(0.92); }
-
-        .header-title {
-            font-size: 16px;
-            font-weight: 800;
-            color: #FFFFFF;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Hero Commission Card */
+        /* Million Dollar Luxury Hero Banner */
         .commission-hero {
             margin: 14px 14px 0;
-            padding: 20px 18px;
-            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(20, 24, 38, 0.98) 100%);
-            border: 1.5px solid rgba(255, 215, 0, 0.4);
-            border-radius: 16px;
+            padding: 22px 18px;
+            background: linear-gradient(135deg, rgba(229, 24, 55, 0.25) 0%, rgba(20, 24, 38, 0.98) 60%, rgba(255, 215, 0, 0.15) 100%);
+            border: 1.5px solid rgba(255, 215, 0, 0.45);
+            border-radius: 18px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6);
         }
+
         .commission-hero::before {
             content: '';
             position: absolute;
-            top: -40px;
-            right: -40px;
-            width: 140px;
-            height: 140px;
-            background: radial-gradient(circle, rgba(255, 215, 0, 0.25) 0%, transparent 70%);
+            top: -45px;
+            right: -45px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
             pointer-events: none;
         }
 
         .comm-tier-tag {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%);
-            color: #111;
+            color: #000;
             font-size: 11px;
             font-weight: 900;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 12px;
             margin-bottom: 8px;
-            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.35);
+            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.4);
+            letter-spacing: 0.5px;
         }
+
         .comm-label {
             font-size: 12px;
             color: #A0A5B8;
@@ -137,35 +117,42 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
         .comm-amount {
-            font-size: 30px;
+            font-size: 32px;
             font-weight: 900;
             color: #FFD700;
             font-family: 'JetBrains Mono', monospace;
-            margin: 4px 0 12px;
-            text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
-        }
-        .comm-subtext {
-            font-size: 12px;
-            color: #C0C5D8;
-            line-height: 1.4;
-            margin-bottom: 12px;
+            margin: 4px 0 10px;
+            text-shadow: 0 2px 12px rgba(255, 215, 0, 0.35);
         }
 
-        /* 3-Column Stats */
+        .comm-subtext-box {
+            background: rgba(10, 13, 20, 0.8);
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #E2E8F0;
+            line-height: 1.45;
+        }
+
+        /* 3-Column Stats Grid */
         .referral-stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
             margin: 14px 14px 0;
         }
+
         .stat-box {
-            background: #141726;
+            background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             padding: 12px 10px;
             text-align: center;
         }
+
         .stat-box-label {
             font-size: 10px;
             color: #8E94A5;
@@ -173,23 +160,26 @@
             text-transform: uppercase;
             margin-bottom: 4px;
         }
+
         .stat-box-val {
             font-size: 16px;
             font-weight: 800;
             color: #FFF;
             font-family: 'JetBrains Mono', monospace;
         }
-        .stat-box-val.highlight { color: #FFD700; }
-        .stat-box-val.green { color: #00E676; }
 
-        /* Invite Code & Link Section */
+        .stat-box-val.highlight { color: #FFD700; }
+        .stat-box-val.green { color: #34d399; }
+
+        /* Invite Credentials Card */
         .share-section {
             margin: 16px 14px 0;
-            background: #121522;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: var(--card-bg);
+            border: 1.5px solid rgba(229, 24, 55, 0.25);
             border-radius: 16px;
             padding: 16px;
         }
+
         .share-section-title {
             font-size: 14px;
             font-weight: 800;
@@ -210,11 +200,12 @@
             justify-content: space-between;
             margin-bottom: 10px;
         }
-        .share-box:last-child { margin-bottom: 0; }
+
         .share-box-content {
             overflow: hidden;
             margin-right: 10px;
         }
+
         .share-box-label {
             font-size: 9.5px;
             color: #8E94A5;
@@ -222,6 +213,7 @@
             text-transform: uppercase;
             margin-bottom: 2px;
         }
+
         .share-box-value {
             font-size: 14px;
             font-weight: 800;
@@ -231,8 +223,9 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
         .share-copy-btn {
-            background: linear-gradient(135deg, #FF2E4D 0%, #B80A22 100%);
+            background: linear-gradient(135deg, var(--red-primary) 0%, var(--red-dark) 100%);
             color: #FFF;
             border: 1px solid rgba(255, 255, 255, 0.2);
             font-size: 11px;
@@ -245,12 +238,12 @@
         }
         .share-copy-btn:active { transform: scale(0.95); }
 
-        /* Social Share Buttons */
         .social-share-row {
             display: flex;
             gap: 10px;
             margin-top: 14px;
         }
+
         .social-btn {
             flex: 1;
             height: 40px;
@@ -270,55 +263,167 @@
         .social-btn.whatsapp { background: #25D366; }
         .social-btn.telegram { background: #0088CC; }
 
-        /* Multi-Tier Commission Model */
-        .tier-section {
+        /* TOP 3 REFERRAL STARS (MILLION DOLLAR PODIUM) */
+        .stars-podium-section {
             margin: 16px 14px 0;
-            background: #121522;
+            background: linear-gradient(180deg, rgba(18, 21, 34, 0.95) 0%, rgba(10, 12, 20, 0.98) 100%);
+            border: 1.5px solid rgba(255, 215, 0, 0.35);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .stars-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .stars-header-title {
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            font-weight: 900;
+            color: #FFD700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .podium-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.05fr 1fr;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .podium-card {
+            background: #0B0E18;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .podium-card.rank-1 {
+            border: 1.5px solid #FFD700;
+            background: linear-gradient(180deg, rgba(255, 215, 0, 0.15) 0%, #0B0E18 100%);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.25);
+            order: 2;
+        }
+
+        .podium-card.rank-2 {
+            border: 1.5px solid #C0C0C0;
+            background: linear-gradient(180deg, rgba(192, 192, 192, 0.12) 0%, #0B0E18 100%);
+            order: 1;
+        }
+
+        .podium-card.rank-3 {
+            border: 1.5px solid #CD7F32;
+            background: linear-gradient(180deg, rgba(205, 127, 50, 0.12) 0%, #0B0E18 100%);
+            order: 3;
+        }
+
+        .podium-crown {
+            font-size: 22px;
+            margin-bottom: 2px;
+        }
+
+        .podium-name {
+            font-size: 11px;
+            font-weight: 800;
+            color: #FFF;
+            margin-bottom: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .podium-phone {
+            font-size: 10px;
+            color: #8E94A5;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 4px;
+        }
+
+        .podium-invites {
+            font-size: 10px;
+            color: #A0A5B8;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .podium-earnings {
+            font-size: 12px;
+            font-weight: 900;
+            color: #34d399;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 10% Deposit + 1% Bet Rules Card */
+        .rules-card-section {
+            margin: 16px 14px 0;
+            background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 16px;
             padding: 16px;
         }
-        .tier-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        .tier-card {
+
+        .rule-item-box {
             background: #0B0E18;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 10px 8px;
-            text-align: center;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
         }
-        .tier-badge {
-            font-size: 10px;
+        .rule-item-box:last-child { margin-bottom: 0; }
+
+        .rule-icon-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(229, 24, 55, 0.15);
+            border: 1px solid rgba(229, 24, 55, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .rule-title {
+            font-size: 13px;
             font-weight: 800;
             color: #FFD700;
             margin-bottom: 2px;
         }
-        .tier-rate {
-            font-size: 15px;
-            font-weight: 900;
-            color: #00E676;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .tier-sub {
-            font-size: 9.5px;
-            color: #8E94A5;
-            margin-top: 2px;
+
+        .rule-desc {
+            font-size: 11.5px;
+            color: #94a3b8;
+            line-height: 1.4;
         }
 
-        /* Referral Team Table */
+        /* Team Records Table */
         .team-section {
             margin: 16px 14px 0;
         }
+
         .team-card {
-            background: #121522;
+            background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 14px;
             overflow: hidden;
         }
+
         .team-row {
             display: flex;
             justify-content: space-between;
@@ -327,90 +432,42 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         .team-row:last-child { border-bottom: none; }
+
         .team-user-phone {
             font-size: 13px;
             font-weight: 700;
             color: #FFF;
         }
+
         .team-user-date {
             font-size: 11px;
             color: #8E94A5;
         }
+
         .team-status-tag {
             font-size: 11px;
             font-weight: 800;
             padding: 3px 8px;
             border-radius: 6px;
         }
+
         .team-status-tag.active {
-            background: rgba(0, 230, 118, 0.15);
-            color: #00E676;
-            border: 1px solid rgba(0, 230, 118, 0.3);
-        }
-        .team-status-tag.pending {
-            background: rgba(255, 143, 0, 0.15);
-            color: #FFB300;
-            border: 1px solid rgba(255, 143, 0, 0.3);
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
         }
 
-        /* Universal Bottom Navigation */
-        .universal-bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            max-width: 480px;
-            height: 52px;
-            background: #0F121E;
-            border-top: 1px solid rgba(255, 215, 0, 0.25);
-            display: flex;
-            align-items: center;
-            justify-content: space-around;
-            z-index: 1000;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.7);
-        }
-        .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-            color: #7A8094;
-            font-size: 10px;
-            font-weight: 700;
-            text-decoration: none;
-            cursor: pointer;
-            flex: 1;
-            height: 100%;
-            transition: color 0.15s ease;
-        }
-        .bottom-nav-item.active {
-            color: #FF2E4D;
-        }
-        .bottom-nav-item.active svg {
-            stroke: #FF2E4D;
-        }
-        .bottom-nav-center {
-            position: relative;
-            top: -12px;
-            background: linear-gradient(135deg, #FF2E4D 0%, #E51837 50%, #900516 100%);
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid #FFD700;
-            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.5);
-            color: #FFF;
+        .team-status-tag.pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
         }
     </style>
 </head>
 <body>
     <div class="referral-container">
-        <!-- Header (Clean, Compact, Unified Brand Header) -->
-        <div class="referral-header">
+        <!-- TOP APP BAR (Clean, Compact, Unified Brand Header) -->
+        <header class="referral-header">
             <div class="home-brand-block" onclick="window.location.href='index.html'">
                 <div class="home-logo-circle">
                     <img src="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" alt="Smarty91 Logo" />
@@ -422,17 +479,19 @@
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
             </div>
-        </div>
+        </header>
 
-        <!-- Hero Commission Card -->
+        <!-- MILLION DOLLAR HERO CARD -->
         <div class="commission-hero">
-            <div class="comm-tier-tag">👑 VIP PARTNER LEVEL 1</div>
-            <div class="comm-label">Total Commission Earned</div>
+            <div class="comm-tier-tag">👑 MILLION DOLLAR VIP AGENT HUB</div>
+            <div class="comm-label">Total Referral Commission Earned</div>
             <div id="comm-total-val" class="comm-amount">₹0.00</div>
-            <div class="comm-subtext">Earn flat <strong>₹100 real cash bonus</strong> on every friend's first deposit + up to <strong>0.6% perpetual betting turnover commission</strong>!</div>
+            <div class="comm-subtext-box">
+                Earn <strong>10% Instant Cash Bonus</strong> on every friend's deposit (e.g. ₹100 on ₹1,000) + <strong>1% Perpetual Betting Commission</strong> on every bet placed!
+            </div>
         </div>
 
-        <!-- 3-Column Team Stats -->
+        <!-- 3-COLUMN STATS -->
         <div class="referral-stats-grid">
             <div class="stat-box">
                 <div class="stat-box-label">Invited Friends</div>
@@ -443,15 +502,15 @@
                 <div id="stat-active-depos" class="stat-box-val green">0</div>
             </div>
             <div class="stat-box">
-                <div class="stat-box-label">Bonus Per Dep</div>
-                <div class="stat-box-val highlight">₹100</div>
+                <div class="stat-box-label">Deposit Bonus</div>
+                <div class="stat-box-val highlight">10%</div>
             </div>
         </div>
 
-        <!-- Share Section -->
+        <!-- EXCLUSIVE INVITE CREDENTIALS CARD -->
         <div class="share-section">
             <div class="share-section-title">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFD700" stroke-width="2.5"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 <span>Your Exclusive Invite Credentials</span>
             </div>
 
@@ -484,34 +543,68 @@
             </div>
         </div>
 
-        <!-- Multi-Tier Model Card -->
-        <div class="tier-section">
-            <div class="share-section-title">
-                <span>🌟 3-Tier Multi-Level Commission Structure</span>
+        <!-- TOP 3 REFERRAL STARS (MILLION DOLLAR LEADERBOARD) -->
+        <div class="home-podium-card" style="margin: 0 14px 16px;">
+            <div class="trust-card-header">
+                <div class="trust-card-title">
+                    <span>👑</span>
+                    <span>TOP 3 <span class="gold-highlight" style="color: #ff4d6d;">REFERRAL STARS</span></span>
+                </div>
+                <span class="trust-live-tag" style="background: rgba(229, 24, 55, 0.15); color: #ff4d6d;">LEADERBOARD</span>
             </div>
-            <div class="tier-grid">
-                <div class="tier-card">
-                    <div class="tier-badge">Tier 1 Direct</div>
-                    <div class="tier-rate">0.6% + ₹100</div>
-                    <div class="tier-sub">Direct Invite turnover</div>
+
+            <div class="podium-grid">
+                <!-- Rank 2: Silver -->
+                <div class="podium-item rank-2">
+                    <div class="podium-avatar">🥈</div>
+                    <div class="podium-user" id="star-user-2">User 91***88</div>
+                    <div class="podium-won-val" id="star-val-2">₹92,400</div>
                 </div>
-                <div class="tier-card">
-                    <div class="tier-badge">Tier 2 Sub</div>
-                    <div class="tier-rate">0.3%</div>
-                    <div class="tier-sub">Level 2 turnover</div>
+
+                <!-- Rank 1: Gold Champion -->
+                <div class="podium-item rank-1">
+                    <span class="podium-crown">👑</span>
+                    <div class="podium-avatar">🥇</div>
+                    <div class="podium-user" id="star-user-1">User 98***12</div>
+                    <div class="podium-won-val" id="star-val-1">₹1,48,500</div>
                 </div>
-                <div class="tier-card">
-                    <div class="tier-badge">Tier 3 Team</div>
-                    <div class="tier-rate">0.1%</div>
-                    <div class="tier-sub">Level 3 turnover</div>
+
+                <!-- Rank 3: Bronze -->
+                <div class="podium-item rank-3">
+                    <div class="podium-avatar">🥉</div>
+                    <div class="podium-user" id="star-user-3">User 88***45</div>
+                    <div class="podium-won-val" id="star-val-3">₹64,200</div>
                 </div>
             </div>
         </div>
 
-        <!-- Referral Team Activity Table -->
+        <!-- 10% DEPOSIT + 1% BET REWARD SYSTEM RULES -->
+        <div class="rules-card-section">
+            <div class="share-section-title">
+                <span>🌟 Agent Commission System Rules</span>
+            </div>
+
+            <div class="rule-item-box">
+                <div class="rule-icon-circle">💰</div>
+                <div>
+                    <div class="rule-title">10% Instant Deposit Reward</div>
+                    <div class="rule-desc">When your referred friend makes a deposit, you get <strong>10% instantly credited</strong> to your wallet balance (e.g. ₹1,000 deposit = ₹100 instant cash!).</div>
+                </div>
+            </div>
+
+            <div class="rule-item-box">
+                <div class="rule-icon-circle">🎯</div>
+                <div>
+                    <div class="rule-title">1% Lifetime Betting Commission</div>
+                    <div class="rule-desc">Get a <strong>1% lifetime commission</strong> on every single bet placed by your referred friends in all game modes (30s, 1Min, 3Min, 5Min)!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TEAM RECORDS TABLE -->
         <div class="team-section">
             <div class="share-section-title" style="margin: 0 14px 10px;">
-                <span>👥 Invited Friends &amp; Team Records</span>
+                <span>👥 Invited Friends & Team Records</span>
             </div>
             <div id="team-records-card" class="team-card" style="margin: 0 14px;">
                 <div class="team-row" style="justify-content: center; color: #7A8094; font-size: 12px;">
@@ -520,7 +613,9 @@
             </div>
         </div>
 
-        <!-- Universal Bottom Navigation -->
+        </div>
+
+        <!-- UNIVERSAL BOTTOM NAVIGATION BAR (VIP) -->
         <nav class="app-bottom-nav">
             <button class="bottom-nav-item" data-tab="home" onclick="window.navigateToPage('index.html', 'Loading Home...')" title="Home">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -568,7 +663,6 @@
                 <span class="bottom-nav-label">Profile</span>
             </button>
         </nav>
-    </div>
 
     <!-- Referral Logic JS -->
     <script type="module">
@@ -585,11 +679,51 @@
                     refData = await resp.json();
                     renderUI();
                 }
+            } catch (err) {
+                console.error('Error fetching referral stats:', err);
+            } finally {
                 if (window.revealPageReady) {
                     window.revealPageReady('.referral-container');
                 }
+            }
+        }
+
+        async function fetchReferralStars() {
+            try {
+                const resp = await fetch('/api/game/referral-stars');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && data.referralStars) {
+                        renderStars(data.referralStars);
+                    }
+                }
             } catch (err) {
-                console.error('Error fetching referral stats:', err);
+                console.error('Error fetching referral stars:', err);
+            }
+        }
+
+        function renderStars(stars) {
+            if (!stars) return;
+
+            // Rank 1
+            if (stars.rank1) {
+                const r1 = stars.rank1;
+                document.getElementById('star-user-1').textContent = `User ${r1.first2 || '98'}***${r1.last2 || '12'}`;
+                document.getElementById('star-val-1').textContent = r1.amount || '₹1,48,500';
+            }
+
+            // Rank 2
+            if (stars.rank2) {
+                const r2 = stars.rank2;
+                document.getElementById('star-user-2').textContent = `User ${r2.first2 || '91'}***${r2.last2 || '88'}`;
+                document.getElementById('star-val-2').textContent = r2.amount || '₹92,400';
+            }
+
+            // Rank 3
+            if (stars.rank3) {
+                const r3 = stars.rank3;
+                document.getElementById('star-user-3').textContent = `User ${r3.first2 || '88'}***${r3.last2 || '45'}`;
+                document.getElementById('star-val-3').textContent = r3.amount || '₹64,200';
             }
         }
 
@@ -616,7 +750,7 @@
                             </div>
                             <div>
                                 ${r.hasDeposited 
-                                    ? `<span class="team-status-tag active">Recharged (+₹100)</span>` 
+                                    ? `<span class="team-status-tag active">Recharged (10% Bonus)</span>` 
                                     : `<span class="team-status-tag pending">Registered</span>`}
                             </div>
                         </div>
@@ -657,18 +791,19 @@
         window.shareWhatsApp = function() {
             const code = refData?.inviteCode || 'SM9101';
             const link = `${window.location.origin}/login.html?ref=${code}`;
-            const text = encodeURIComponent(`🔥 Join Smarty91 VIP - India's most trusted Colour Prediction platform! Use my exclusive invite code: ${code} to get daily bonuses: ${link}`);
+            const text = encodeURIComponent(`🔥 Join Smarty91 Million Dollar VIP Agent Hub! Use invite code: ${code} - Get 10% Instant Deposit Bonus + 1% Betting Commission: ${link}`);
             window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
         };
 
         window.shareTelegram = function() {
             const code = refData?.inviteCode || 'SM9101';
             const link = `${window.location.origin}/login.html?ref=${code}`;
-            const text = encodeURIComponent(`🔥 Join Smarty91 VIP Colour Prediction! Use invite code: ${code} - Instant Withdrawals & Daily Rewards: ${link}`);
+            const text = encodeURIComponent(`🔥 Join Smarty91 Million Dollar VIP Agent Hub! Use invite code: ${code} - Instant Withdrawals & High Commission: ${link}`);
             window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`, '_blank');
         };
 
         fetchReferralStats();
+        fetchReferralStars();
     </script>
 </body>
 </html>

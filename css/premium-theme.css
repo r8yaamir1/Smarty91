@@ -321,7 +321,7 @@ body {
   color: var(--text_color_L2, #666666) !important;
   white-space: nowrap !important;
   line-height: 1.04rem !important;
-  animation: marquee 12s linear infinite !important;
+  animation: marquee 24s linear infinite !important;
 }
 
 /* ----------------------------------------------------------
@@ -2039,7 +2039,7 @@ body {
   border-radius: 12px;
   background: #0D0205;
   border: 1.5px solid #FF2E4D;
-  box-shadow: 0 4px 18px rgba(229, 24, 55, 0.4), inset 0 0 12px rgba(255, 215, 0, 0.18);
+  box-shadow: 0 4px 18px rgba(229, 24, 55, 0.5), inset 0 0 12px rgba(255, 215, 0, 0.25);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -2052,17 +2052,31 @@ body {
   justify-content: flex-end;
   box-sizing: border-box;
   overflow: hidden;
+  animation: cpActiveHighlight 2s infinite alternate ease-in-out;
+}
+
+@keyframes cpActiveHighlight {
+  0% {
+    box-shadow: 0 4px 18px rgba(229, 24, 55, 0.5), inset 0 0 12px rgba(255, 215, 0, 0.2), 0 0 8px rgba(229, 24, 55, 0.3);
+    border-color: #FF2E4D;
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 8px 25px rgba(229, 24, 55, 0.9), inset 0 0 18px rgba(255, 215, 0, 0.45), 0 0 18px rgba(255, 215, 0, 0.4);
+    border-color: #FFD700;
+    transform: scale(1.05);
+  }
 }
 
 .game-card-active:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 8px 28px rgba(255, 46, 77, 0.7), 0 0 20px rgba(255, 215, 0, 0.45);
+  transform: translateY(-2px) scale(1.07);
+  box-shadow: 0 10px 30px rgba(255, 46, 77, 0.8), 0 0 25px rgba(255, 215, 0, 0.6);
   border-color: #FFD700;
 }
 
 .game-card-active:active {
-  transform: scale(0.96);
-  box-shadow: 0 0 16px rgba(255, 46, 77, 0.8);
+  transform: scale(0.98);
+  box-shadow: 0 0 18px rgba(255, 46, 77, 0.9);
 }
 
 .cp-card-bg-artwork {
@@ -2195,8 +2209,8 @@ body {
 /* Upcoming Sci-Fi Red Game Cards */
 .game-card-upcoming {
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(22, 7, 13, 0.95) 0%, rgba(9, 3, 6, 0.98) 100%);
-  border: 1px solid rgba(229, 24, 55, 0.25);
+  background: linear-gradient(180deg, rgba(16, 17, 24, 0.95) 0%, rgba(8, 9, 12, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 8px 4px;
   height: 98px;
   display: flex;
@@ -2207,7 +2221,9 @@ body {
   cursor: pointer;
   overflow: hidden;
   box-sizing: border-box;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s, opacity 0.15s, filter 0.15s;
+  opacity: 0.55;
+  filter: grayscale(0.85);
 }
 
 /* Flanking Left & Right Boxes with Increased Height */
@@ -2358,24 +2374,29 @@ body {
 
 .app-bottom-nav,
 .universal-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: 48px;
-  background: rgba(8, 10, 16, 0.98);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(229, 24, 55, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  z-index: 9999;
-  box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.75);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-sizing: border-box;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  height: 52px !important;
+  background: rgba(8, 10, 16, 0.98) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-top: 1px solid rgba(229, 24, 55, 0.3) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  z-index: 999999 !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.85) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  box-sizing: border-box !important;
+}
+
+.app-bottom-nav.nav-hidden,
+.universal-bottom-nav.nav-hidden {
+  display: none !important;
 }
 
 .bottom-nav-item {
@@ -2433,6 +2454,31 @@ body {
 .bottom-nav-item.active span {
   color: #FF2E4D;
   font-weight: 600;
+}
+
+/* Subtle Red Theme Highlight for Referral Icon in Bottom Navigation Bar */
+.bottom-nav-item[data-tab="referral"] svg,
+.app-bottom-nav .bottom-nav-item[data-tab="referral"] svg,
+.universal-bottom-nav .bottom-nav-item[data-tab="referral"] svg {
+  stroke: #ff4d6d !important;
+  filter: drop-shadow(0 0 5px rgba(229, 24, 55, 0.45)) !important;
+}
+
+.bottom-nav-item[data-tab="referral"] .bottom-nav-label,
+.bottom-nav-item[data-tab="referral"] span,
+.app-bottom-nav .bottom-nav-item[data-tab="referral"] .bottom-nav-label,
+.universal-bottom-nav .bottom-nav-item[data-tab="referral"] .bottom-nav-label {
+  color: #ff4d6d !important;
+  font-weight: 700 !important;
+}
+
+.bottom-nav-item[data-tab="referral"] {
+  position: relative;
+  background: rgba(229, 24, 55, 0.08) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(229, 24, 55, 0.22) !important;
+  margin: 2px 3px !important;
+  padding: 3px 2px !important;
 }
 
 /* Fixed Uniform Center Referral Item (No Jumping / Layout Shifts) */

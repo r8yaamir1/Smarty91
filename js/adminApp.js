@@ -337,6 +337,9 @@ function renderActiveTab(force = false) {
         case 'users':
             renderUsersView(container, force);
             break;
+        case 'profitstars':
+            renderProfitStarsView(container, force);
+            break;
         case 'rules':
             renderRulesView(container, force);
             break;
@@ -1351,6 +1354,400 @@ function renderUsersTableContent(container) {
             if (amtInput) amtInput.focus();
         });
     });
+}
+
+// -------------------------------------------------------------
+// 5.5. TODAY'S PROFIT STARS MANAGER (HOME PAGE PODIUM CONTROLLER)
+// -------------------------------------------------------------
+let cachedProfitStars = null;
+let cachedReferralStars = null;
+
+async function renderProfitStarsView(container, force = false) {
+    const isMounted = container.querySelector('#profit-stars-admin-view');
+    if (isMounted && !force) return;
+
+    try {
+        const resp = await adminService.getProfitStars();
+        if (resp && resp.success && resp.profitStars) {
+            cachedProfitStars = resp.profitStars;
+        }
+    } catch (e) {
+        console.warn('Failed to fetch profit stars for admin:', e);
+    }
+
+    try {
+        const respRef = await adminService.getReferralStars();
+        if (respRef && respRef.success && respRef.referralStars) {
+            cachedReferralStars = respRef.referralStars;
+        }
+    } catch (e) {
+        console.warn('Failed to fetch referral stars for admin:', e);
+    }
+
+    const s = cachedProfitStars || {
+        rank1: { first2: '98', last2: '71', amount: '₹1,84,500' },
+        rank2: { first2: '91', last2: '04', amount: '₹1,12,800' },
+        rank3: { first2: '88', last2: '51', amount: '₹76,400' }
+    };
+
+    const refS = cachedReferralStars || {
+        rank1: { first2: '98', last2: '12', amount: '₹1,48,500' },
+        rank2: { first2: '91', last2: '88', amount: '₹92,400' },
+        rank3: { first2: '88', last2: '45', amount: '₹64,200' }
+    };
+
+    container.innerHTML = `
+        <div id="profit-stars-admin-view" class="admin-card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">👑</span>
+                    <div>
+                        <div style="font-size: 15px; font-weight: 800; color: #fff;">Today's Profit Stars Controller</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Edit the top 3 leaderboard winners shown on the Home screen</div>
+                    </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 800; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 3px 8px; border-radius: 12px;">
+                    ⚡ Live Home Sync
+                </span>
+            </div>
+
+            <!-- Rank 1: Gold / Champion -->
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1.5px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #f59e0b;">
+                        <span>🥇</span>
+                        <span>RANK 1 (1ST PLACE - GOLD CHAMPION)</span>
+                    </div>
+                    <div id="preview-rank1" style="font-size: 11px; font-weight: 700; color: #fef08a; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${s.rank1.first2 || '98'}***${s.rank1.last2 || '71'} (${s.rank1.amount || '₹1,84,500'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label" style="color: #fcd34d;">First 2 Digits</label>
+                        <input type="text" id="star-r1-first2" class="form-input" value="${s.rank1.first2 || '98'}" maxlength="4" placeholder="98" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fcd34d;">Last 2 Digits</label>
+                        <input type="text" id="star-r1-last2" class="form-input" value="${s.rank1.last2 || '71'}" maxlength="4" placeholder="71" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fcd34d;">Profit Price / Amount (₹)</label>
+                        <input type="text" id="star-r1-amount" class="form-input" value="${s.rank1.amount || '₹1,84,500'}" placeholder="₹1,84,500" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rank 2: Silver -->
+            <div style="background: rgba(148, 163, 184, 0.08); border: 1.5px solid rgba(148, 163, 184, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #cbd5e1;">
+                        <span>🥈</span>
+                        <span>RANK 2 (2ND PLACE - SILVER PODIUM)</span>
+                    </div>
+                    <div id="preview-rank2" style="font-size: 11px; font-weight: 700; color: #e2e8f0; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${s.rank2.first2 || '91'}***${s.rank2.last2 || '04'} (${s.rank2.amount || '₹1,12,800'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label">First 2 Digits</label>
+                        <input type="text" id="star-r2-first2" class="form-input" value="${s.rank2.first2 || '91'}" maxlength="4" placeholder="91" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label">Last 2 Digits</label>
+                        <input type="text" id="star-r2-last2" class="form-input" value="${s.rank2.last2 || '04'}" maxlength="4" placeholder="04" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label">Profit Price / Amount (₹)</label>
+                        <input type="text" id="star-r2-amount" class="form-input" value="${s.rank2.amount || '₹1,12,800'}" placeholder="₹1,12,800" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rank 3: Bronze -->
+            <div style="background: rgba(180, 83, 9, 0.08); border: 1.5px solid rgba(180, 83, 9, 0.35); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #fb923c;">
+                        <span>🥉</span>
+                        <span>RANK 3 (3RD PLACE - BRONZE PODIUM)</span>
+                    </div>
+                    <div id="preview-rank3" style="font-size: 11px; font-weight: 700; color: #fed7aa; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${s.rank3.first2 || '88'}***${s.rank3.last2 || '51'} (${s.rank3.amount || '₹76,400'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">First 2 Digits</label>
+                        <input type="text" id="star-r3-first2" class="form-input" value="${s.rank3.first2 || '88'}" maxlength="4" placeholder="88" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">Last 2 Digits</label>
+                        <input type="text" id="star-r3-last2" class="form-input" value="${s.rank3.last2 || '51'}" maxlength="4" placeholder="51" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">Profit Price / Amount (₹)</label>
+                        <input type="text" id="star-r3-amount" class="form-input" value="${s.rank3.amount || '₹76,400'}" placeholder="₹76,400" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback banner -->
+            <div id="profit-stars-feedback" style="display:none; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; margin-bottom: 14px;"></div>
+
+            <!-- Action Button -->
+            <button id="btn-save-profit-stars" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000; font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>👑</span>
+                <span>SAVE & SYNC TODAY'S PROFIT STARS</span>
+            </button>
+        </div>
+
+        <!-- TOP 3 REFERRAL STARS CONTROLLER -->
+        <div id="referral-stars-admin-view" class="admin-card" style="margin-top: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">🌟</span>
+                    <div>
+                        <div style="font-size: 15px; font-weight: 800; color: #fff;">Top 3 Referral Stars Controller</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Customize the Top 3 Agent Champions shown on the Referral Hub</div>
+                    </div>
+                </div>
+                <span style="font-size: 10px; font-weight: 800; background: rgba(229, 24, 55, 0.15); color: #ff4d6d; border: 1px solid rgba(229, 24, 55, 0.3); padding: 3px 8px; border-radius: 12px;">
+                    ⚡ Live Referral Sync
+                </span>
+            </div>
+
+            <!-- Rank 1 Referral Star -->
+            <div style="background: rgba(229, 24, 55, 0.08); border: 1.5px solid rgba(229, 24, 55, 0.35); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #ff4d6d;">
+                        <span>🥇</span>
+                        <span>RANK 1 (1ST PLACE - GOLD CHAMPION)</span>
+                    </div>
+                    <div id="preview-ref-rank1" style="font-size: 11px; font-weight: 700; color: #ff4d6d; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${refS.rank1.first2 || '98'}***${refS.rank1.last2 || '12'} (${refS.rank1.amount || '₹1,48,500'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label" style="color: #ff4d6d;">First 2 Digits</label>
+                        <input type="text" id="refstar-r1-first2" class="form-input" value="${refS.rank1.first2 || '98'}" maxlength="4" placeholder="98" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #ff4d6d;">Last 2 Digits</label>
+                        <input type="text" id="refstar-r1-last2" class="form-input" value="${refS.rank1.last2 || '12'}" maxlength="4" placeholder="12" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #ff4d6d;">Earnings Amount (₹)</label>
+                        <input type="text" id="refstar-r1-amount" class="form-input" value="${refS.rank1.amount || '₹1,48,500'}" placeholder="₹1,48,500" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rank 2 Referral Star -->
+            <div style="background: rgba(255, 215, 0, 0.05); border: 1.5px solid rgba(255, 215, 0, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #FFD700;">
+                        <span>🥈</span>
+                        <span>RANK 2 (2ND PLACE - SILVER PODIUM)</span>
+                    </div>
+                    <div id="preview-ref-rank2" style="font-size: 11px; font-weight: 700; color: #ffd700; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${refS.rank2.first2 || '91'}***${refS.rank2.last2 || '88'} (${refS.rank2.amount || '₹92,400'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label">First 2 Digits</label>
+                        <input type="text" id="refstar-r2-first2" class="form-input" value="${refS.rank2.first2 || '91'}" maxlength="4" placeholder="91" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label">Last 2 Digits</label>
+                        <input type="text" id="refstar-r2-last2" class="form-input" value="${refS.rank2.last2 || '88'}" maxlength="4" placeholder="88" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label">Earnings Amount (₹)</label>
+                        <input type="text" id="refstar-r2-amount" class="form-input" value="${refS.rank2.amount || '₹92,400'}" placeholder="₹92,400" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rank 3 Referral Star -->
+            <div style="background: rgba(180, 83, 9, 0.08); border: 1.5px solid rgba(180, 83, 9, 0.35); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #fb923c;">
+                        <span>🥉</span>
+                        <span>RANK 3 (3RD PLACE - BRONZE PODIUM)</span>
+                    </div>
+                    <div id="preview-ref-rank3" style="font-size: 11px; font-weight: 700; color: #fed7aa; background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 6px;">
+                        Preview: User ${refS.rank3.first2 || '88'}***${refS.rank3.last2 || '45'} (${refS.rank3.amount || '₹64,200'})
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px;">
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">First 2 Digits</label>
+                        <input type="text" id="refstar-r3-first2" class="form-input" value="${refS.rank3.first2 || '88'}" maxlength="4" placeholder="88" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">Last 2 Digits</label>
+                        <input type="text" id="refstar-r3-last2" class="form-input" value="${refS.rank3.last2 || '45'}" maxlength="4" placeholder="45" style="font-family: monospace; font-size: 14px; font-weight: 700; text-align: center;" />
+                    </div>
+                    <div>
+                        <label class="form-label" style="color: #fdba74;">Earnings Amount (₹)</label>
+                        <input type="text" id="refstar-r3-amount" class="form-input" value="${refS.rank3.amount || '₹64,200'}" placeholder="₹64,200" style="font-size: 14px; font-weight: 700; color: #34d399;" />
+                    </div>
+                </div>
+            </div>
+
+            <div id="referral-stars-feedback" style="display:none; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; margin-bottom: 12px;"></div>
+
+            <button id="btn-save-referral-stars" class="btn-primary" style="background: linear-gradient(135deg, #E51837 0%, #B80A22 100%); color: #fff; font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>🌟</span>
+                <span>SAVE & SYNC TOP 3 REFERRAL STARS</span>
+            </button>
+        </div>
+    `;
+
+    // Live Preview update listeners
+    const updatePreviews = () => {
+        const f1 = container.querySelector('#star-r1-first2').value.trim() || '98';
+        const l1 = container.querySelector('#star-r1-last2').value.trim() || '71';
+        const a1 = container.querySelector('#star-r1-amount').value.trim() || '₹1,84,500';
+        container.querySelector('#preview-rank1').textContent = `Preview: User ${f1}***${l1} (${a1})`;
+
+        const f2 = container.querySelector('#star-r2-first2').value.trim() || '91';
+        const l2 = container.querySelector('#star-r2-last2').value.trim() || '04';
+        const a2 = container.querySelector('#star-r2-amount').value.trim() || '₹1,12,800';
+        container.querySelector('#preview-rank2').textContent = `Preview: User ${f2}***${l2} (${a2})`;
+
+        const f3 = container.querySelector('#star-r3-first2').value.trim() || '88';
+        const l3 = container.querySelector('#star-r3-last2').value.trim() || '51';
+        const a3 = container.querySelector('#star-r3-amount').value.trim() || '₹76,400';
+        container.querySelector('#preview-rank3').textContent = `Preview: User ${f3}***${l3} (${a3})`;
+
+        // Referral Stars Previews
+        const rf1 = container.querySelector('#refstar-r1-first2').value.trim() || '98';
+        const rl1 = container.querySelector('#refstar-r1-last2').value.trim() || '12';
+        const ra1 = container.querySelector('#refstar-r1-amount').value.trim() || '₹1,48,500';
+        container.querySelector('#preview-ref-rank1').textContent = `Preview: User ${rf1}***${rl1} (${ra1})`;
+
+        const rf2 = container.querySelector('#refstar-r2-first2').value.trim() || '91';
+        const rl2 = container.querySelector('#refstar-r2-last2').value.trim() || '88';
+        const ra2 = container.querySelector('#refstar-r2-amount').value.trim() || '₹92,400';
+        container.querySelector('#preview-ref-rank2').textContent = `Preview: User ${rf2}***${rl2} (${ra2})`;
+
+        const rf3 = container.querySelector('#refstar-r3-first2').value.trim() || '88';
+        const rl3 = container.querySelector('#refstar-r3-last2').value.trim() || '45';
+        const ra3 = container.querySelector('#refstar-r3-amount').value.trim() || '₹64,200';
+        container.querySelector('#preview-ref-rank3').textContent = `Preview: User ${rf3}***${rl3} (${ra3})`;
+    };
+
+    container.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', updatePreviews);
+    });
+
+    // Save button event listener
+    const saveBtn = container.querySelector('#btn-save-profit-stars');
+    const feedbackEl = container.querySelector('#profit-stars-feedback');
+
+    saveBtn.addEventListener('click', async () => {
+        const payload = {
+            rank1: {
+                first2: container.querySelector('#star-r1-first2').value.trim(),
+                last2: container.querySelector('#star-r1-last2').value.trim(),
+                amount: container.querySelector('#star-r1-amount').value.trim()
+            },
+            rank2: {
+                first2: container.querySelector('#star-r2-first2').value.trim(),
+                last2: container.querySelector('#star-r2-last2').value.trim(),
+                amount: container.querySelector('#star-r2-amount').value.trim()
+            },
+            rank3: {
+                first2: container.querySelector('#star-r3-first2').value.trim(),
+                last2: container.querySelector('#star-r3-last2').value.trim(),
+                amount: container.querySelector('#star-r3-amount').value.trim()
+            }
+        };
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span>⏳</span><span>SAVING & SYNCING...</span>';
+
+        try {
+            const res = await adminService.updateProfitStars(payload);
+            if (res && res.success) {
+                cachedProfitStars = res.profitStars;
+                feedbackEl.style.display = 'block';
+                feedbackEl.style.background = 'rgba(16, 185, 129, 0.15)';
+                feedbackEl.style.border = '1px solid #10b981';
+                feedbackEl.style.color = '#10b981';
+                feedbackEl.textContent = '✅ Success! Today\'s Profit Stars updated and synced to Firestore & all live players!';
+                updatePreviews();
+            } else {
+                throw new Error(res.message || 'Failed to update profit stars');
+            }
+        } catch (err) {
+            feedbackEl.style.display = 'block';
+            feedbackEl.style.background = 'rgba(239, 68, 68, 0.15)';
+            feedbackEl.style.border = '1px solid #ef4444';
+            feedbackEl.style.color = '#ef4444';
+            feedbackEl.textContent = `❌ Error: ${err.message}`;
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span>👑</span><span>SAVE & SYNC TODAY\'S PROFIT STARS</span>';
+        }
+    });
+
+    // Save Referral Stars listener
+    const saveRefBtn = container.querySelector('#btn-save-referral-stars');
+    const refFeedbackEl = container.querySelector('#referral-stars-feedback');
+
+    if (saveRefBtn) {
+        saveRefBtn.addEventListener('click', async () => {
+            const payload = {
+                rank1: {
+                    first2: container.querySelector('#refstar-r1-first2').value.trim(),
+                    last2: container.querySelector('#refstar-r1-last2').value.trim(),
+                    amount: container.querySelector('#refstar-r1-amount').value.trim()
+                },
+                rank2: {
+                    first2: container.querySelector('#refstar-r2-first2').value.trim(),
+                    last2: container.querySelector('#refstar-r2-last2').value.trim(),
+                    amount: container.querySelector('#refstar-r2-amount').value.trim()
+                },
+                rank3: {
+                    first2: container.querySelector('#refstar-r3-first2').value.trim(),
+                    last2: container.querySelector('#refstar-r3-last2').value.trim(),
+                    amount: container.querySelector('#refstar-r3-amount').value.trim()
+                }
+            };
+
+            saveRefBtn.disabled = true;
+            saveRefBtn.innerHTML = '<span>⏳</span><span>SAVING & SYNCING...</span>';
+
+            try {
+                const res = await adminService.updateReferralStars(payload);
+                if (res && res.success) {
+                    cachedReferralStars = res.referralStars;
+                    refFeedbackEl.style.display = 'block';
+                    refFeedbackEl.style.background = 'rgba(16, 185, 129, 0.15)';
+                    refFeedbackEl.style.border = '1px solid #10b981';
+                    refFeedbackEl.style.color = '#10b981';
+                    refFeedbackEl.textContent = '✅ Success! Top 3 Referral Stars updated and synced to Firestore & Referral Hub!';
+                    updatePreviews();
+                } else {
+                    throw new Error(res.message || 'Failed to update referral stars');
+                }
+            } catch (err) {
+                refFeedbackEl.style.display = 'block';
+                refFeedbackEl.style.background = 'rgba(239, 68, 68, 0.15)';
+                refFeedbackEl.style.border = '1px solid #ef4444';
+                refFeedbackEl.style.color = '#ef4444';
+                refFeedbackEl.textContent = `❌ Error: ${err.message}`;
+            } finally {
+                saveRefBtn.disabled = false;
+                saveRefBtn.innerHTML = '<span>🌟</span><span>SAVE & SYNC TOP 3 REFERRAL STARS</span>';
+            }
+        });
+    }
 }
 
 // -------------------------------------------------------------

@@ -3,7 +3,9 @@
 
 let currentDepositAmount = 200;
 let currentBonusAmount = 200;
-let selectedChannel = 'USDT';
+let selectedChannel = 'BHIM_UPI';
+let currentPlatform = 'INR';
+let currentDepositAmountUsdt = 10;
 let countdownInterval = null;
 let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
@@ -188,10 +190,6 @@ window.goToDepositStage = function(stageNumber) {
         if (line2) line2.className = 'step-line';
         clearInterval(countdownInterval);
     } else if (stageNumber === 2) {
-        if (currentDepositAmount < 200) {
-            showToast('Minimum deposit is ₹200');
-            return;
-        }
         if (stage1) stage1.style.display = 'none';
         if (stage2) {
             stage2.style.display = 'block';
@@ -199,14 +197,24 @@ window.goToDepositStage = function(stageNumber) {
         }
         if (stage3) stage3.style.display = 'none';
 
+        const inrPanel = document.getElementById('inr-stage2-panel');
+        const usdtPanel = document.getElementById('usdt-stage2-panel');
+
+        if (currentPlatform === 'INR') {
+            if (inrPanel) inrPanel.style.display = 'block';
+            if (usdtPanel) usdtPanel.style.display = 'none';
+            selectDepositAmount(currentDepositAmount, currentBonusAmount);
+        } else {
+            if (inrPanel) inrPanel.style.display = 'none';
+            if (usdtPanel) usdtPanel.style.display = 'block';
+            selectDepositAmountUsdt(currentDepositAmountUsdt);
+        }
+
         if (step1Ind) step1Ind.className = 'step-item completed';
         if (step2Ind) step2Ind.className = 'step-item active';
         if (step3Ind) step3Ind.className = 'step-item';
         if (line1) line1.className = 'step-line completed';
         if (line2) line2.className = 'step-line';
-
-        const stage2Amount = document.getElementById('stage-2-amount-display');
-        if (stage2Amount) stage2Amount.innerText = `₹${currentDepositAmount.toLocaleString('en-IN')}`;
     } else if (stageNumber === 3) {
         if (stage1) stage1.style.display = 'none';
         if (stage2) stage2.style.display = 'none';
@@ -223,13 +231,44 @@ window.goToDepositStage = function(stageNumber) {
     }
 };
 
-// Select Quick Amount Pill
+// Platform selection handler
+window.selectPaymentPlatform = function(platform) {
+    currentPlatform = platform;
+
+    // Highlight selected card and unhighlight other
+    const platformInr = document.getElementById('platform-card-inr');
+    const platformUsdt = document.getElementById('platform-card-usdt');
+
+    if (platform === 'INR') {
+        if (platformInr) {
+            platformInr.classList.add('selected');
+            platformInr.style.borderColor = '#FFD700';
+        }
+        if (platformUsdt) {
+            platformUsdt.classList.remove('selected');
+            platformUsdt.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+        }
+        selectedChannel = 'BHIM_UPI'; // Default INR channel
+    } else {
+        if (platformInr) {
+            platformInr.classList.remove('selected');
+            platformInr.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+        }
+        if (platformUsdt) {
+            platformUsdt.classList.add('selected');
+            platformUsdt.style.borderColor = '#10b981';
+        }
+        selectedChannel = 'USDT_TRC20'; // Default USDT channel
+    }
+};
+
+// Select Quick Amount Pill (INR)
 window.selectDepositAmount = function(amount, bonus) {
     currentDepositAmount = Number(amount);
     currentBonusAmount = Number(bonus);
 
     // Update Pill active styling
-    const pills = document.querySelectorAll('.amount-pill-card');
+    const pills = document.querySelectorAll('#inr-stage2-panel .amount-pill-card');
     pills.forEach(p => p.classList.remove('selected'));
     if (event && event.currentTarget) {
         event.currentTarget.classList.add('selected');
@@ -241,14 +280,14 @@ window.selectDepositAmount = function(amount, bonus) {
     updateBonusPreviewCard();
 };
 
-// Handle Custom Input
+// Handle Custom Input (INR)
 window.handleCustomDepositChange = function(val) {
     const num = Number(val) || 0;
     currentDepositAmount = num;
     currentBonusAmount = computeBonusForAmount(num);
 
     // Remove pill selection if not exact match
-    const pills = document.querySelectorAll('.amount-pill-card');
+    const pills = document.querySelectorAll('#inr-stage2-panel .amount-pill-card');
     pills.forEach(p => p.classList.remove('selected'));
 
     updateBonusPreviewCard();
@@ -282,19 +321,88 @@ function updateBonusPreviewCard() {
     }
 }
 
+// Select Quick Amount Pill (USDT)
+window.selectDepositAmountUsdt = function(usdtAmount) {
+    currentDepositAmountUsdt = Number(usdtAmount);
+
+    // Update Pill active styling
+    const pills = document.querySelectorAll('#usdt-stage2-panel .amount-pill-card');
+    pills.forEach(p => p.classList.remove('selected'));
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('selected');
+    }
+
+    const customInput = document.getElementById('custom-deposit-usdt-input');
+    if (customInput) customInput.value = usdtAmount;
+
+    updateUsdtBonusPreviewCard();
+};
+
+// Handle Custom Input (USDT)
+window.handleCustomDepositUsdtChange = function(val) {
+    const num = Number(val) || 0;
+    currentDepositAmountUsdt = num;
+
+    // Remove pill selection if not exact match
+    const pills = document.querySelectorAll('#usdt-stage2-panel .amount-pill-card');
+    pills.forEach(p => p.classList.remove('selected'));
+
+    updateUsdtBonusPreviewCard();
+};
+
+function updateUsdtBonusPreviewCard() {
+    const titleEl = document.getElementById('usdt-bonus-card-title');
+    const descEl = document.getElementById('usdt-bonus-card-desc');
+    const amtEl = document.getElementById('usdt-bonus-card-amount');
+
+    const inrValue = currentDepositAmountUsdt * activeUsdtRate;
+    const bonusInr = inrValue; // 100% matching bonus
+
+    if (currentDepositAmountUsdt >= 10) {
+        if (titleEl) {
+            titleEl.innerHTML = `<span>100% USDT Match Bonus</span> <span class="bonus-coupon-tag" style="background: #10b981;">COUPON APPLIED</span>`;
+        }
+        if (descEl) descEl.innerText = `Deposit $${currentDepositAmountUsdt} USDT (₹${inrValue.toLocaleString('en-IN')}) & get ₹${(inrValue + bonusInr).toLocaleString('en-IN')} total play credit`;
+        if (amtEl) amtEl.innerText = `+₹${bonusInr.toLocaleString('en-IN')}`;
+    } else {
+        if (titleEl) {
+            titleEl.innerHTML = `<span>Minimum USDT Deposit is 10</span>`;
+        }
+        if (descEl) descEl.innerText = 'Please select at least 10 USDT to receive instant 100% Match Bonus';
+        if (amtEl) amtEl.innerText = '+₹0';
+    }
+}
+
+// Quick Add Custom Amount (USDT)
+window.addCustomUsdtVal = function(val) {
+    const customInput = document.getElementById('custom-deposit-usdt-input');
+    if (customInput) {
+        let currentVal = Number(customInput.value) || 0;
+        customInput.value = currentVal + Number(val);
+        handleCustomDepositUsdtChange(customInput.value);
+    }
+};
+
 // Payment Channel Selection (Stage 2)
 window.selectPaymentChannel = function(channelCode, cardElement) {
     selectedChannel = channelCode;
-    const cards = document.querySelectorAll('.payment-channel-card');
+    const cards = document.querySelectorAll('#deposit-stage-2 .payment-channel-card');
     cards.forEach(c => c.classList.remove('selected'));
     if (cardElement) cardElement.classList.add('selected');
 };
 
 // Start Stage 3 (Generate Dynamic QR and Start 10-Minute Countdown)
 window.startDepositCheckoutPhase = function() {
-    if (currentDepositAmount < 200) {
-        showToast('Minimum deposit amount is ₹200');
-        return;
+    if (currentPlatform === 'INR') {
+        if (currentDepositAmount < 200) {
+            showToast('Minimum deposit amount is ₹200');
+            return;
+        }
+    } else {
+        if (currentDepositAmountUsdt < 10) {
+            showToast('Minimum deposit amount is 10 USDT');
+            return;
+        }
     }
 
     goToDepositStage(3);
@@ -302,20 +410,22 @@ window.startDepositCheckoutPhase = function() {
     const usdtBox = document.getElementById('usdt-checkout-box');
     const upiBox = document.getElementById('upi-checkout-box');
 
-    if (selectedChannel === 'USDT' || selectedChannel === 'USDT_TRC20') {
+    if (currentPlatform === 'USDT') {
         if (usdtBox) usdtBox.style.display = 'block';
         if (upiBox) upiBox.style.display = 'none';
 
-        const usdtPayable = (currentDepositAmount / activeUsdtRate).toFixed(2);
         const usdtAmtEl = document.getElementById('usdt-payable-amount');
         const usdtConvEl = document.getElementById('usdt-inr-conversion-display');
         const usdtBonusEl = document.getElementById('usdt-stage3-bonus-display');
         const usdtAddrEl = document.getElementById('usdt-merchant-address');
         const usdtQrImg = document.getElementById('usdt-qr-image');
 
-        if (usdtAmtEl) usdtAmtEl.innerText = `$${usdtPayable} USDT`;
-        if (usdtConvEl) usdtConvEl.innerText = `Equivalent to ₹${currentDepositAmount.toLocaleString('en-IN')} (@ ₹${activeUsdtRate.toFixed(2)} / USDT)`;
-        if (usdtBonusEl) usdtBonusEl.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ Instant Automatic Credit';
+        const inrEquivalent = currentDepositAmountUsdt * activeUsdtRate;
+        const usdtBonusVal = inrEquivalent; // 100% matching bonus
+
+        if (usdtAmtEl) usdtAmtEl.innerText = `$${currentDepositAmountUsdt.toFixed(2)} USDT`;
+        if (usdtConvEl) usdtConvEl.innerText = `Equivalent to ₹${inrEquivalent.toLocaleString('en-IN')} (@ ₹${activeUsdtRate.toFixed(2)} / USDT)`;
+        if (usdtBonusEl) usdtBonusEl.innerText = `+ Includes ₹${usdtBonusVal.toLocaleString('en-IN')} VIP Bonus`;
         if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
         if (usdtQrImg) {
             usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
@@ -444,7 +554,7 @@ window.submitUsdtDepositTx = async function() {
             },
             body: JSON.stringify({
                 txid,
-                amountUsdt: Number((currentDepositAmount / activeUsdtRate).toFixed(2))
+                amountUsdt: currentPlatform === 'USDT' ? currentDepositAmountUsdt : Number((currentDepositAmount / activeUsdtRate).toFixed(2))
             })
         });
 
@@ -619,8 +729,8 @@ window.submitUsdtWithdrawalRequest = async function() {
     const usdtAddress = addressInput ? addressInput.value.trim() : '';
     const pin = pinInput ? pinInput.value.trim() : '';
 
-    if (isNaN(amount) || amount < 500) {
-        showToast('Minimum withdrawal amount is ₹500');
+    if (isNaN(amount) || amount < 200) {
+        showToast('Minimum withdrawal is 10 USDT (₹200)');
         return;
     }
     if (!usdtAddress || usdtAddress.length < 15) {
@@ -710,8 +820,8 @@ window.submitWithdrawalRequest = async function() {
     const pin = pinInput ? pinInput.value.trim() : '';
     const mobile = mobileInput ? mobileInput.value.trim() : '';
 
-    if (isNaN(amount) || amount < 500) {
-        showToast('Minimum withdrawal amount is ₹500');
+    if (isNaN(amount) || amount < 200) {
+        showToast('Minimum withdrawal amount is ₹200');
         return;
     }
     if (!accountNum || accountNum.length < 6) {

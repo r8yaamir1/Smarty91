@@ -16,10 +16,10 @@ const checkAdminAuth = (req, res, next) => {
 };
 
 // Helper to resolve current logged-in user or guest
-const getAuthUser = (req) => {
+const getAuthUser = async (req) => {
     const authHeader = req.headers.authorization;
     if (authHeader) {
-        const user = serverEngine.getUserFromToken(authHeader);
+        const user = await serverEngine.resolveUserFromToken(authHeader);
         if (user) return user;
     }
     return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
@@ -30,7 +30,7 @@ const getAuthUser = (req) => {
 // -------------------------------------------------------------
 
 // POST /api/auth/register (Direct Fast Registration - 91 Club Style)
-apiRouter.post('/auth/register', (req, res) => {
+apiRouter.post('/auth/register', async (req, res) => {
     try {
         const { phone, password, inviteCode, securityPin } = req.body;
         const result = serverEngine.registerUser({ phone, password, inviteCode, securityPin });
@@ -41,10 +41,10 @@ apiRouter.post('/auth/register', (req, res) => {
 });
 
 // POST /api/auth/forgot-password (Security PIN or Master Support Reset)
-apiRouter.post('/auth/forgot-password', (req, res) => {
+apiRouter.post('/auth/forgot-password', async (req, res) => {
     try {
         const { phone, newPassword, securityPin, masterPin } = req.body;
-        const result = serverEngine.resetUserPassword({ phone, newPassword, securityPin, masterPin });
+        const result = await serverEngine.resetUserPassword({ phone, newPassword, securityPin, masterPin });
         res.json(result);
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -52,10 +52,10 @@ apiRouter.post('/auth/forgot-password', (req, res) => {
 });
 
 // POST /api/auth/login
-apiRouter.post('/auth/login', (req, res) => {
+apiRouter.post('/auth/login', async (req, res) => {
     try {
         const { phone, password } = req.body;
-        const result = serverEngine.loginUser({ phone, password });
+        const result = await serverEngine.loginUser({ phone, password });
         res.json(result);
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -74,12 +74,12 @@ apiRouter.post('/admin/users/reset-password', checkAdminAuth, (req, res) => {
 });
 
 // GET /api/auth/me
-apiRouter.get('/auth/me', (req, res) => {
+apiRouter.get('/auth/me', async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
         return res.status(401).json({ success: false, message: 'No authorization token provided' });
     }
-    const user = serverEngine.getUserFromToken(authHeader);
+    const user = await serverEngine.resolveUserFromToken(authHeader);
     if (!user) {
         return res.status(401).json({ success: false, message: 'Invalid or expired session' });
     }
@@ -96,6 +96,46 @@ apiRouter.get('/auth/me', (req, res) => {
             createdAt: user.createdAt
         }
     });
+});
+
+// GET /api/game/profit-stars -> Today's Profit Stars (Public)
+apiRouter.get('/game/profit-stars', (req, res) => {
+    try {
+        const stars = serverEngine.getProfitStars();
+        res.json({ success: true, profitStars: stars });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/profit-stars -> Update Today's Profit Stars (Admin Auth)
+apiRouter.post('/admin/profit-stars', checkAdminAuth, (req, res) => {
+    try {
+        const result = serverEngine.updateProfitStars(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// GET /api/game/referral-stars -> Top 3 Referral Stars (Public)
+apiRouter.get('/game/referral-stars', (req, res) => {
+    try {
+        const stars = serverEngine.getReferralStars();
+        res.json({ success: true, referralStars: stars });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/referral-stars -> Update Top 3 Referral Stars (Admin Auth)
+apiRouter.post('/admin/referral-stars', checkAdminAuth, (req, res) => {
+    try {
+        const result = serverEngine.updateReferralStars(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // POST /api/auth/logout

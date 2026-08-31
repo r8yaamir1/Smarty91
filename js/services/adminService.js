@@ -58,6 +58,22 @@ class AdminService {
     async updateTelegramConfig(botToken, chatId) {
         return await apiClient.post('/admin/telegram/config', { botToken, chatId });
     }
+
+    async getProfitStars() {
+        return await apiClient.get('/game/profit-stars');
+    }
+
+    async updateProfitStars(stars) {
+        return await apiClient.post('/admin/profit-stars', stars);
+    }
+
+    async getReferralStars() {
+        return await apiClient.get('/game/referral-stars');
+    }
+
+    async updateReferralStars(stars) {
+        return await apiClient.post('/admin/referral-stars', stars);
+    }
 }
 
 export const adminService = new AdminService();

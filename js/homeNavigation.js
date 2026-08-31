@@ -23,12 +23,18 @@ export function switchView(viewName) {
     const homeView = document.getElementById('home-dashboard-view');
     const wingoView = document.getElementById('wingo-game-view');
     const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+    const floatingToast = document.getElementById('home-floating-toast');
+    const bottomNav = document.querySelector('.app-bottom-nav');
 
     if (viewName === 'game') {
+        if (floatingToast) floatingToast.classList.remove('show');
         if (homeView) homeView.style.display = 'none';
         if (wingoView) {
             wingoView.style.display = 'block';
             if (window.applyTabAnimation) window.applyTabAnimation(wingoView);
+        }
+        if (bottomNav) {
+            bottomNav.classList.add('nav-hidden');
         }
         window.scrollTo({ top: 0, behavior: 'instant' });
     } else {
@@ -39,6 +45,9 @@ export function switchView(viewName) {
             if (window.applyTabAnimation) window.applyTabAnimation(homeView);
         }
         if (wingoView) wingoView.style.display = 'none';
+        if (bottomNav) {
+            bottomNav.classList.remove('nav-hidden');
+        }
         window.scrollTo({ top: 0, behavior: 'instant' });
     }
 
@@ -394,8 +403,68 @@ export function initHomeNavigation() {
     // Load initial check-in data in background
     loadCheckInStatus();
 
+    // Load Today's Profit Stars from server
+    loadProfitStars();
+
     // Initialize Social Proof & Multi-User Live Winning Engine
     initSocialProofEngine();
+}
+
+export async function loadProfitStars() {
+    try {
+        const resp = await fetch('/api/game/profit-stars');
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.success && data.profitStars) {
+                renderProfitStars(data.profitStars);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load profit stars:', e);
+    }
+}
+
+export function renderProfitStars(stars) {
+    if (!stars) return;
+
+    // Rank 1
+    const u1 = document.getElementById('podium-user-1');
+    const v1 = document.getElementById('podium-val-1');
+    if (stars.rank1) {
+        const f1 = stars.rank1.first2 || '98';
+        const l1 = stars.rank1.last2 || '71';
+        if (u1) u1.textContent = `User ${f1}***${l1}`;
+        if (v1) {
+            const amt1 = stars.rank1.amount || '₹1,84,500';
+            v1.textContent = amt1.startsWith('₹') ? amt1 : `₹${amt1}`;
+        }
+    }
+
+    // Rank 2
+    const u2 = document.getElementById('podium-user-2');
+    const v2 = document.getElementById('podium-val-2');
+    if (stars.rank2) {
+        const f2 = stars.rank2.first2 || '91';
+        const l2 = stars.rank2.last2 || '04';
+        if (u2) u2.textContent = `User ${f2}***${l2}`;
+        if (v2) {
+            const amt2 = stars.rank2.amount || '₹1,12,800';
+            v2.textContent = amt2.startsWith('₹') ? amt2 : `₹${amt2}`;
+        }
+    }
+
+    // Rank 3
+    const u3 = document.getElementById('podium-user-3');
+    const v3 = document.getElementById('podium-val-3');
+    if (stars.rank3) {
+        const f3 = stars.rank3.first2 || '88';
+        const l3 = stars.rank3.last2 || '51';
+        if (u3) u3.textContent = `User ${f3}***${l3}`;
+        if (v3) {
+            const amt3 = stars.rank3.amount || '₹76,400';
+            v3.textContent = amt3.startsWith('₹') ? amt3 : `₹${amt3}`;
+        }
+    }
 }
 
 /* ==========================================================
@@ -536,6 +605,29 @@ function initFloatingToastLoop() {
 
     function triggerToast() {
         if (document.hidden) return;
+
+        // ONLY trigger popup toast if the user is strictly on the HOME tab (not in game view, modals, or other tabs)
+        const homeView = document.getElementById('home-dashboard-view');
+        const wingoView = document.getElementById('wingo-game-view');
+        const checkinModal = document.getElementById('daily-signin-modal');
+        const referralModal = document.getElementById('referral-modal');
+        const noticeModal = document.getElementById('notice-modal');
+
+        if (!homeView || homeView.style.display === 'none') {
+            toastEl.classList.remove('show');
+            return;
+        }
+        if (wingoView && wingoView.style.display !== 'none') {
+            toastEl.classList.remove('show');
+            return;
+        }
+        if ((checkinModal && checkinModal.classList.contains('active')) ||
+            (referralModal && referralModal.classList.contains('active')) ||
+            (noticeModal && noticeModal.classList.contains('active'))) {
+            toastEl.classList.remove('show');
+            return;
+        }
+
         const ev = generateRandomEvent();
         const isW = !!ev.outcome.isWithdrawal;
 
@@ -558,7 +650,7 @@ function initFloatingToastLoop() {
         }, 3000);
     }
 
-    // First toast after 2.5s, then every 5.5s
+    // First toast after 2.5s, then every 5.8s
     setTimeout(triggerToast, 2500);
     setInterval(triggerToast, 5800);
 }
