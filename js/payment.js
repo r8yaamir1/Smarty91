@@ -3,15 +3,16 @@
 
 let currentDepositAmount = 200;
 let currentBonusAmount = 200;
-let selectedChannel = 'BHIM_UPI';
-let currentPlatform = 'INR';
-let currentDepositAmountUsdt = 10;
+let selectedChannel = 'USDT_TRC20';
+let currentPlatform = 'USDT';
+let currentDepositAmountUsdt = 5;
 let countdownInterval = null;
 let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
 let activeMerchantUpi = '6289140468@axl';
 let activeMerchantName = 'Smarty91';
 let activeMerchantUsdtAddress = 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+let activeMerchantUsdtQrImage = '';
 let activeUsdtRate = 90;
 
 // Load live merchant config (UPI & USDT)
@@ -30,6 +31,9 @@ async function fetchMerchantConfig() {
                 activeMerchantUsdtAddress = data.usdtAddress;
                 const usdtAddrEl = document.getElementById('usdt-merchant-address');
                 if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
+            }
+            if (data.usdtQrImage) {
+                activeMerchantUsdtQrImage = data.usdtQrImage;
             }
             if (data.usdtRate) {
                 activeUsdtRate = Number(data.usdtRate) || 90;
@@ -233,33 +237,25 @@ window.goToDepositStage = function(stageNumber) {
 
 // Platform selection handler
 window.selectPaymentPlatform = function(platform) {
-    currentPlatform = platform;
+    if (platform === 'INR') {
+        showToast('UPI deposits are temporarily undergoing system upgrade. Please use USDT for instant deposit.');
+        return;
+    }
+    currentPlatform = 'USDT';
 
     // Highlight selected card and unhighlight other
     const platformInr = document.getElementById('platform-card-inr');
     const platformUsdt = document.getElementById('platform-card-usdt');
 
-    if (platform === 'INR') {
-        if (platformInr) {
-            platformInr.classList.add('selected');
-            platformInr.style.borderColor = '#FFD700';
-        }
-        if (platformUsdt) {
-            platformUsdt.classList.remove('selected');
-            platformUsdt.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-        }
-        selectedChannel = 'BHIM_UPI'; // Default INR channel
-    } else {
-        if (platformInr) {
-            platformInr.classList.remove('selected');
-            platformInr.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-        }
-        if (platformUsdt) {
-            platformUsdt.classList.add('selected');
-            platformUsdt.style.borderColor = '#10b981';
-        }
-        selectedChannel = 'USDT_TRC20'; // Default USDT channel
+    if (platformInr) {
+        platformInr.classList.remove('selected');
+        platformInr.style.borderColor = 'rgba(255, 255, 255, 0.08)';
     }
+    if (platformUsdt) {
+        platformUsdt.classList.add('selected');
+        platformUsdt.style.borderColor = '#10b981';
+    }
+    selectedChannel = 'USDT_TRC20'; // Default USDT channel
 };
 
 // Select Quick Amount Pill (INR)
@@ -358,7 +354,7 @@ function updateUsdtBonusPreviewCard() {
     const inrValue = currentDepositAmountUsdt * activeUsdtRate;
     const bonusInr = inrValue; // 100% matching bonus
 
-    if (currentDepositAmountUsdt >= 10) {
+    if (currentDepositAmountUsdt >= 5) {
         if (titleEl) {
             titleEl.innerHTML = `<span>100% USDT Match Bonus</span> <span class="bonus-coupon-tag" style="background: #10b981;">COUPON APPLIED</span>`;
         }
@@ -366,9 +362,9 @@ function updateUsdtBonusPreviewCard() {
         if (amtEl) amtEl.innerText = `+₹${bonusInr.toLocaleString('en-IN')}`;
     } else {
         if (titleEl) {
-            titleEl.innerHTML = `<span>Minimum USDT Deposit is 10</span>`;
+            titleEl.innerHTML = `<span>Minimum USDT Deposit is 5</span>`;
         }
-        if (descEl) descEl.innerText = 'Please select at least 10 USDT to receive instant 100% Match Bonus';
+        if (descEl) descEl.innerText = 'Please select at least 5 USDT to receive instant 100% Match Bonus';
         if (amtEl) amtEl.innerText = '+₹0';
     }
 }
@@ -399,8 +395,8 @@ window.startDepositCheckoutPhase = function() {
             return;
         }
     } else {
-        if (currentDepositAmountUsdt < 10) {
-            showToast('Minimum deposit amount is 10 USDT');
+        if (currentDepositAmountUsdt < 5) {
+            showToast('Minimum deposit amount is 5 USDT');
             return;
         }
     }
@@ -428,7 +424,11 @@ window.startDepositCheckoutPhase = function() {
         if (usdtBonusEl) usdtBonusEl.innerText = `+ Includes ₹${usdtBonusVal.toLocaleString('en-IN')} VIP Bonus`;
         if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
         if (usdtQrImg) {
-            usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
+            if (activeMerchantUsdtQrImage && activeMerchantUsdtQrImage.trim() !== '') {
+                usdtQrImg.src = activeMerchantUsdtQrImage.trim();
+            } else {
+                usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
+            }
         }
     } else {
         if (usdtBox) usdtBox.style.display = 'none';
@@ -729,8 +729,10 @@ window.submitUsdtWithdrawalRequest = async function() {
     const usdtAddress = addressInput ? addressInput.value.trim() : '';
     const pin = pinInput ? pinInput.value.trim() : '';
 
-    if (isNaN(amount) || amount < 200) {
-        showToast('Minimum withdrawal is 10 USDT (₹200)');
+    const minUsdtValue = 10;
+    const requiredInr = minUsdtValue * activeUsdtRate;
+    if (isNaN(amount) || amount < requiredInr) {
+        showToast(`Minimum withdrawal is 10 USDT (₹${requiredInr})`);
         return;
     }
     if (!usdtAddress || usdtAddress.length < 15) {

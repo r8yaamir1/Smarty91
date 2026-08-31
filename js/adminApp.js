@@ -1905,6 +1905,7 @@ function initDeveloperPortal() {
     const currentNameEl = document.getElementById('dev-portal-current-name');
     const newUpiInput = document.getElementById('dev-portal-new-upi-input');
     const newUsdtInput = document.getElementById('dev-portal-new-usdt-input');
+    const newQrInput = document.getElementById('dev-portal-new-qr-input');
     const newRateInput = document.getElementById('dev-portal-new-rate-input');
     const newNameInput = document.getElementById('dev-portal-new-name-input');
     const updateBtn = document.getElementById('dev-portal-update-btn');
@@ -1934,6 +1935,7 @@ function initDeveloperPortal() {
             // Open main developer portal
             const activeUpi = liveData?.config?.upiId || '6289140468@axl';
             const activeUsdt = liveData?.config?.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+            const activeQr = liveData?.config?.usdtQrImage || '';
             const activeRate = liveData?.config?.usdtRate || 90;
             const activeName = liveData?.config?.upiName || 'Smarty91';
 
@@ -1943,6 +1945,7 @@ function initDeveloperPortal() {
 
             if (newUpiInput) newUpiInput.value = activeUpi;
             if (newUsdtInput) newUsdtInput.value = activeUsdt;
+            if (newQrInput) newQrInput.value = activeQr;
             if (newRateInput) newRateInput.value = activeRate;
             if (newNameInput) newNameInput.value = activeName;
             if (feedbackMsg) feedbackMsg.style.display = 'none';
@@ -1959,6 +1962,7 @@ function initDeveloperPortal() {
         updateBtn.addEventListener('click', async () => {
             const upiId = newUpiInput ? newUpiInput.value.trim() : '';
             const usdtAddress = newUsdtInput ? newUsdtInput.value.trim() : '';
+            const usdtQrImage = newQrInput ? newQrInput.value.trim() : '';
             const usdtRate = newRateInput ? Number(newRateInput.value) : 90;
             const upiName = newNameInput ? newNameInput.value.trim() : 'Smarty91';
 
@@ -1974,6 +1978,7 @@ function initDeveloperPortal() {
                         upiId,
                         upiName,
                         usdtAddress,
+                        usdtQrImage,
                         usdtRate
                     })
                 });

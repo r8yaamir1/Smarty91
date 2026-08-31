@@ -63,6 +63,7 @@ class Smarty91ServerEngine {
             upiId: '6289140468@axl',
             upiName: 'Smarty91',
             usdtAddress: 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
+            usdtQrImage: '',
             usdtRate: 90,
             minDeposit: 200,
             maxDeposit: 100000,
