@@ -225,22 +225,19 @@ export async function placeBet(betData) {
 
     let currentBalance = getBalance();
     
-    // If client balance appears insufficient, attempt an immediate fresh sync with the server before failing
+    // If client balance appears insufficient, attempt a fast live sync
     if (totalAmount > currentBalance) {
         try {
             currentBalance = await syncServerBalance(false);
         } catch (e) {}
     }
 
-    // Only reject if even after live sync the balance is insufficient
     if (totalAmount > currentBalance) {
-        return { success: false, message: 'Insufficient wallet balance. Please recharge.' };
+        return { success: false, message: `Insufficient wallet balance. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${totalAmount.toFixed(2)}` };
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Securing Bet on Blockchain...');
-
-        // Call server betting endpoint which performs direct Firebase check & atomic deduction
+        // Call server betting endpoint
         const res = await gameService.placeBet({
             mode: targetMode,
             periodId: modeState.currentIssueNumber,
@@ -255,7 +252,7 @@ export async function placeBet(betData) {
             return { success: false, message: res ? res.message : 'Failed to place bet on server' };
         }
 
-        // Successfully placed and debited on Firestore! Now sync state
+        // Successfully placed and debited on server! Now sync local state instantly
         const contractAmount = parseFloat((totalAmount * 0.98).toFixed(2));
         const fee = parseFloat((totalAmount * 0.02).toFixed(2));
         
@@ -265,7 +262,7 @@ export async function placeBet(betData) {
             id: betId,
             mode: targetMode,
             gameType: modeState.displayName,
-            periodId: modeState.currentIssueNumber,
+            periodId: res.bet ? res.bet.periodId : modeState.currentIssueNumber,
             type: betData.type,
             selection: betData.selection,
             selectionLabel: betData.selectionLabel,
@@ -283,15 +280,13 @@ export async function placeBet(betData) {
         if (res.newBalance !== undefined) {
             setBalanceLocally(res.newBalance);
         } else {
-            await syncServerBalance();
+            syncServerBalance(false).catch(() => {});
         }
 
         return { success: true, bet: betRecord };
     } catch (err) {
         console.warn('Bet placement failed:', err);
         return { success: false, message: err.message || 'Server error. Please try again.' };
-    } finally {
-        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 }
 

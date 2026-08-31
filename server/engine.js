@@ -532,17 +532,20 @@ class Smarty91ServerEngine {
                         const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
                         const data = JSON.parse(payloadJson);
                         if (data && data.uid) {
-                            // Always prioritize fetching fresh database document (Source of Truth)
-                            let user = null;
-                            try {
-                                user = await firebaseSync.fetchUserFromFirestore(data.uid);
-                            } catch (e) {
-                                console.warn('[Server] Direct Firestore fetch failed during token resolution:', e.message);
+                            // 1. Fast in-memory resolution (sub-millisecond)
+                            let user = this.users.get(data.uid);
+                            if (!user) {
+                                this._loadUsersFromDisk();
+                                user = this.users.get(data.uid);
                             }
 
+                            // 2. Fallback to Firestore if not in memory
                             if (!user) {
-                                // Fallback to in-memory check
-                                user = this.getUserFromToken(token);
+                                try {
+                                    user = await firebaseSync.fetchUserFromFirestore(data.uid);
+                                } catch (e) {
+                                    console.warn('[Server] Firestore fetch failed during token resolution:', e.message);
+                                }
                             }
 
                             if (user) {
@@ -777,14 +780,28 @@ class Smarty91ServerEngine {
             bet.settledAt = new Date().toISOString();
 
             if (settlement.isWin && settlement.payoutAmount > 0) {
+                const user = this.users.get(bet.userId);
+                let balanceBefore = 0;
+                let balanceAfter = 0;
+                if (user) {
+                    balanceBefore = user.balance;
+                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
+                    balanceAfter = user.balance;
+                    this._saveUsersToDisk();
+                }
+
                 const ledgerEntry = {
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: bet.userId,
                     type: 'BET_WIN_CREDIT',
                     amount: settlement.payoutAmount,
+                    balanceBefore,
+                    balanceAfter,
                     referenceId: bet.id,
+                    timestamp: new Date().toISOString(),
                     description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
                 };
+                this.ledger.unshift(ledgerEntry);
 
                 try {
                     await firebaseSync.settleWinningBetTransaction(bet.userId, settlement.payoutAmount, bet, ledgerEntry);
@@ -792,7 +809,11 @@ class Smarty91ServerEngine {
                     console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
                     // Fallback to separate operations in worst case scenarios
                     await firebaseSync.updateBetSettlement(bet);
-                    await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout');
+                    if (user) {
+                        await firebaseSync.updateUserBalance(bet.userId, user.balance, 'Round win payout');
+                    } else {
+                        await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout');
+                    }
                 }
             } else {
                 await firebaseSync.updateBetSettlement(bet);
@@ -884,11 +905,24 @@ class Smarty91ServerEngine {
         }
 
         if (modeState.isLocked) {
-            throw new Error('Betting window is locked for the final 5 seconds');
+            throw new Error('Betting is locked for the final 5 seconds. Please wait for next round.');
         }
 
-        if (periodId !== modeState.currentPeriodId) {
-            throw new Error('Period expired or mismatch. Please refresh');
+        // Fast & reliable user lookup
+        let user = this.users.get(userId);
+        if (!user) {
+            this._loadUsersFromDisk();
+            user = this.users.get(userId);
+        }
+        if (!user) {
+            try {
+                user = await firebaseSync.fetchUserFromFirestore(userId);
+            } catch (e) {
+                console.warn('[Server] Firestore user fetch during bet placement:', e.message);
+            }
+        }
+        if (!user) {
+            throw new Error('User account not found. Please log in again.');
         }
 
         const totalAmount = Number(unitAmount) * Number(multiplier) * Number(quantity);
@@ -899,7 +933,13 @@ class Smarty91ServerEngine {
             throw new Error(`Maximum bet amount is ₹${this.config.maxBetAmount}`);
         }
 
-        const feePercent = this.config.serviceFeePercent;
+        // Check authoritative balance
+        const currentBalance = Number(user.balance || 0);
+        if (currentBalance < totalAmount) {
+            throw new Error(`Insufficient wallet balance. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${totalAmount.toFixed(2)}`);
+        }
+
+        const feePercent = this.config.serviceFeePercent || 2;
         const serviceFee = Number((totalAmount * (feePercent / 100)).toFixed(2));
         const contractAmount = Number((totalAmount - serviceFee).toFixed(2));
 
@@ -909,14 +949,17 @@ class Smarty91ServerEngine {
         if (!isNaN(parseInt(selection, 10))) {
             selectionLabel = `Number ${selection}`;
         } else {
-            selectionLabel = selection.toUpperCase();
+            selectionLabel = String(selection).toUpperCase();
         }
+
+        // Always lock to active server round period
+        const activePeriodId = modeState.currentPeriodId || periodId;
 
         const betOrder = {
             id: betId,
             userId,
             mode,
-            periodId,
+            periodId: activePeriodId,
             type,
             selection: String(selection),
             selectionLabel,
@@ -932,30 +975,37 @@ class Smarty91ServerEngine {
             settledAt: null
         };
 
+        // Instant Atomic In-Memory Balance Deduction
+        const balanceBefore = user.balance;
+        user.balance = Number((user.balance - totalAmount).toFixed(2));
+        const balanceAfter = user.balance;
+
         const ledgerEntry = {
             id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             userId,
             type: 'BET_DEBIT',
             amount: -totalAmount,
+            balanceBefore,
+            balanceAfter,
             referenceId: betId,
-            description: `Bet on ${mode} round ${periodId} (${selectionLabel})`
+            timestamp: new Date().toISOString(),
+            description: `Bet on ${mode} round ${activePeriodId} (${selectionLabel})`
         };
 
-        // Execute absolute atomic database transaction
-        let newBalance = 0;
-        try {
-            newBalance = await firebaseSync.placeBetTransaction(userId, totalAmount, betOrder, ledgerEntry);
-        } catch (error) {
-            throw new Error(error.message || 'Failed to place bet due to server state. Please try again.');
-        }
-
-        // Cache the active bet for the current round engine calculations
+        // Cache active bet & ledger in memory immediately
         this.bets.set(betId, betOrder);
+        this.ledger.unshift(ledgerEntry);
+
+        // Background non-blocking persistence to Firestore & Disk
+        this._saveUsersToDisk();
+        firebaseSync.saveBet(betOrder).catch(e => console.warn('[Bet Firestore Save]', e.message));
+        firebaseSync.updateUserBalance(userId, user.balance, `Bet on ${mode} round ${activePeriodId}`).catch(e => console.warn('[Bet Balance Sync]', e.message));
+        firebaseSync.saveTransaction(ledgerEntry).catch(e => console.warn('[Ledger Save]', e.message));
 
         return {
             success: true,
             bet: betOrder,
-            newBalance: newBalance
+            newBalance: user.balance
         };
     }
 

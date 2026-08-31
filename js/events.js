@@ -429,15 +429,18 @@ export function handleBettingOverlay_clicks() {
         });
 
         if (!result.success) {
+            const errorMsg = result.message || 'Failed to place bet. Please try again.';
             if (InsufficientBalance) {
+                const toastText = InsufficientBalance.querySelector('.van-toast__text');
+                if (toastText) toastText.textContent = errorMsg;
                 InsufficientBalance.style.display = "";
                 InsufficientBalance.style.opacity = "1";
                 setTimeout(() => {
                     InsufficientBalance.style.opacity = "0";
                     InsufficientBalance.style.display = "none";
-                }, 2200);
+                }, 2500);
             } else {
-                showToast(result.message || 'Insufficient balance', 'error');
+                showToast(errorMsg, 'error');
             }
             return;
         }
