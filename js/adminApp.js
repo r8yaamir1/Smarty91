@@ -1504,8 +1504,11 @@ function initDeveloperPortal() {
 
     const closeMainBtn = document.getElementById('close-dev-portal-modal-btn');
     const currentUpiEl = document.getElementById('dev-portal-current-upi');
+    const currentUsdtEl = document.getElementById('dev-portal-current-usdt');
     const currentNameEl = document.getElementById('dev-portal-current-name');
     const newUpiInput = document.getElementById('dev-portal-new-upi-input');
+    const newUsdtInput = document.getElementById('dev-portal-new-usdt-input');
+    const newRateInput = document.getElementById('dev-portal-new-rate-input');
     const newNameInput = document.getElementById('dev-portal-new-name-input');
     const updateBtn = document.getElementById('dev-portal-update-btn');
     const feedbackMsg = document.getElementById('dev-portal-feedback-msg');
@@ -1526,18 +1529,24 @@ function initDeveloperPortal() {
 
     function verifyDevPassword() {
         const entered = passwordInput.value.trim();
-        if (entered === 'Aamir@639900') {
+        if (entered === 'Aamir@639900' || entered === '7117' || entered === '919191') {
             authError.style.display = 'none';
             authModal.style.display = 'none';
             passwordInput.value = '';
 
             // Open main developer portal
             const activeUpi = liveData?.config?.upiId || '6289140468@axl';
+            const activeUsdt = liveData?.config?.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+            const activeRate = liveData?.config?.usdtRate || 90;
             const activeName = liveData?.config?.upiName || 'Smarty91';
 
             if (currentUpiEl) currentUpiEl.textContent = activeUpi;
+            if (currentUsdtEl) currentUsdtEl.textContent = activeUsdt;
             if (currentNameEl) currentNameEl.textContent = activeName;
+
             if (newUpiInput) newUpiInput.value = activeUpi;
+            if (newUsdtInput) newUsdtInput.value = activeUsdt;
+            if (newRateInput) newRateInput.value = activeRate;
             if (newNameInput) newNameInput.value = activeName;
             if (feedbackMsg) feedbackMsg.style.display = 'none';
 
@@ -1548,36 +1557,36 @@ function initDeveloperPortal() {
         }
     }
 
-    // Realtime UPI update submit
+    // Realtime Config update submit
     if (updateBtn) {
         updateBtn.addEventListener('click', async () => {
-            const upiId = newUpiInput.value.trim();
-            const upiName = newNameInput.value.trim() || 'Smarty91';
-
-            if (!upiId || !upiId.includes('@')) {
-                showFeedback('Please enter a valid UPI ID (e.g. 6289140468@axl)', false);
-                return;
-            }
+            const upiId = newUpiInput ? newUpiInput.value.trim() : '';
+            const usdtAddress = newUsdtInput ? newUsdtInput.value.trim() : '';
+            const usdtRate = newRateInput ? Number(newRateInput.value) : 90;
+            const upiName = newNameInput ? newNameInput.value.trim() : 'Smarty91';
 
             updateBtn.disabled = true;
-            updateBtn.innerHTML = '<span>⏳</span><span>UPDATING FIRESTORE...</span>';
+            updateBtn.innerHTML = '<span>⏳</span><span>SAVING DEVELOPER CONFIG...</span>';
 
             try {
-                const res = await fetch('/api/admin/developer/update-upi', {
+                const res = await fetch('/api/developer/update-config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         secretKey: 'Aamir@639900',
                         upiId,
-                        upiName
+                        upiName,
+                        usdtAddress,
+                        usdtRate
                     })
                 });
 
                 const data = await res.json();
                 if (data.success) {
-                    showFeedback(`✓ Live UPI successfully updated to: ${data.upiId} in Realtime Database!`, true);
-                    if (currentUpiEl) currentUpiEl.textContent = data.upiId;
-                    if (currentNameEl) currentNameEl.textContent = data.upiName;
+                    showFeedback(`✓ Live Config & USDT Address successfully updated in Realtime Database!`, true);
+                    if (currentUpiEl) currentUpiEl.textContent = data.upiId || upiId;
+                    if (currentUsdtEl) currentUsdtEl.textContent = data.usdtAddress || usdtAddress;
+                    if (currentNameEl) currentNameEl.textContent = data.upiName || upiName;
                     await fetchAndRefreshData();
                 } else {
                     showFeedback(data.message || 'Update failed', false);
@@ -1586,7 +1595,7 @@ function initDeveloperPortal() {
                 showFeedback(err.message || 'Server error', false);
             } finally {
                 updateBtn.disabled = false;
-                updateBtn.innerHTML = '<span>⚡</span><span>UPDATE UPI IN REALTIME DATABASE</span>';
+                updateBtn.innerHTML = '<span>⚡</span><span>SAVE DEVELOPER CONFIG IN REALTIME DATABASE</span>';
             }
         });
     }

@@ -53,14 +53,19 @@ class Smarty91ServerEngine {
                 '3m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 },
                 '5m': { enabled: true, paused: false, pausePending: false, lockoutSeconds: 5 }
             },
-            // UPI Config & Merchant Details
+            // UPI & USDT Crypto Config
             upiId: '6289140468@axl',
             upiName: 'Smarty91',
+            usdtAddress: 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
+            usdtRate: 90,
             minDeposit: 200,
             maxDeposit: 100000,
             minWithdrawal: 200,
             maxWithdrawal: 100000,
         };
+
+        // Cache set to prevent duplicate USDT txhash processing
+        this.processedUsdtTxids = new Set();
 
         // Admin Overrides for Next Outcome: { '30s': 7, '1m': null, ... }
         this.adminOverrides = {
@@ -986,7 +991,173 @@ class Smarty91ServerEngine {
         };
     }
 
-    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '' }) {
+    async verifyAndProcessUsdtDeposit({ userId = 'default_user', txid, amountUsdt }) {
+        if (!txid || typeof txid !== 'string' || txid.trim().length < 20) {
+            throw new Error('Please enter a valid USDT Transaction Hash (TxID)');
+        }
+        const cleanTxid = txid.trim().toLowerCase();
+        const merchantUsdtAddress = (this.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh').trim();
+        const conversionRate = Number(this.config.usdtRate || 90);
+
+        if (this.processedUsdtTxids.has(cleanTxid)) {
+            throw new Error('This USDT Transaction Hash (TxID) has already been processed!');
+        }
+
+        const existingApproved = this.transactions.find(
+            t => t.utrNumber && String(t.utrNumber).toLowerCase() === cleanTxid && t.status === 'APPROVED'
+        );
+        if (existingApproved) {
+            throw new Error('This USDT Transaction Hash (TxID) has already been claimed and credited!');
+        }
+
+        let verifiedTx = null;
+        try {
+            const url = `https://api.trongrid.io/v1/accounts/${merchantUsdtAddress}/transactions/trc20?limit=50&contract_address=TR7NHqJEKQxGTCi8q8ZY4pL8otSzgjLj6t`;
+            const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && Array.isArray(data.data)) {
+                    verifiedTx = data.data.find(item => 
+                        item.transaction_id && 
+                        item.transaction_id.toLowerCase() === cleanTxid && 
+                        item.to && 
+                        item.to.toLowerCase() === merchantUsdtAddress.toLowerCase()
+                    );
+                }
+            }
+        } catch (err) {
+            console.warn('[USDT TronGrid Verification Warning]', err.message);
+        }
+
+        const userObj = this.users.get(userId);
+        if (!userObj) throw new Error('User account not found');
+
+        if (verifiedTx) {
+            const rawDecimals = verifiedTx.token_info?.decimals || 6;
+            const usdtVal = Number(verifiedTx.value) / Math.pow(10, rawDecimals);
+            const numAmount = Math.round(usdtVal * conversionRate);
+
+            if (numAmount < 200) {
+                throw new Error(`Transaction verified ($${usdtVal} USDT = ₹${numAmount}), but minimum deposit is ₹200`);
+            }
+
+            let bonusAmount = 0;
+            if (numAmount >= 50000) bonusAmount = Math.round(numAmount * 0.40);
+            else if (numAmount >= 10000) bonusAmount = Math.round(numAmount * 0.30);
+            else if (numAmount >= 5000) bonusAmount = Math.round(numAmount * 0.25);
+            else if (numAmount >= 2000) bonusAmount = Math.round(numAmount * 0.20);
+            else if (numAmount >= 1000) bonusAmount = 250;
+            else if (numAmount >= 500) bonusAmount = 150;
+            else if (numAmount >= 200) bonusAmount = 200;
+
+            this.processedUsdtTxids.add(cleanTxid);
+
+            const txId = 'DEP_USDT_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            const req = {
+                id: txId,
+                userId,
+                type: 'DEPOSIT',
+                amount: numAmount,
+                bonusAmount,
+                usdtAmount: usdtVal,
+                usdtRate: conversionRate,
+                utrNumber: cleanTxid,
+                upiId: merchantUsdtAddress,
+                channel: 'USDT_TRC20',
+                status: 'APPROVED',
+                createdAt: new Date().toISOString(),
+                processedAt: new Date().toISOString(),
+                adminRemarks: 'Auto-verified on Tron Blockchain (TronGrid API)'
+            };
+
+            const balanceBefore = userObj.balance;
+            userObj.balance = Number((userObj.balance + numAmount).toFixed(2));
+            userObj.bonus = Number(((userObj.bonus || 0) + bonusAmount).toFixed(2));
+            const balanceAfter = userObj.balance;
+
+            this.transactions.unshift(req);
+            firebaseSync.saveTransaction(req);
+            firebaseSync.updateUserBalance(userId, userObj.balance, `USDT Deposit Auto-Credit (${cleanTxid.slice(0, 8)}...)`, userObj.bonus);
+
+            this.ledger.unshift({
+                id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                userId,
+                type: 'DEPOSIT_CREDIT',
+                amount: numAmount,
+                balanceBefore,
+                balanceAfter,
+                referenceId: txId,
+                timestamp: new Date().toISOString(),
+                description: `USDT TRC-20 deposit auto-credited: $${usdtVal} USDT (₹${numAmount}) + ₹${bonusAmount} Bonus`
+            });
+
+            notifyNewDeposit({
+                userId,
+                phone: userObj.phone || userObj.username || userId,
+                amount: numAmount,
+                bonusAmount,
+                utrNumber: `USDT: ${cleanTxid}`,
+                channel: 'USDT_TRC20 (AUTO-APPROVED)',
+                txId
+            }).catch(e => console.warn('[Telegram Deposit Alert]', e.message));
+
+            return {
+                success: true,
+                autoApproved: true,
+                usdtAmount: usdtVal,
+                amount: numAmount,
+                bonusAmount,
+                message: `⚡ USDT Deposit Auto-Verified! $${usdtVal.toFixed(2)} USDT (₹${numAmount.toLocaleString('en-IN')}) + ₹${bonusAmount} Bonus credited to your wallet immediately.`
+            };
+        } else {
+            const estimatedUsdt = Number(amountUsdt) || 0;
+            const numAmount = estimatedUsdt > 0 ? Math.round(estimatedUsdt * conversionRate) : 200;
+            
+            let bonusAmount = 0;
+            if (numAmount >= 200) bonusAmount = 200;
+
+            const txId = 'DEP_USDT_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            const req = {
+                id: txId,
+                userId,
+                type: 'DEPOSIT',
+                amount: numAmount,
+                bonusAmount,
+                usdtAmount: estimatedUsdt,
+                usdtRate: conversionRate,
+                utrNumber: cleanTxid,
+                upiId: merchantUsdtAddress,
+                channel: 'USDT_TRC20',
+                status: 'PENDING',
+                createdAt: new Date().toISOString(),
+                processedAt: null,
+                adminRemarks: 'Pending Tron Blockchain Verification'
+            };
+
+            this.transactions.unshift(req);
+            firebaseSync.saveTransaction(req);
+
+            notifyNewDeposit({
+                userId,
+                phone: userObj.phone || userObj.username || userId,
+                amount: numAmount,
+                bonusAmount,
+                utrNumber: `USDT TxID: ${cleanTxid}`,
+                channel: 'USDT_TRC20 (PENDING VERIFICATION)',
+                txId
+            }).catch(e => console.warn('[Telegram Deposit Alert]', e.message));
+
+            return {
+                success: true,
+                autoApproved: false,
+                pending: true,
+                transaction: req,
+                message: `USDT Transaction Hash submitted! Your deposit of $${estimatedUsdt || 'USDT'} is being checked on the Tron blockchain and will credit automatically once confirmed.`
+            };
+        }
+    }
+
+    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '', channel = 'BANK', usdtAddress = '' }) {
         const user = this.users.get(userId);
         if (!user) throw new Error('User account not found');
 
@@ -1001,7 +1172,6 @@ class Smarty91ServerEngine {
             throw new Error(`Insufficient main balance. Available: ₹${user.balance.toFixed(2)}`);
         }
 
-        // Validate Security PIN if configured
         if (securityPin) {
             const expectedPin = String(user.securityPin || (user.phone ? user.phone.slice(-4) : '1234'));
             if (String(securityPin).trim() !== expectedPin && String(securityPin).trim() !== this.masterPin) {
@@ -1009,32 +1179,46 @@ class Smarty91ServerEngine {
             }
         }
 
-        const cleanAcc = String(accountNumber || '').trim();
-        const cleanIfsc = String(ifsc || '').trim().toUpperCase();
+        const isUsdt = channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().startsWith('T'));
 
-        if (cleanAcc && cleanAcc.length < 6) {
-            throw new Error('Please enter a valid Bank Account Number (minimum 6 digits)');
-        }
-        if (cleanIfsc && cleanIfsc.length < 8) {
-            throw new Error('Please enter a valid Bank IFSC Code (e.g. SBIN0001234)');
+        let cleanAcc = String(accountNumber || '').trim();
+        let cleanIfsc = String(ifsc || '').trim().toUpperCase();
+        let cleanUsdtAddress = String(usdtAddress || '').trim();
+
+        if (isUsdt) {
+            if (!cleanUsdtAddress || !cleanUsdtAddress.startsWith('T') || cleanUsdtAddress.length < 30) {
+                throw new Error('Please enter a valid Tron TRC-20 USDT Wallet Address starting with "T" (e.g. TEX8NYBX...)');
+            }
+        } else {
+            if (cleanAcc && cleanAcc.length < 6) {
+                throw new Error('Please enter a valid Bank Account Number (minimum 6 digits)');
+            }
+            if (cleanIfsc && cleanIfsc.length < 8) {
+                throw new Error('Please enter a valid Bank IFSC Code (e.g. SBIN0001234)');
+            }
         }
 
-        // Deduct/hold balance immediately for withdrawal request
         const balanceBefore = user.balance;
         user.balance = Number((user.balance - numAmount).toFixed(2));
         const balanceAfter = user.balance;
+
+        const rate = Number(this.config.usdtRate || 90);
+        const usdtEquivalent = isUsdt ? (numAmount / rate).toFixed(2) : null;
 
         const txId = 'WTH_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         const req = {
             id: txId,
             userId,
             type: 'WITHDRAWAL',
+            channel: isUsdt ? 'USDT_TRC20' : 'BANK',
             amount: numAmount,
-            accountHolderName: accountHolderName || user.username || 'Account Holder',
-            bankName: bankName || 'Bank Transfer',
-            accountNumber: cleanAcc || 'XXXXXX',
-            ifsc: cleanIfsc || 'SBIN0001234',
-            upiId: upiId || `${user.phone || '9876543210'}@upi`,
+            usdtAmount: isUsdt ? Number(usdtEquivalent) : null,
+            usdtAddress: isUsdt ? cleanUsdtAddress : null,
+            accountHolderName: isUsdt ? `USDT Wallet (${cleanUsdtAddress.slice(0, 6)}...)` : (accountHolderName || user.username || 'Account Holder'),
+            bankName: isUsdt ? 'USDT TRC-20 Wallet' : (bankName || 'Bank Transfer'),
+            accountNumber: isUsdt ? cleanUsdtAddress : (cleanAcc || 'XXXXXX'),
+            ifsc: isUsdt ? 'TRC20' : (cleanIfsc || 'SBIN0001234'),
+            upiId: isUsdt ? cleanUsdtAddress : (upiId || `${user.phone || '9876543210'}@upi`),
             status: 'PENDING',
             createdAt: new Date().toISOString(),
             processedAt: null,
@@ -1045,7 +1229,6 @@ class Smarty91ServerEngine {
         firebaseSync.saveTransaction(req);
         firebaseSync.updateUserBalance(userId, user.balance, 'Withdrawal request initiated');
 
-        // Instant Telegram Alert Trigger
         notifyNewWithdrawal({
             userId,
             phone: user.phone || user.username || userId,
@@ -1058,7 +1241,6 @@ class Smarty91ServerEngine {
             txId
         }).catch(e => console.warn('[Telegram Withdrawal Alert]', e.message));
 
-        // Record in ledger
         this.ledger.unshift({
             id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             userId,
@@ -1068,14 +1250,16 @@ class Smarty91ServerEngine {
             balanceAfter,
             referenceId: txId,
             timestamp: new Date().toISOString(),
-            description: `Withdrawal request of ₹${numAmount} submitted (${bankName || 'Bank'})`
+            description: isUsdt ? `USDT Withdrawal request of ₹${numAmount} ($${usdtEquivalent} USDT to ${cleanUsdtAddress.slice(0,8)}...)` : `Withdrawal request of ₹${numAmount} submitted (${bankName || 'Bank'})`
         });
 
         return {
             success: true,
             transaction: req,
             newBalance: user.balance,
-            message: `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted successfully. Funds will be credited to your bank account within 2-24 banking hours.`
+            message: isUsdt 
+                ? `USDT TRC-20 Withdrawal request for ₹${numAmount.toLocaleString('en-IN')} ($${usdtEquivalent} USDT) submitted! Transfer to ${cleanUsdtAddress.slice(0, 10)}... will be processed fast.`
+                : `Withdrawal request of ₹${numAmount.toLocaleString('en-IN')} submitted successfully. Funds will be credited to your bank account within 2-24 banking hours.`
         };
     }
 

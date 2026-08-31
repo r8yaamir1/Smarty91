@@ -3,26 +3,38 @@
 
 let currentDepositAmount = 200;
 let currentBonusAmount = 200;
-let selectedChannel = 'GPAY';
+let selectedChannel = 'USDT_TRC20';
 let countdownInterval = null;
 let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
 let activeMerchantUpi = '6289140468@axl';
 let activeMerchantName = 'Smarty91';
+let activeMerchantUsdtAddress = 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+let activeUsdtRate = 90;
 
-// Load live merchant UPI config
+// Load live merchant config (UPI & USDT)
 async function fetchMerchantConfig() {
     try {
         const res = await fetch('/api/wallet/config');
         const data = await res.json();
-        if (data.success && data.upiId) {
-            activeMerchantUpi = data.upiId;
-            activeMerchantName = data.upiName || 'Smarty91';
-            const upiTextEl = document.getElementById('upi-merchant-id');
-            if (upiTextEl) upiTextEl.textContent = activeMerchantUpi;
+        if (data.success) {
+            if (data.upiId) {
+                activeMerchantUpi = data.upiId;
+                activeMerchantName = data.upiName || 'Smarty91';
+                const upiTextEl = document.getElementById('upi-merchant-id');
+                if (upiTextEl) upiTextEl.textContent = activeMerchantUpi;
+            }
+            if (data.usdtAddress) {
+                activeMerchantUsdtAddress = data.usdtAddress;
+                const usdtAddrEl = document.getElementById('usdt-merchant-address');
+                if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
+            }
+            if (data.usdtRate) {
+                activeUsdtRate = Number(data.usdtRate) || 90;
+            }
         }
     } catch (e) {
-        console.warn('Using default merchant UPI config', e);
+        console.warn('Using default merchant config', e);
     }
 }
 fetchMerchantConfig();
@@ -267,31 +279,57 @@ window.startDepositCheckoutPhase = function() {
 
     goToDepositStage(3);
 
-    // Update Amount & Bonus displays
-    const st3Amt = document.getElementById('stage-3-amount-display');
-    const st3Bonus = document.getElementById('stage-3-bonus-display');
-    if (st3Amt) st3Amt.innerText = `₹${currentDepositAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-    if (st3Bonus) st3Bonus.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ 100% Secure & Fast Deposit';
+    const usdtBox = document.getElementById('usdt-checkout-box');
+    const upiBox = document.getElementById('upi-checkout-box');
 
-    // Construct Exact Amount UPI URI
-    const upiId = activeMerchantUpi || '6289140468@axl';
-    const upiName = activeMerchantName || 'Smarty91';
-    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(currentDepositAmount.toFixed(2))}&cu=INR&tn=VIP_DEP_${Date.now()}`;
+    if (selectedChannel === 'USDT_TRC20') {
+        if (usdtBox) usdtBox.style.display = 'block';
+        if (upiBox) upiBox.style.display = 'none';
 
-    // Update UPI text display
-    const upiTextEl = document.getElementById('upi-merchant-id');
-    if (upiTextEl) upiTextEl.textContent = upiId;
+        const usdtPayable = (currentDepositAmount / activeUsdtRate).toFixed(2);
+        const usdtAmtEl = document.getElementById('usdt-payable-amount');
+        const usdtConvEl = document.getElementById('usdt-inr-conversion-display');
+        const usdtBonusEl = document.getElementById('usdt-stage3-bonus-display');
+        const usdtAddrEl = document.getElementById('usdt-merchant-address');
+        const usdtQrImg = document.getElementById('usdt-qr-image');
 
-    // Set Dynamic QR Image URL
-    const qrImg = document.getElementById('dynamic-qr-image');
-    if (qrImg) {
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(upiUri)}`;
-    }
+        if (usdtAmtEl) usdtAmtEl.innerText = `$${usdtPayable} USDT`;
+        if (usdtConvEl) usdtConvEl.innerText = `Equivalent to ₹${currentDepositAmount.toLocaleString('en-IN')} (@ ₹${activeUsdtRate.toFixed(2)} / USDT)`;
+        if (usdtBonusEl) usdtBonusEl.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ Instant Tron Blockchain Auto Credit';
+        if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
+        if (usdtQrImg) {
+            usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
+        }
+    } else {
+        if (usdtBox) usdtBox.style.display = 'none';
+        if (upiBox) upiBox.style.display = 'block';
 
-    // Set Direct UPI App Deep Link
-    const directLink = document.getElementById('upi-direct-app-link');
-    if (directLink) {
-        directLink.href = upiUri;
+        // Update Amount & Bonus displays
+        const st3Amt = document.getElementById('stage-3-amount-display');
+        const st3Bonus = document.getElementById('stage-3-bonus-display');
+        if (st3Amt) st3Amt.innerText = `₹${currentDepositAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        if (st3Bonus) st3Bonus.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ 100% Secure & Fast Deposit';
+
+        // Construct Exact Amount UPI URI
+        const upiId = activeMerchantUpi || '6289140468@axl';
+        const upiName = activeMerchantName || 'Smarty91';
+        const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(currentDepositAmount.toFixed(2))}&cu=INR&tn=VIP_DEP_${Date.now()}`;
+
+        // Update UPI text display
+        const upiTextEl = document.getElementById('upi-merchant-id');
+        if (upiTextEl) upiTextEl.textContent = upiId;
+
+        // Set Dynamic QR Image URL
+        const qrImg = document.getElementById('dynamic-qr-image');
+        if (qrImg) {
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(upiUri)}`;
+        }
+
+        // Set Direct UPI App Deep Link
+        const directLink = document.getElementById('upi-direct-app-link');
+        if (directLink) {
+            directLink.href = upiUri;
+        }
     }
 
     // Start 10-Minute Countdown Timer
@@ -335,10 +373,83 @@ window.copyUpiId = function() {
         .catch(() => showToast('UPI ID: ' + upiId));
 };
 
+// Copy USDT Address helper
+window.copyUsdtAddress = function() {
+    const addr = activeMerchantUsdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+    navigator.clipboard.writeText(addr)
+        .then(() => showToast('Merchant USDT TRC-20 Address Copied!'))
+        .catch(() => showToast('Address: ' + addr));
+};
+
 // Cancel Deposit Session
 window.cancelDepositSession = function() {
     clearInterval(countdownInterval);
     goToDepositStage(1);
+};
+
+// Submit USDT Deposit TxID Verification (Blockchain Automatic)
+window.submitUsdtDepositTx = async function() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    const txidInput = document.getElementById('usdt-txid-input');
+    const submitBtn = document.getElementById('submit-usdt-deposit-btn');
+    const txid = txidInput ? txidInput.value.trim() : '';
+
+    if (!txid || txid.length < 30) {
+        showToast('Please enter a valid Tron Transaction Hash / TxID');
+        return;
+    }
+
+    try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Verifying USDT Transaction on Tron Blockchain...');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Verifying on Blockchain...';
+        }
+
+        const res = await fetch('/api/wallet/deposit-usdt', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                txid,
+                amountUsdt: Number((currentDepositAmount / activeUsdtRate).toFixed(2))
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'USDT Verification failed');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = '⚡ Verify & Credit USDT Automatically';
+            }
+            return;
+        }
+
+        clearInterval(countdownInterval);
+        showToast(data.message || 'USDT Deposit Verified! Balance credited instantly.');
+
+        if (txidInput) txidInput.value = '';
+
+        await loadWalletData();
+
+        setTimeout(() => {
+            switchCashierTab('history');
+            goToDepositStage(1);
+        }, 1200);
+
+    } catch (err) {
+        showToast('Network error during USDT verification');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = '⚡ Verify & Credit USDT Automatically';
+        }
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
+    }
 };
 
 // Submit Deposit UTR Verification
@@ -401,6 +512,135 @@ window.submitDepositUTR = async function() {
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerText = 'Submit UTR Verification';
+        }
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
+    }
+};
+
+// Withdrawal Method Switcher (USDT TRC20 vs Bank)
+window.switchWithdrawMethod = function(method) {
+    const usdtContainer = document.getElementById('withdraw-usdt-form-container');
+    const bankContainer = document.getElementById('withdraw-bank-form-container');
+    const usdtBtn = document.getElementById('wtab-usdt-btn');
+    const bankBtn = document.getElementById('wtab-bank-btn');
+
+    if (method === 'USDT_TRC20') {
+        if (usdtContainer) usdtContainer.style.display = 'block';
+        if (bankContainer) bankContainer.style.display = 'none';
+
+        if (usdtBtn) {
+            usdtBtn.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+            usdtBtn.style.color = '#FFFFFF';
+            usdtBtn.style.boxShadow = '0 4px 12px rgba(16,185,129,0.3)';
+        }
+        if (bankBtn) {
+            bankBtn.style.background = 'transparent';
+            bankBtn.style.color = '#64748B';
+            bankBtn.style.boxShadow = 'none';
+        }
+    } else {
+        if (usdtContainer) usdtContainer.style.display = 'none';
+        if (bankContainer) bankContainer.style.display = 'block';
+
+        if (bankBtn) {
+            bankBtn.style.background = 'linear-gradient(135deg, #E51837 0%, #C10C27 100%)';
+            bankBtn.style.color = '#FFFFFF';
+            bankBtn.style.boxShadow = '0 4px 12px rgba(229,24,55,0.3)';
+        }
+        if (usdtBtn) {
+            usdtBtn.style.background = 'transparent';
+            usdtBtn.style.color = '#64748B';
+            usdtBtn.style.boxShadow = 'none';
+        }
+    }
+};
+
+window.calculateUsdtPayoutAmount = function(inrVal) {
+    const num = Number(inrVal) || 0;
+    const rate = activeUsdtRate || 90;
+    const usdtVal = (num / rate).toFixed(2);
+    const getEl = document.getElementById('withdraw-usdt-get-amount');
+    if (getEl) getEl.innerText = `$${usdtVal} USDT`;
+};
+
+window.withdrawAllBalanceUsdt = function() {
+    const bal = currentWalletSummary ? Number(currentWalletSummary.balance || 0) : 0;
+    const input = document.getElementById('withdraw-usdt-amount-input');
+    if (input) {
+        input.value = Math.floor(bal);
+        calculateUsdtPayoutAmount(Math.floor(bal));
+    }
+};
+
+window.submitUsdtWithdrawalRequest = async function() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    const amountInput = document.getElementById('withdraw-usdt-amount-input');
+    const addressInput = document.getElementById('withdraw-usdt-address-input');
+    const pinInput = document.getElementById('withdraw-usdt-pin-input');
+    const submitBtn = document.getElementById('submit-usdt-withdraw-btn');
+
+    const amount = Number(amountInput ? amountInput.value : 0);
+    const usdtAddress = addressInput ? addressInput.value.trim() : '';
+    const pin = pinInput ? pinInput.value.trim() : '';
+
+    if (isNaN(amount) || amount < 200) {
+        showToast('Minimum withdrawal amount is ₹200');
+        return;
+    }
+    if (!usdtAddress || !usdtAddress.startsWith('T') || usdtAddress.length < 30) {
+        showToast('Please enter a valid Tron (TRC-20) wallet address starting with T');
+        return;
+    }
+
+    try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Submitting USDT TRC-20 Withdrawal...');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting Request...';
+        }
+
+        const res = await fetch('/api/wallet/withdraw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                amount,
+                channel: 'USDT_TRC20',
+                usdtAddress,
+                securityPin: pin
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'USDT Withdrawal failed');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = '⚡ Submit USDT TRC-20 Withdrawal';
+            }
+            return;
+        }
+
+        showToast(data.message || 'USDT TRC-20 Withdrawal request submitted!');
+
+        if (amountInput) amountInput.value = '';
+        if (pinInput) pinInput.value = '';
+
+        loadWalletData();
+
+        setTimeout(() => {
+            switchCashierTab('history');
+        }, 1200);
+
+    } catch (err) {
+        showToast('Network error during USDT withdrawal submission');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = '⚡ Submit USDT TRC-20 Withdrawal';
         }
     } finally {
         if (window.SmartyLoader) window.SmartyLoader.hide();

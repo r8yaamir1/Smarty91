@@ -332,12 +332,14 @@ apiRouter.post('/wallet/deposit-init', (req, res) => {
     }
 });
 
-// GET /api/wallet/config -> Live Merchant UPI Config
+// GET /api/wallet/config -> Live Merchant UPI & USDT Config
 apiRouter.get('/wallet/config', (req, res) => {
     res.json({
         success: true,
         upiId: serverEngine.config.upiId || '6289140468@axl',
         upiName: serverEngine.config.upiName || 'Smarty91',
+        usdtAddress: serverEngine.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
+        usdtRate: serverEngine.config.usdtRate || 90,
         minDeposit: serverEngine.config.minDeposit || 200,
         maxDeposit: serverEngine.config.maxDeposit || 100000,
         minWithdrawal: serverEngine.config.minWithdrawal || 200,
@@ -387,6 +389,22 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
     }
 });
 
+// POST /api/wallet/deposit-usdt -> Automatic Tron Blockchain USDT TRC-20 Verification & Credit
+apiRouter.post('/wallet/deposit-usdt', async (req, res) => {
+    try {
+        const authUser = getAuthUser(req);
+        const { txid, amountUsdt } = req.body;
+        const result = await serverEngine.verifyAndProcessUsdtDeposit({
+            userId: authUser.id,
+            txid,
+            amountUsdt
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 // POST /api/wallet/deposit -> Submit user deposit request (UTR Verification)
 apiRouter.post('/wallet/deposit', (req, res) => {
     try {
@@ -405,11 +423,11 @@ apiRouter.post('/wallet/deposit', (req, res) => {
     }
 });
 
-// POST /api/wallet/withdraw -> User bank withdrawal submission
+// POST /api/wallet/withdraw -> User bank or USDT withdrawal submission
 apiRouter.post('/wallet/withdraw', (req, res) => {
     try {
         const authUser = getAuthUser(req);
-        const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
+        const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId, channel, usdtAddress } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
             amount,
@@ -418,7 +436,9 @@ apiRouter.post('/wallet/withdraw', (req, res) => {
             accountNumber,
             ifsc,
             securityPin,
-            upiId
+            upiId,
+            channel,
+            usdtAddress
         });
         res.json(result);
     } catch (err) {
@@ -796,5 +816,87 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, (req, res) => {
         success: true,
         message: `Balance updated for ${user.username}`,
         newBalance: user.balance
+    });
+});
+
+// -------------------------------------------------------------
+// 5. DEVELOPER SECRET PORTAL APIs
+// -------------------------------------------------------------
+
+// POST /api/developer/get-config -> Read USDT & Merchant Config
+apiRouter.post('/developer/get-config', (req, res) => {
+    const { pin, secretKey } = req.body;
+    const authKey = pin || secretKey;
+    if (authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    res.json({
+        success: true,
+        usdtAddress: serverEngine.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
+        usdtRate: serverEngine.config.usdtRate || 90,
+        upiId: serverEngine.config.upiId || '6289140468@axl',
+        upiName: serverEngine.config.upiName || 'Smarty91',
+        minDeposit: serverEngine.config.minDeposit || 200,
+        maxDeposit: serverEngine.config.maxDeposit || 100000,
+        minWithdrawal: serverEngine.config.minWithdrawal || 200,
+        maxWithdrawal: serverEngine.config.maxWithdrawal || 100000,
+        masterPin: serverEngine.masterPin || '919191'
+    });
+});
+
+// POST /api/developer/update-config -> Save USDT Wallet, Rate & Merchant Details
+apiRouter.post('/developer/update-config', (req, res) => {
+    const { pin, secretKey, usdtAddress, usdtRate, upiId, upiName, masterPin, minDeposit, maxDeposit, minWithdrawal, maxWithdrawal } = req.body;
+    const authKey = pin || secretKey;
+    if (authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+
+    if (usdtAddress) serverEngine.config.usdtAddress = usdtAddress.trim();
+    if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
+    if (upiId) serverEngine.config.upiId = upiId.trim();
+    if (upiName) serverEngine.config.upiName = upiName.trim();
+    if (masterPin) serverEngine.masterPin = masterPin.trim();
+    if (minDeposit !== undefined) serverEngine.config.minDeposit = Number(minDeposit);
+    if (maxDeposit !== undefined) serverEngine.config.maxDeposit = Number(maxDeposit);
+    if (minWithdrawal !== undefined) serverEngine.config.minWithdrawal = Number(minWithdrawal);
+    if (maxWithdrawal !== undefined) serverEngine.config.maxWithdrawal = Number(maxWithdrawal);
+
+    firebaseSync.saveSystemConfig(serverEngine.config);
+    firebaseSync.logAdminAction('DEVELOPER_UPDATE_CONFIG', 'Updated USDT wallet and merchant parameters');
+
+    res.json({
+        success: true,
+        message: '⚡ USDT Wallet Address & Merchant Config Updated Successfully!',
+        usdtAddress: serverEngine.config.usdtAddress,
+        usdtRate: serverEngine.config.usdtRate,
+        upiId: serverEngine.config.upiId,
+        upiName: serverEngine.config.upiName,
+        masterPin: serverEngine.masterPin
+    });
+});
+
+// Alias for backwards compatibility
+apiRouter.post('/admin/developer/update-upi', (req, res) => {
+    const { secretKey, upiId, upiName, usdtAddress, usdtRate } = req.body;
+    if (secretKey !== 'Aamir@639900' && secretKey !== '7117' && secretKey !== serverEngine.masterPin) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Key' });
+    }
+
+    if (upiId) serverEngine.config.upiId = upiId.trim();
+    if (upiName) serverEngine.config.upiName = upiName.trim();
+    if (usdtAddress) serverEngine.config.usdtAddress = usdtAddress.trim();
+    if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
+
+    firebaseSync.saveSystemConfig(serverEngine.config);
+    firebaseSync.logAdminAction('DEVELOPER_UPDATE_CONFIG', 'Updated live config parameters');
+
+    res.json({
+        success: true,
+        message: 'Config updated successfully',
+        upiId: serverEngine.config.upiId,
+        upiName: serverEngine.config.upiName,
+        usdtAddress: serverEngine.config.usdtAddress,
+        usdtRate: serverEngine.config.usdtRate
     });
 });
