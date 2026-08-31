@@ -1,9 +1,9 @@
 // js/payment.js - Professional 3-Stage Checkout & Cashier Controller for Smarty91
-// Direct UPI + Dynamic QR (6289140468@axl / Smarty91)
+// Direct UPI + Dynamic QR + USDT Crypto Automatic Verification
 
 let currentDepositAmount = 200;
 let currentBonusAmount = 200;
-let selectedChannel = 'USDT_TRC20';
+let selectedChannel = 'USDT';
 let countdownInterval = null;
 let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
@@ -50,16 +50,12 @@ function showToast(msg, duration = 3000) {
     }, duration);
 }
 
-// Calculate bonus for any given amount
+// Calculate bonus for any given amount (100% Match Bonus for all deposits >= 200)
 function computeBonusForAmount(amount) {
     const num = Number(amount) || 0;
-    if (num >= 50000) return Math.round(num * 0.40);
-    if (num >= 10000) return Math.round(num * 0.30);
-    if (num >= 5000) return Math.round(num * 0.25);
-    if (num >= 2000) return Math.round(num * 0.20);
-    if (num >= 1000) return 250;
-    if (num >= 500) return 150;
-    if (num >= 200) return 200;
+    if (num >= 200) {
+        return num; // 100% bonus matching deposit amount
+    }
     return 0;
 }
 
@@ -72,8 +68,6 @@ async function loadWalletData() {
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Loading Cashier...');
-
         const res = await fetch('/api/wallet/summary', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -87,10 +81,11 @@ async function loadWalletData() {
         currentWalletSummary = data.summary;
         renderHeaderWalletInfo();
         renderTransactionsHistory();
+        if (window.revealPageReady) {
+            window.revealPageReady('.cashier-page-container');
+        }
     } catch (err) {
         showToast('Network error loading wallet data');
-    } finally {
-        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 }
 
@@ -134,21 +129,31 @@ window.switchCashierTab = function(tabName) {
     });
 
     if (tabName === 'deposit') {
-        if (depositSec) depositSec.style.display = 'block';
+        if (depositSec) {
+            depositSec.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(depositSec);
+        }
         if (withdrawSec) withdrawSec.style.display = 'none';
         if (historySec) historySec.style.display = 'none';
         if (depositTabBtn) depositTabBtn.classList.add('active');
         if (mainTitle) mainTitle.innerText = 'Deposit Funds';
     } else if (tabName === 'withdraw') {
         if (depositSec) depositSec.style.display = 'none';
-        if (withdrawSec) withdrawSec.style.display = 'block';
+        if (withdrawSec) {
+            withdrawSec.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(withdrawSec);
+        }
         if (historySec) historySec.style.display = 'none';
         if (withdrawTabBtn) withdrawTabBtn.classList.add('active');
-        if (mainTitle) mainTitle.innerText = 'Bank Withdrawal';
+        if (mainTitle) mainTitle.innerText = 'Withdraw Funds';
+        switchWithdrawMethod('USDT');
     } else if (tabName === 'history') {
         if (depositSec) depositSec.style.display = 'none';
         if (withdrawSec) withdrawSec.style.display = 'none';
-        if (historySec) historySec.style.display = 'block';
+        if (historySec) {
+            historySec.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(historySec);
+        }
         if (historyTabBtn) historyTabBtn.classList.add('active');
         if (mainTitle) mainTitle.innerText = 'Transaction Passbook';
         loadWalletData();
@@ -169,13 +174,16 @@ window.goToDepositStage = function(stageNumber) {
     const line2 = document.getElementById('wizard-line-2');
 
     if (stageNumber === 1) {
-        if (stage1) stage1.style.display = 'block';
+        if (stage1) {
+            stage1.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(stage1);
+        }
         if (stage2) stage2.style.display = 'none';
         if (stage3) stage3.style.display = 'none';
 
-        step1Ind.className = 'step-item active';
-        step2Ind.className = 'step-item';
-        step3Ind.className = 'step-item';
+        if (step1Ind) step1Ind.className = 'step-item active';
+        if (step2Ind) step2Ind.className = 'step-item';
+        if (step3Ind) step3Ind.className = 'step-item';
         if (line1) line1.className = 'step-line';
         if (line2) line2.className = 'step-line';
         clearInterval(countdownInterval);
@@ -185,12 +193,15 @@ window.goToDepositStage = function(stageNumber) {
             return;
         }
         if (stage1) stage1.style.display = 'none';
-        if (stage2) stage2.style.display = 'block';
+        if (stage2) {
+            stage2.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(stage2);
+        }
         if (stage3) stage3.style.display = 'none';
 
-        step1Ind.className = 'step-item completed';
-        step2Ind.className = 'step-item active';
-        step3Ind.className = 'step-item';
+        if (step1Ind) step1Ind.className = 'step-item completed';
+        if (step2Ind) step2Ind.className = 'step-item active';
+        if (step3Ind) step3Ind.className = 'step-item';
         if (line1) line1.className = 'step-line completed';
         if (line2) line2.className = 'step-line';
 
@@ -199,11 +210,14 @@ window.goToDepositStage = function(stageNumber) {
     } else if (stageNumber === 3) {
         if (stage1) stage1.style.display = 'none';
         if (stage2) stage2.style.display = 'none';
-        if (stage3) stage3.style.display = 'block';
+        if (stage3) {
+            stage3.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(stage3);
+        }
 
-        step1Ind.className = 'step-item completed';
-        step2Ind.className = 'step-item completed';
-        step3Ind.className = 'step-item active';
+        if (step1Ind) step1Ind.className = 'step-item completed';
+        if (step2Ind) step2Ind.className = 'step-item completed';
+        if (step3Ind) step3Ind.className = 'step-item active';
         if (line1) line1.className = 'step-line completed';
         if (line2) line2.className = 'step-line completed';
     }
@@ -247,17 +261,23 @@ function updateBonusPreviewCard() {
 
     if (currentDepositAmount >= 200) {
         if (currentBonusAmount > 0) {
-            if (titleEl) titleEl.innerText = currentDepositAmount === 200 ? '100% First Deposit Match Bonus' : 'VIP Tier Match Bonus';
-            if (descEl) descEl.innerText = `Deposit ₹${currentDepositAmount.toLocaleString('en-IN')} & get ₹${(currentDepositAmount + currentBonusAmount).toLocaleString('en-IN')} total playing credit`;
+            if (titleEl) {
+                titleEl.innerHTML = `<span>100% Deposit Match Bonus</span> <span class="bonus-coupon-tag">COUPON APPLIED</span>`;
+            }
+            if (descEl) descEl.innerText = `Deposit ₹${currentDepositAmount.toLocaleString('en-IN')} & get ₹${(currentDepositAmount + currentBonusAmount).toLocaleString('en-IN')} total playing credit (Instant 2X)`;
             if (amtEl) amtEl.innerText = `+₹${currentBonusAmount.toLocaleString('en-IN')}`;
         } else {
-            if (titleEl) titleEl.innerText = 'Standard Fast Deposit';
+            if (titleEl) {
+                titleEl.innerHTML = `<span>Standard Fast Deposit</span>`;
+            }
             if (descEl) descEl.innerText = `Deposit ₹${currentDepositAmount.toLocaleString('en-IN')} instant play credit`;
             if (amtEl) amtEl.innerText = '+₹0';
         }
     } else {
-        if (titleEl) titleEl.innerText = 'Minimum Deposit is ₹200';
-        if (descEl) descEl.innerText = 'Please select at least ₹200 to receive instant VIP Bonus';
+        if (titleEl) {
+            titleEl.innerHTML = `<span>Minimum Deposit is ₹200</span>`;
+        }
+        if (descEl) descEl.innerText = 'Please select at least ₹200 to receive instant 100% Match Bonus';
         if (amtEl) amtEl.innerText = '+₹0';
     }
 }
@@ -282,7 +302,7 @@ window.startDepositCheckoutPhase = function() {
     const usdtBox = document.getElementById('usdt-checkout-box');
     const upiBox = document.getElementById('upi-checkout-box');
 
-    if (selectedChannel === 'USDT_TRC20') {
+    if (selectedChannel === 'USDT' || selectedChannel === 'USDT_TRC20') {
         if (usdtBox) usdtBox.style.display = 'block';
         if (upiBox) upiBox.style.display = 'none';
 
@@ -295,7 +315,7 @@ window.startDepositCheckoutPhase = function() {
 
         if (usdtAmtEl) usdtAmtEl.innerText = `$${usdtPayable} USDT`;
         if (usdtConvEl) usdtConvEl.innerText = `Equivalent to ₹${currentDepositAmount.toLocaleString('en-IN')} (@ ₹${activeUsdtRate.toFixed(2)} / USDT)`;
-        if (usdtBonusEl) usdtBonusEl.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ Instant Tron Blockchain Auto Credit';
+        if (usdtBonusEl) usdtBonusEl.innerText = currentBonusAmount > 0 ? `+ Includes ₹${currentBonusAmount.toLocaleString('en-IN')} VIP Bonus` : '+ Instant Automatic Credit';
         if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
         if (usdtQrImg) {
             usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
@@ -372,13 +392,23 @@ window.copyUpiId = function() {
         .then(() => showToast('Official UPI ID copied: ' + upiId))
         .catch(() => showToast('UPI ID: ' + upiId));
 };
+window.copyUpiAddress = window.copyUpiId;
 
 // Copy USDT Address helper
 window.copyUsdtAddress = function() {
     const addr = activeMerchantUsdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
     navigator.clipboard.writeText(addr)
-        .then(() => showToast('Merchant USDT TRC-20 Address Copied!'))
+        .then(() => showToast('USDT Address Copied!'))
         .catch(() => showToast('Address: ' + addr));
+};
+
+// Quick Add Custom Amount (+100, +500, +1000, +5000)
+window.addCustomVal = function(delta) {
+    const input = document.getElementById('custom-deposit-input');
+    let current = Number(input ? input.value : currentDepositAmount) || 0;
+    current += delta;
+    if (input) input.value = current;
+    handleCustomDepositChange(current);
 };
 
 // Cancel Deposit Session
@@ -394,16 +424,16 @@ window.submitUsdtDepositTx = async function() {
     const submitBtn = document.getElementById('submit-usdt-deposit-btn');
     const txid = txidInput ? txidInput.value.trim() : '';
 
-    if (!txid || txid.length < 30) {
-        showToast('Please enter a valid Tron Transaction Hash / TxID');
+    if (!txid || txid.length < 10) {
+        showToast('Please enter a valid Transaction ID / Reference No.');
         return;
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Verifying USDT Transaction on Tron Blockchain...');
+        if (window.SmartyLoader) window.SmartyLoader.show('Verifying USDT Transaction...');
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerText = 'Verifying on Blockchain...';
+            submitBtn.innerText = 'Verifying Transaction...';
         }
 
         const res = await fetch('/api/wallet/deposit-usdt', {
@@ -424,13 +454,13 @@ window.submitUsdtDepositTx = async function() {
             showToast(data.message || 'USDT Verification failed');
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.innerText = '⚡ Verify & Credit USDT Automatically';
+                submitBtn.innerText = 'Verify & Credit USDT';
             }
             return;
         }
 
         clearInterval(countdownInterval);
-        showToast(data.message || 'USDT Deposit Verified! Balance credited instantly.');
+        showToast(data.message || 'USDT Deposit Verified! Balance credited.');
 
         if (txidInput) txidInput.value = '';
 
@@ -445,7 +475,7 @@ window.submitUsdtDepositTx = async function() {
         showToast('Network error during USDT verification');
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerText = '⚡ Verify & Credit USDT Automatically';
+            submitBtn.innerText = 'Verify & Credit USDT';
         }
     } finally {
         if (window.SmartyLoader) window.SmartyLoader.hide();
@@ -455,8 +485,8 @@ window.submitUsdtDepositTx = async function() {
 // Submit Deposit UTR Verification
 window.submitDepositUTR = async function() {
     const token = localStorage.getItem('smarty91_auth_token');
-    const utrInput = document.getElementById('utr-number-input');
-    const submitBtn = document.getElementById('submit-deposit-btn');
+    const utrInput = document.getElementById('utr-ref-input') || document.getElementById('utr-number-input');
+    const submitBtn = document.getElementById('submit-utr-btn') || document.getElementById('submit-deposit-btn');
     const utr = utrInput ? utrInput.value.trim() : '';
 
     if (!utr || utr.length < 6) {
@@ -517,26 +547,29 @@ window.submitDepositUTR = async function() {
         if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 };
+window.submitUtrDeposit = window.submitDepositUTR;
 
-// Withdrawal Method Switcher (USDT TRC20 vs Bank)
+// Withdrawal Method Switcher (USDT vs Bank)
 window.switchWithdrawMethod = function(method) {
     const usdtContainer = document.getElementById('withdraw-usdt-form-container');
     const bankContainer = document.getElementById('withdraw-bank-form-container');
     const usdtBtn = document.getElementById('wtab-usdt-btn');
     const bankBtn = document.getElementById('wtab-bank-btn');
 
-    if (method === 'USDT_TRC20') {
+    if (method === 'USDT' || method === 'USDT_TRC20') {
         if (usdtContainer) usdtContainer.style.display = 'block';
         if (bankContainer) bankContainer.style.display = 'none';
 
         if (usdtBtn) {
             usdtBtn.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
             usdtBtn.style.color = '#FFFFFF';
-            usdtBtn.style.boxShadow = '0 4px 12px rgba(16,185,129,0.3)';
+            usdtBtn.style.border = '1.5px solid #10b981';
+            usdtBtn.style.boxShadow = '0 4px 14px rgba(16,185,129,0.35)';
         }
         if (bankBtn) {
-            bankBtn.style.background = 'transparent';
-            bankBtn.style.color = '#64748B';
+            bankBtn.style.background = 'var(--card-elevated)';
+            bankBtn.style.color = 'var(--text-muted)';
+            bankBtn.style.border = '1px solid rgba(255,255,255,0.1)';
             bankBtn.style.boxShadow = 'none';
         }
     } else {
@@ -546,11 +579,13 @@ window.switchWithdrawMethod = function(method) {
         if (bankBtn) {
             bankBtn.style.background = 'linear-gradient(135deg, #E51837 0%, #C10C27 100%)';
             bankBtn.style.color = '#FFFFFF';
-            bankBtn.style.boxShadow = '0 4px 12px rgba(229,24,55,0.3)';
+            bankBtn.style.border = '1.5px solid var(--red-primary)';
+            bankBtn.style.boxShadow = '0 4px 14px rgba(229,24,55,0.35)';
         }
         if (usdtBtn) {
-            usdtBtn.style.background = 'transparent';
-            usdtBtn.style.color = '#64748B';
+            usdtBtn.style.background = 'var(--card-elevated)';
+            usdtBtn.style.color = 'var(--text-muted)';
+            usdtBtn.style.border = '1px solid rgba(255,255,255,0.1)';
             usdtBtn.style.boxShadow = 'none';
         }
     }
@@ -584,17 +619,17 @@ window.submitUsdtWithdrawalRequest = async function() {
     const usdtAddress = addressInput ? addressInput.value.trim() : '';
     const pin = pinInput ? pinInput.value.trim() : '';
 
-    if (isNaN(amount) || amount < 200) {
-        showToast('Minimum withdrawal amount is ₹200');
+    if (isNaN(amount) || amount < 500) {
+        showToast('Minimum withdrawal amount is ₹500');
         return;
     }
-    if (!usdtAddress || !usdtAddress.startsWith('T') || usdtAddress.length < 30) {
-        showToast('Please enter a valid Tron (TRC-20) wallet address starting with T');
+    if (!usdtAddress || usdtAddress.length < 15) {
+        showToast('Please enter a valid USDT wallet address');
         return;
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Submitting USDT TRC-20 Withdrawal...');
+        if (window.SmartyLoader) window.SmartyLoader.show('Submitting USDT Withdrawal...');
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = 'Submitting Request...';
@@ -608,7 +643,7 @@ window.submitUsdtWithdrawalRequest = async function() {
             },
             body: JSON.stringify({
                 amount,
-                channel: 'USDT_TRC20',
+                channel: 'USDT',
                 usdtAddress,
                 securityPin: pin
             })
@@ -620,12 +655,12 @@ window.submitUsdtWithdrawalRequest = async function() {
             showToast(data.message || 'USDT Withdrawal failed');
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.innerText = '⚡ Submit USDT TRC-20 Withdrawal';
+                submitBtn.innerText = 'Confirm USDT Withdrawal';
             }
             return;
         }
 
-        showToast(data.message || 'USDT TRC-20 Withdrawal request submitted!');
+        showToast(data.message || 'USDT Withdrawal request submitted!');
 
         if (amountInput) amountInput.value = '';
         if (pinInput) pinInput.value = '';
@@ -640,7 +675,7 @@ window.submitUsdtWithdrawalRequest = async function() {
         showToast('Network error during USDT withdrawal submission');
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerText = '⚡ Submit USDT TRC-20 Withdrawal';
+            submitBtn.innerText = 'Confirm USDT Withdrawal';
         }
     } finally {
         if (window.SmartyLoader) window.SmartyLoader.hide();
@@ -653,17 +688,19 @@ window.withdrawAllBalance = function() {
     const input = document.getElementById('withdraw-amount-input');
     if (input) input.value = Math.floor(bal);
 };
+window.fillMaxWithdraw = window.withdrawAllBalance;
 
 // Submit Withdrawal Request
 window.submitWithdrawalRequest = async function() {
     const token = localStorage.getItem('smarty91_auth_token');
     const amountInput = document.getElementById('withdraw-amount-input');
-    const holderInput = document.getElementById('withdraw-holder-input');
-    const accountInput = document.getElementById('withdraw-account-input');
-    const ifscInput = document.getElementById('withdraw-ifsc-input');
+    const holderInput = document.getElementById('withdraw-holder-name') || document.getElementById('withdraw-holder-input');
+    const accountInput = document.getElementById('withdraw-acc-num') || document.getElementById('withdraw-account-input');
+    const ifscInput = document.getElementById('withdraw-ifsc') || document.getElementById('withdraw-ifsc-input');
+    const mobileInput = document.getElementById('withdraw-mobile');
     const bankNameInput = document.getElementById('withdraw-bank-name-input');
     const pinInput = document.getElementById('withdraw-pin-input');
-    const submitBtn = document.getElementById('submit-withdraw-btn');
+    const submitBtn = document.getElementById('withdraw-submit-btn') || document.getElementById('submit-withdraw-btn');
 
     const amount = Number(amountInput ? amountInput.value : 0);
     const holderName = holderInput ? holderInput.value.trim() : '';
@@ -671,9 +708,10 @@ window.submitWithdrawalRequest = async function() {
     const ifsc = ifscInput ? ifscInput.value.trim().toUpperCase() : '';
     const bankName = bankNameInput ? bankNameInput.value.trim() : 'Bank Transfer';
     const pin = pinInput ? pinInput.value.trim() : '';
+    const mobile = mobileInput ? mobileInput.value.trim() : '';
 
-    if (isNaN(amount) || amount < 200) {
-        showToast('Minimum withdrawal amount is ₹200');
+    if (isNaN(amount) || amount < 500) {
+        showToast('Minimum withdrawal amount is ₹500');
         return;
     }
     if (!accountNum || accountNum.length < 6) {
@@ -704,6 +742,7 @@ window.submitWithdrawalRequest = async function() {
                 bankName,
                 accountNumber: accountNum,
                 ifsc,
+                mobile,
                 securityPin: pin
             })
         });
@@ -714,7 +753,7 @@ window.submitWithdrawalRequest = async function() {
             showToast(data.message || 'Withdrawal failed');
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.innerText = 'Submit Withdrawal Request';
+                submitBtn.innerText = 'Confirm Bank Withdrawal';
             }
             return;
         }
@@ -736,16 +775,94 @@ window.submitWithdrawalRequest = async function() {
         showToast('Network error during withdrawal submission');
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerText = 'Submit Withdrawal Request';
+            submitBtn.innerText = 'Confirm Bank Withdrawal';
         }
     } finally {
         if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 };
 
+window.handleWithdrawalSubmit = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    submitWithdrawalRequest();
+    return false;
+};
+
+// Filter Transactions
+let cachedLedgerItems = [];
+window.filterTransactions = function(type, btn) {
+    const buttons = document.querySelectorAll('.filter-chip-btn');
+    buttons.forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    renderFilteredTransactions(type);
+};
+
+function renderFilteredTransactions(type) {
+    const listContainer = document.getElementById('history-list-container') || document.getElementById('history-items-list');
+    if (!listContainer) return;
+
+    let filtered = cachedLedgerItems;
+    if (type === 'DEPOSIT') {
+        filtered = cachedLedgerItems.filter(item => item.type && item.type.includes('DEPOSIT'));
+    } else if (type === 'WITHDRAWAL') {
+        filtered = cachedLedgerItems.filter(item => item.type && item.type.includes('WITHDRAW'));
+    } else if (type === 'BONUS') {
+        filtered = cachedLedgerItems.filter(item => item.type && (item.type.includes('BONUS') || item.type.includes('PROMO')));
+    }
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 2.5rem 1rem; color: #94A3B8;">
+                <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
+                <div style="font-weight: 700; color: #64748b;">No Transactions Found</div>
+                <div style="font-size: 0.75rem; margin-top: 4px;">No records match the selected filter.</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    filtered.slice(0, 40).forEach(item => {
+        const isCredit = item.amount > 0;
+        const amountFormatted = `${isCredit ? '+' : ''}₹${Math.abs(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Recent';
+
+        let statusClass = 'approved';
+        let statusLabel = item.type;
+        if (item.status === 'PENDING' || item.type.includes('WITHDRAW')) {
+            statusClass = item.status === 'APPROVED' ? 'approved' : item.status === 'REJECTED' ? 'rejected' : 'pending';
+            statusLabel = item.status || 'PENDING';
+        } else if (item.status === 'REJECTED') {
+            statusClass = 'rejected';
+            statusLabel = 'REJECTED';
+        } else {
+            statusClass = 'approved';
+            statusLabel = item.status || 'COMPLETED';
+        }
+
+        html += `
+            <div class="passbook-item-card">
+                <div>
+                    <div class="passbook-item-left">
+                        <span>${item.description || item.type}</span>
+                    </div>
+                    <div class="passbook-item-date">${dateStr} • Ref: ${item.referenceId || 'N/A'}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.95rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: ${isCredit ? '#10B981' : '#f87171'};">${amountFormatted}</div>
+                    <span class="status-badge ${statusClass}">${statusLabel}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    listContainer.innerHTML = html;
+}
+
 // Render Transaction History (Passbook)
 async function renderTransactionsHistory() {
-    const listContainer = document.getElementById('history-items-list');
+    const listContainer = document.getElementById('history-list-container') || document.getElementById('history-items-list');
     if (!listContainer) return;
 
     const token = localStorage.getItem('smarty91_auth_token');
@@ -757,50 +874,19 @@ async function renderTransactionsHistory() {
         const data = await res.json();
 
         if (!data.success || !Array.isArray(data.items) || data.items.length === 0) {
+            cachedLedgerItems = [];
             listContainer.innerHTML = `
                 <div style="text-align: center; padding: 2.5rem 1rem; color: #94A3B8;">
                     <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
-                    <div style="font-weight: 700; color: #475569;">No Transactions Recorded Yet</div>
+                    <div style="font-weight: 700; color: #64748b;">No Transactions Recorded Yet</div>
                     <div style="font-size: 0.75rem; margin-top: 4px;">Your deposits and withdrawals will appear here.</div>
                 </div>
             `;
             return;
         }
 
-        let html = '';
-        data.items.slice(0, 30).forEach(item => {
-            const isCredit = item.amount > 0;
-            const amountFormatted = `${isCredit ? '+' : ''}₹${Math.abs(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-            const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Recent';
-
-            let statusBadge = '';
-            if (item.type.includes('DEPOSIT')) {
-                statusBadge = `<span class="status-badge approved">Deposit</span>`;
-            } else if (item.type.includes('WITHDRAWAL')) {
-                statusBadge = `<span class="status-badge pending">Withdrawal</span>`;
-            } else if (item.type.includes('BONUS')) {
-                statusBadge = `<span class="status-badge approved">VIP Bonus</span>`;
-            } else if (item.type.includes('WIN')) {
-                statusBadge = `<span class="status-badge approved">Game Win</span>`;
-            } else {
-                statusBadge = `<span class="status-badge pending">${item.type}</span>`;
-            }
-
-            html += `
-                <div class="history-card-item">
-                    <div>
-                        <div class="history-left-title">${item.description || item.type}</div>
-                        <div class="history-time">${dateStr} • Ref: ${item.referenceId || 'N/A'}</div>
-                    </div>
-                    <div class="history-right-val">
-                        <div class="history-amount" style="color: ${isCredit ? '#10B981' : '#E51837'};">${amountFormatted}</div>
-                        <div>${statusBadge}</div>
-                    </div>
-                </div>
-            `;
-        });
-
-        listContainer.innerHTML = html;
+        cachedLedgerItems = data.items;
+        renderFilteredTransactions('ALL');
 
     } catch (e) {
         listContainer.innerHTML = `

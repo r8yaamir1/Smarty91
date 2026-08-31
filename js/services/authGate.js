@@ -54,22 +54,27 @@
         fetch('/api/auth/me', {
             headers: { 'Authorization': `Bearer ${token}` }
         })
-        .then(res => res.json())
-        .then(data => {
-            if (!data || !data.success || !data.user) {
-                // Token expired / invalidated -> Clear and go to login
-                localStorage.removeItem('smarty91_auth_token');
-                localStorage.removeItem('smarty91_user_id');
-                window.location.replace('login.html');
-            } else {
-                // Keep device storage updated
-                localStorage.setItem('smarty91_user_id', data.user.id);
-                localStorage.setItem('smarty91_user_phone', data.user.phone);
-                localStorage.setItem('smarty91_cached_balance', (data.user.balance || 0).toString());
+        .then(async (res) => {
+            if (res.status === 401) {
+                const data = await res.json().catch(() => ({}));
+                if (data && data.message && (data.message.includes('expired') || data.message.includes('Invalid'))) {
+                    // Only clear if server explicitly validated token as invalid
+                    localStorage.removeItem('smarty91_auth_token');
+                    localStorage.removeItem('smarty91_user_id');
+                    window.location.replace('login.html');
+                }
+            } else if (res.ok) {
+                const data = await res.json();
+                if (data && data.success && data.user) {
+                    // Keep device storage updated
+                    localStorage.setItem('smarty91_user_id', data.user.id);
+                    localStorage.setItem('smarty91_user_phone', data.user.phone);
+                    localStorage.setItem('smarty91_cached_balance', (data.user.balance || 0).toString());
+                }
             }
         })
         .catch(err => {
-            console.warn('Background session sync warning:', err);
+            console.warn('Background session sync warning (offline or server booting):', err);
         });
     }
 })();

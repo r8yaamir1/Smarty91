@@ -108,6 +108,47 @@ apiRouter.post('/auth/logout', (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// -------------------------------------------------------------
+// 0.1. DAILY SIGN-IN & REFERRAL PROMOTIONS
+// -------------------------------------------------------------
+
+// GET /api/user/checkin/status -> Current streak, status & 7-day rewards
+apiRouter.get('/user/checkin/status', (req, res) => {
+    try {
+        const user = getAuthUser(req);
+        const status = serverEngine.getDailyCheckInStatus(user.id);
+        res.json(status);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/user/checkin/claim -> Claim today's bonus (Requires min 1 Deposit)
+apiRouter.post('/user/checkin/claim', (req, res) => {
+    try {
+        const user = getAuthUser(req);
+        const result = serverEngine.claimDailyCheckIn(user.id);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({
+            success: false,
+            code: err.code || 'CLAIM_ERROR',
+            message: err.message
+        });
+    }
+});
+
+// GET /api/user/referral/stats -> User referral performance & invite history
+apiRouter.get('/user/referral/stats', (req, res) => {
+    try {
+        const user = getAuthUser(req);
+        const summary = serverEngine.getReferralSummary(user.id);
+        res.json(summary);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 // Helper for error handling
 const asyncWrap = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -342,7 +383,7 @@ apiRouter.get('/wallet/config', (req, res) => {
         usdtRate: serverEngine.config.usdtRate || 90,
         minDeposit: serverEngine.config.minDeposit || 200,
         maxDeposit: serverEngine.config.maxDeposit || 100000,
-        minWithdrawal: serverEngine.config.minWithdrawal || 200,
+        minWithdrawal: serverEngine.config.minWithdrawal || 500,
         maxWithdrawal: serverEngine.config.maxWithdrawal || 100000
     });
 });

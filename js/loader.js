@@ -1,7 +1,7 @@
-// js/loader.js - Minimal Transparent Circular Loader & Network Reconnection Listener
+// js/loader.js - Minimal Transparent Circular Loader & Ultra-Smooth Page Transitions
 
 (function() {
-    // Inject clean transparent spinner styles
+    // Inject clean transparent spinner and ultra-smooth transition styles
     if (!document.getElementById('smarty-loader-styles')) {
         const style = document.createElement('style');
         style.id = 'smarty-loader-styles';
@@ -12,9 +12,9 @@
                 left: 0;
                 width: 100vw;
                 height: 100vh;
-                background: rgba(0, 0, 0, 0.35);
-                backdrop-filter: blur(3px);
-                -webkit-backdrop-filter: blur(3px);
+                background: rgba(10, 12, 18, 0.65);
+                backdrop-filter: blur(6px);
+                -webkit-backdrop-filter: blur(6px);
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -22,34 +22,72 @@
                 z-index: 99999;
                 opacity: 0;
                 pointer-events: none;
-                transition: opacity 0.2s ease;
+                transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s ease;
+                visibility: hidden;
             }
             .smarty-transparent-loader-overlay.active {
                 opacity: 1;
                 pointer-events: auto;
+                visibility: visible;
             }
             .smarty-minimal-circle-spinner {
-                width: 46px;
-                height: 46px;
-                border: 3.5px solid rgba(245, 158, 11, 0.2);
-                border-top: 3.5px solid #f59e0b;
-                border-right: 3.5px solid #fbbf24;
+                width: 48px;
+                height: 48px;
+                border: 3.5px solid rgba(255, 215, 0, 0.15);
+                border-top: 3.5px solid #FFD700;
+                border-right: 3.5px solid #FF2E4D;
                 border-radius: 50%;
-                animation: smartyCircleSpin 0.75s linear infinite;
-                filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.4));
+                animation: smartyCircleSpin 0.7s linear infinite;
+                filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.5));
             }
             .smarty-loader-subtext {
-                margin-top: 12px;
-                color: #ffffff;
+                margin-top: 14px;
+                color: #FFFFFF;
                 font-size: 13px;
-                font-weight: 600;
+                font-weight: 700;
                 letter-spacing: 0.5px;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+                font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, sans-serif;
+                background: linear-gradient(135deg, #FFFFFF 0%, #FFD700 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
             }
             @keyframes smartyCircleSpin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
+            }
+
+            /* Smooth View Transitions */
+            @keyframes smartyTabFadeIn {
+                0% {
+                    opacity: 0;
+                    transform: translateY(6px);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes smartyPageFadeIn {
+                0% {
+                    opacity: 0;
+                    transform: translateY(8px) scale(0.995);
+                }
+                100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+
+            .tab-smooth-enter {
+                animation: smartyTabFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+                will-change: opacity, transform;
+            }
+
+            .page-smooth-enter {
+                animation: smartyPageFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+                will-change: opacity, transform;
             }
 
             /* Offline / Slow Network Status Banner */
@@ -58,8 +96,8 @@
                 top: 12px;
                 left: 50%;
                 transform: translateX(-50%) translateY(-60px);
-                background: rgba(220, 38, 38, 0.92);
-                backdrop-filter: blur(6px);
+                background: rgba(220, 38, 38, 0.94);
+                backdrop-filter: blur(8px);
                 color: #ffffff;
                 padding: 8px 18px;
                 border-radius: 24px;
@@ -68,7 +106,7 @@
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
                 z-index: 100000;
                 transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
                 opacity: 0;
@@ -137,16 +175,15 @@
         if (offlineBanner) {
             const text = document.getElementById('smarty-offline-text');
             if (text) text.innerText = 'Network restored!';
-            offlineBanner.style.background = 'rgba(22, 163, 74, 0.92)';
+            offlineBanner.style.background = 'rgba(22, 163, 74, 0.94)';
             setTimeout(() => {
                 offlineBanner.classList.remove('visible');
-                offlineBanner.style.background = 'rgba(220, 38, 38, 0.92)';
+                offlineBanner.style.background = 'rgba(220, 38, 38, 0.94)';
             }, 1800);
         }
     });
 
     window.SmartyLoader = {
-        // Show ONLY on explicit manual actions
         show: function(msg = '') {
             if (typeof document === 'undefined') return;
             ensureElements();
@@ -173,7 +210,7 @@
                         overlay.classList.remove('active');
                         if (labelEl) labelEl.innerText = '';
                     }
-                }, 80);
+                }, 60);
             }
         },
 
@@ -189,4 +226,70 @@
             }
         }
     };
+
+    // Helper to animate an element smoothly when switching tabs
+    window.applyTabAnimation = function(targetEl) {
+        if (!targetEl) return;
+        targetEl.classList.remove('tab-smooth-enter');
+        // Trigger reflow to restart CSS animation
+        void targetEl.offsetWidth;
+        targetEl.classList.add('tab-smooth-enter');
+    };
+
+    // Helper to trigger page entrance fade after data render
+    window.revealPageReady = function(targetContainerSelector = '.profile-container, .cashier-page-container, .referral-container, .checkin-container, #app, .app-shell, .home-tab-container') {
+        const applyFade = () => {
+            const elements = document.querySelectorAll(targetContainerSelector);
+            elements.forEach(el => {
+                el.classList.add('page-smooth-enter');
+            });
+            if (window.SmartyLoader) {
+                window.SmartyLoader.hide(true);
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyFade, { once: true });
+        } else {
+            setTimeout(applyFade, 10);
+        }
+    };
+
+    window.navigateToPage = function(url, msg) {
+        if (!url) return;
+        const currentPath = window.location.pathname;
+        const isCurrentHome = (url === 'index.html' || url === '/') && (currentPath === '/' || currentPath.endsWith('index.html'));
+        const isSamePage = currentPath.endsWith(url) || isCurrentHome;
+
+        if (isSamePage) {
+            if (url === 'index.html' || url === '/') {
+                if (typeof window.switchAppView === 'function') {
+                    window.switchAppView('home');
+                }
+            }
+            return;
+        }
+
+        // Show single clean VIP loader with appropriate subtitle
+        if (window.SmartyLoader) {
+            let label = msg || 'Loading VIP Arena...';
+            if (url.includes('checkin')) label = 'Loading Daily Sign In...';
+            else if (url.includes('referral')) label = 'Loading VIP Agent Hub...';
+            else if (url.includes('payment')) label = 'Loading Cashier & Wallet...';
+            else if (url.includes('profile')) label = 'Loading VIP Profile...';
+            else if (url.includes('index') || url === '/') label = 'Loading Smarty91...';
+
+            window.SmartyLoader.show(label);
+        }
+
+        // Smooth immediate navigation
+        setTimeout(() => {
+            window.location.href = url;
+        }, 120);
+    };
+
+    // Auto-reveal on load
+    if (typeof document !== 'undefined') {
+        window.revealPageReady();
+    }
 })();

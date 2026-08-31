@@ -16,7 +16,7 @@ import {
     updateModeHistoryFromServer
 } from "./gameEngine.js";
 import { showEvaluationDialog } from "./updateWin.js";
-import { playTickSound, stopCountdownAudio } from "./audio.js";
+import { playTickSound, stopCountdownAudio, isGameViewActive } from "./audio.js";
 import { gameService } from "./services/gameService.js";
 import { syncServerBalance } from "./wallet.js";
 import { subscribeToGamePeriod, subscribeToGameHistory } from "./services/firebaseClient.js";
@@ -212,7 +212,7 @@ function processMasterTick() {
                     `;
                 }
 
-                if (totalSeconds !== state.lastTickSecond) {
+                if (totalSeconds !== state.lastTickSecond && isGameViewActive()) {
                     playTickSound(totalSeconds);
                     state.lastTickSecond = totalSeconds;
                 }

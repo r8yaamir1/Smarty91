@@ -30,7 +30,9 @@ export default defineConfig({
                 admin: './admin.html',
                 login: './login.html',
                 profile: './profile.html',
-                payment: './payment.html'
+                payment: './payment.html',
+                checkin: './checkin.html',
+                referral: './referral.html'
             }
         }
     },

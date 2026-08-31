@@ -10,7 +10,7 @@ function showToast(msg, duration = 3000) {
     }, duration);
 }
 
-// Global Tab switcher
+// Global Tab switcher with smooth animated transitions
 window.switchAuthTab = function(tab) {
     const loginBtn = document.getElementById('tab-login-btn');
     const regBtn = document.getElementById('tab-register-btn');
@@ -19,25 +19,40 @@ window.switchAuthTab = function(tab) {
     const regForm = document.getElementById('register-form');
     const forgotForm = document.getElementById('forgot-form');
 
+    const forms = [loginForm, regForm, forgotForm];
+    forms.forEach(f => {
+        if (f) {
+            f.classList.remove('active');
+            f.style.display = 'none';
+        }
+    });
+
     if (tab === 'login') {
         if (tabsWrap) tabsWrap.style.display = 'flex';
         if (loginBtn) loginBtn.classList.add('active');
         if (regBtn) regBtn.classList.remove('active');
-        if (loginForm) loginForm.style.display = 'block';
-        if (regForm) regForm.style.display = 'none';
-        if (forgotForm) forgotForm.style.display = 'none';
+        if (loginForm) {
+            loginForm.style.display = 'block';
+            // Trigger animation restart cleanly
+            void loginForm.offsetWidth;
+            loginForm.classList.add('active');
+        }
     } else if (tab === 'register') {
         if (tabsWrap) tabsWrap.style.display = 'flex';
         if (loginBtn) loginBtn.classList.remove('active');
         if (regBtn) regBtn.classList.add('active');
-        if (loginForm) loginForm.style.display = 'none';
-        if (regForm) regForm.style.display = 'block';
-        if (forgotForm) forgotForm.style.display = 'none';
+        if (regForm) {
+            regForm.style.display = 'block';
+            void regForm.offsetWidth;
+            regForm.classList.add('active');
+        }
     } else if (tab === 'forgot') {
         if (tabsWrap) tabsWrap.style.display = 'none';
-        if (loginForm) loginForm.style.display = 'none';
-        if (regForm) regForm.style.display = 'none';
-        if (forgotForm) forgotForm.style.display = 'block';
+        if (forgotForm) {
+            forgotForm.style.display = 'block';
+            void forgotForm.offsetWidth;
+            forgotForm.classList.add('active');
+        }
     }
 };
 
@@ -47,17 +62,24 @@ window.togglePasswordVisibility = function(inputId) {
     input.type = input.type === 'password' ? 'text' : 'password';
 };
 
-// Toggle additional register fields (Security PIN & Invite Code)
+// Toggle additional register fields (Security PIN & Invite Code) with smooth animation
 window.toggleExtraRegisterFields = function() {
     const extraBox = document.getElementById('reg-extra-fields');
     const icon = document.getElementById('expand-icon');
     if (!extraBox) return;
-    if (extraBox.style.display === 'none') {
+    if (extraBox.style.display === 'none' || !extraBox.style.display) {
         extraBox.style.display = 'block';
-        if (icon) icon.innerText = '▲';
+        extraBox.style.animation = 'itemPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+        if (icon) {
+            icon.innerText = '▲';
+            icon.style.color = '#FFD700';
+        }
     } else {
         extraBox.style.display = 'none';
-        if (icon) icon.innerText = '▼';
+        if (icon) {
+            icon.innerText = '▼';
+            icon.style.color = '#9ca3af';
+        }
     }
 };
 

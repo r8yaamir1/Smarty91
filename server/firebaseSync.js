@@ -142,6 +142,9 @@ class FirebaseSyncManager {
                 }
             });
             console.log(`[Firebase] Successfully hydrated ${count} permanent users from Firestore into server memory.`);
+            if (count > 0 && typeof this.engine._saveUsersToDisk === 'function') {
+                this.engine._saveUsersToDisk();
+            }
         } catch (err) {
             console.warn('[Firebase] User hydration warning:', err.message);
         }

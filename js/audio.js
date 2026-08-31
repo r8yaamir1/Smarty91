@@ -123,8 +123,30 @@ export function stopCountdownAudio() {
     lastPlayedSecond = null;
 }
 
+// Helper to check if game screen is currently active and visible to user
+export function isGameViewActive() {
+    const wingoView = document.getElementById('wingo-game-view');
+    const homeView = document.getElementById('home-dashboard-view');
+    if (!wingoView) return false;
+
+    // If home view is visible, game view is NOT active
+    if (homeView && homeView.style.display !== 'none' && homeView.offsetParent !== null) {
+        return false;
+    }
+
+    // Check if wingo view is currently displayed
+    const isWingoVisible = wingoView.style.display !== 'none' && wingoView.offsetParent !== null;
+    return isWingoVisible;
+}
+
 export function playTickSound(secondsLeft) {
     if (isMuted) return;
+
+    // Audio MUST only play when user has actually opened and is inside the active game view
+    if (!isGameViewActive()) {
+        stopCountdownAudio();
+        return;
+    }
 
     const now = Date.now();
     // Guard against multiple rapid calls in the same second
@@ -161,13 +183,13 @@ export function playTickSound(secondsLeft) {
 }
 
 export function playSpinTick(step = 0) {
-    if (isMuted) return;
+    if (isMuted || !isGameViewActive()) return;
     const baseFreq = 700 + ((step % 10) * 60);
     playSynthBeep(baseFreq, 0.04, 'triangle');
 }
 
 export function playWinChime() {
-    if (isMuted) return;
+    if (isMuted || !isGameViewActive()) return;
     try {
         const ctx = getAudioContext();
         if (!ctx) return;

@@ -15,6 +15,7 @@ import { initWalletModals, updateHeaderUserUI, renderBalance } from './wallet.js
 import { initGameRecord } from './gameRecord.js';
 import { initAllEvents } from './events.js';
 import { initAdminPanel } from './adminPanel.js';
+import { initHomeNavigation } from './homeNavigation.js';
 
 function initViewportLock() {
     // Prevent double-tap zoom
@@ -48,6 +49,7 @@ function bootstrap() {
     initAllEvents();
     initGameRecord();
     initAdminPanel();
+    initHomeNavigation();
     console.log('Smarty91 VIP ready!');
 }
 

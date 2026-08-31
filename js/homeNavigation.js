@@ -1,0 +1,565 @@
+// js/homeNavigation.js - Smarty91 VIP Home Dashboard & Bottom Nav Controller
+import { syncServerBalance, showToast, formatCurrency } from './wallet.js';
+import { stopCountdownAudio } from './audio.js';
+
+let checkInState = {
+    hasDeposited: false,
+    claimedToday: false,
+    streakDay: 1,
+    rewardsTable: [],
+    totalClaimedAmount: 0
+};
+
+let referralState = {
+    inviteCode: '',
+    totalInvites: 0,
+    activeDepositors: 0,
+    totalCommissionEarned: 0,
+    referrals: []
+};
+
+// Switch between Home Dashboard and Live Colour Prediction
+export function switchView(viewName) {
+    const homeView = document.getElementById('home-dashboard-view');
+    const wingoView = document.getElementById('wingo-game-view');
+    const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+
+    if (viewName === 'game') {
+        if (homeView) homeView.style.display = 'none';
+        if (wingoView) {
+            wingoView.style.display = 'block';
+            if (window.applyTabAnimation) window.applyTabAnimation(wingoView);
+        }
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+        // Leaving game view: Immediately kill all audio
+        stopCountdownAudio();
+        if (homeView) {
+            homeView.style.display = 'flex';
+            if (window.applyTabAnimation) window.applyTabAnimation(homeView);
+        }
+        if (wingoView) wingoView.style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    bottomNavItems.forEach(item => {
+        const tab = item.getAttribute('data-tab');
+        if (tab === 'home' && viewName !== 'game') {
+            item.classList.add('active');
+        } else if (tab === 'home' && viewName === 'game') {
+            item.classList.remove('active');
+        }
+    });
+}
+
+// Smooth VIP Game Opening with Loader & Synchronization (Minimum 2+ seconds duration)
+export async function openGameWithLoader(targetView = 'game') {
+    const overlay = document.getElementById('game-sync-overlay');
+    const meterBar = document.getElementById('game-sync-meter-bar');
+    const statusText = document.getElementById('game-sync-status-text');
+
+    if (!overlay) {
+        switchView(targetView);
+        return;
+    }
+
+    // Reset progress and display sync overlay
+    if (meterBar) meterBar.style.width = '12%';
+    if (statusText) statusText.textContent = 'Connecting to VIP Game Server...';
+    overlay.classList.add('active');
+
+    // Background sync of wallet balance
+    try {
+        syncServerBalance(true).catch(() => {});
+    } catch (e) {}
+
+    // Phase 1: 0 -> 500ms
+    await new Promise(r => setTimeout(r, 500));
+    if (meterBar) meterBar.style.width = '38%';
+    if (statusText) statusText.textContent = 'Verifying Player Session & Wallet Balance...';
+
+    // Phase 2: 500 -> 1100ms (600ms)
+    await new Promise(r => setTimeout(r, 600));
+    if (meterBar) meterBar.style.width = '68%';
+    if (statusText) statusText.textContent = 'Synchronizing Live Draw Periods & History...';
+
+    // Phase 3: 1100 -> 1700ms (600ms)
+    await new Promise(r => setTimeout(r, 600));
+    if (meterBar) meterBar.style.width = '90%';
+    if (statusText) statusText.textContent = 'Loading VIP Arena Engine...';
+
+    // Phase 4: 1700 -> 2150ms (450ms)
+    await new Promise(r => setTimeout(r, 450));
+    if (meterBar) meterBar.style.width = '100%';
+    if (statusText) statusText.textContent = 'Ready! Entering Live Game...';
+
+    // Phase 5: Finalize and open (200ms) -> Total ~2.35s
+    await new Promise(r => setTimeout(r, 200));
+
+    // Switch view smoothly
+    switchView(targetView);
+
+    // Hide loader overlay
+    overlay.classList.remove('active');
+    setTimeout(() => {
+        if (meterBar) meterBar.style.width = '0%';
+    }, 300);
+}
+
+// Fetch Daily Sign-in status
+export async function loadCheckInStatus() {
+    try {
+        const token = localStorage.getItem('smarty91_auth_token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const resp = await fetch('/api/user/checkin/status', { headers });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.success) {
+                checkInState = data;
+                renderCheckInModal();
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to fetch check-in status:', err);
+    }
+}
+
+// Claim Daily Sign-in bonus
+export async function claimCheckInBonus() {
+    const claimBtn = document.getElementById('modal-claim-btn');
+    if (claimBtn) {
+        claimBtn.disabled = true;
+        claimBtn.innerHTML = `<span>Claiming...</span>`;
+    }
+
+    try {
+        const token = localStorage.getItem('smarty91_auth_token');
+        if (!token) {
+            showToast('Please log in first to claim daily bonuses!', 'warn');
+            setTimeout(() => { window.location.href = 'login.html'; }, 1000);
+            return;
+        }
+
+        const resp = await fetch('/api/user/checkin/claim', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await resp.json();
+        if (data && data.success) {
+            showToast(`🎉 Claimed ₹${data.amount} Day ${data.streakDay} Bonus!`, 'success');
+            await syncServerBalance(true);
+            await loadCheckInStatus();
+        } else {
+            if (data && data.code === 'DEPOSIT_REQUIRED') {
+                showToast('Recharge required! Daily bonus unlocks after your first deposit.', 'warn');
+            } else {
+                showToast(data.message || 'Unable to claim bonus', 'warn');
+            }
+            if (claimBtn) {
+                claimBtn.disabled = false;
+                claimBtn.innerHTML = `<span>Claim Today's Bonus</span>`;
+            }
+        }
+    } catch (err) {
+        showToast('Network error while claiming bonus', 'warn');
+        if (claimBtn) {
+            claimBtn.disabled = false;
+            claimBtn.innerHTML = `<span>Claim Today's Bonus</span>`;
+        }
+    }
+}
+
+// Render Daily Sign-in Modal UI
+export function renderCheckInModal() {
+    const grid = document.getElementById('rewards-7day-grid');
+    const lockBox = document.getElementById('checkin-deposit-lock');
+    const claimBtn = document.getElementById('modal-claim-btn');
+    const streakLabel = document.getElementById('modal-streak-count');
+
+    if (streakLabel) {
+        streakLabel.textContent = `Day ${checkInState.streakDay || 1} of 7 Streak`;
+    }
+
+    if (lockBox) {
+        if (!checkInState.hasDeposited) {
+            lockBox.style.display = 'flex';
+        } else {
+            lockBox.style.display = 'none';
+        }
+    }
+
+    if (grid) {
+        const rewards = checkInState.rewardsTable && checkInState.rewardsTable.length > 0 
+            ? checkInState.rewardsTable 
+            : [
+                { day: 1, amount: 5, label: 'Day 1' },
+                { day: 2, amount: 10, label: 'Day 2' },
+                { day: 3, amount: 15, label: 'Day 3' },
+                { day: 4, amount: 20, label: 'Day 4' },
+                { day: 5, amount: 25, label: 'Day 5' },
+                { day: 6, amount: 30, label: 'Day 6' },
+                { day: 7, amount: 50, label: 'Day 7 (Mega)' }
+            ];
+
+        grid.innerHTML = rewards.map((r) => {
+            const isMega = r.day === 7;
+            const isToday = r.day === checkInState.streakDay;
+            const isPast = r.day < checkInState.streakDay || (isToday && checkInState.claimedToday);
+            let cardClasses = `day-reward-card ${isMega ? 'day-7-mega' : ''}`;
+            if (isToday && !checkInState.claimedToday) cardClasses += ' active-today';
+            if (isPast) cardClasses += ' claimed';
+
+            return `
+                <div class="${cardClasses}">
+                    ${isPast ? `<span class="day-claimed-badge">✓</span>` : ''}
+                    <div class="day-card-label">Day ${r.day}</div>
+                    <div class="day-card-icon">${isMega ? '👑' : '🎁'}</div>
+                    <div class="day-card-val">₹${r.amount}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    if (claimBtn) {
+        if (!checkInState.hasDeposited) {
+            claimBtn.disabled = false;
+            claimBtn.innerHTML = `<span>⚡ Recharge to Unlock Daily Bonus</span>`;
+            claimBtn.onclick = () => {
+                window.location.href = 'payment.html?tab=deposit';
+            };
+        } else if (checkInState.claimedToday) {
+            claimBtn.disabled = true;
+            claimBtn.innerHTML = `<span>✓ Already Claimed Today (Come back tomorrow)</span>`;
+            claimBtn.onclick = null;
+        } else {
+            claimBtn.disabled = false;
+            const todayReward = checkInState.rewardsTable && checkInState.rewardsTable[checkInState.streakDay - 1] 
+                ? checkInState.rewardsTable[checkInState.streakDay - 1].amount 
+                : 5;
+            claimBtn.innerHTML = `<span>🎁 Claim Day ${checkInState.streakDay} Bonus (₹${todayReward})</span>`;
+            claimBtn.onclick = claimCheckInBonus;
+        }
+    }
+}
+
+// Fetch Referral stats
+export async function loadReferralStats() {
+    try {
+        const token = localStorage.getItem('smarty91_auth_token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const resp = await fetch('/api/user/referral/stats', { headers });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.success) {
+                referralState = data;
+                renderReferralModal();
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to load referral stats:', err);
+    }
+}
+
+// Render Referral Modal
+export function renderReferralModal() {
+    const codeEl = document.getElementById('ref-code-val');
+    const linkEl = document.getElementById('ref-link-val');
+    const totalInvEl = document.getElementById('ref-total-invites');
+    const activeDepEl = document.getElementById('ref-active-deps');
+    const commissionEl = document.getElementById('ref-total-commission');
+
+    const code = referralState.inviteCode || localStorage.getItem('smarty91_invite_code') || 'SM9101';
+    const inviteUrl = `${window.location.origin}/login.html?ref=${code}`;
+
+    if (codeEl) codeEl.textContent = code;
+    if (linkEl) linkEl.textContent = inviteUrl;
+    if (totalInvEl) totalInvEl.textContent = referralState.totalInvites || 0;
+    if (activeDepEl) activeDepEl.textContent = referralState.activeDepositors || 0;
+    if (commissionEl) commissionEl.textContent = `₹${(referralState.totalCommissionEarned || 0).toLocaleString('en-IN')}`;
+}
+
+// Copy Helper
+export function copyText(text, successMsg = 'Copied to clipboard!') {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(successMsg, 'success');
+        }).catch(() => {
+            legacyCopy(text, successMsg);
+        });
+    } else {
+        legacyCopy(text, successMsg);
+    }
+}
+
+function legacyCopy(text, successMsg) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showToast(successMsg, 'success');
+    } catch (e) {
+        showToast('Please copy manually', 'warn');
+    }
+    document.body.removeChild(textarea);
+}
+
+// Open / Close Modals
+export function openDailyCheckInModal() {
+    const modal = document.getElementById('daily-signin-modal');
+    if (modal) {
+        modal.classList.add('active');
+        loadCheckInStatus();
+    }
+}
+
+export function closeDailyCheckInModal() {
+    const modal = document.getElementById('daily-signin-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+export function openReferralModal() {
+    const modal = document.getElementById('referral-modal');
+    if (modal) {
+        modal.classList.add('active');
+        loadReferralStats();
+    }
+}
+
+export function closeReferralModal() {
+    const modal = document.getElementById('referral-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+export function openNoticeModal() {
+    const modal = document.getElementById('notice-modal');
+    if (modal) modal.classList.add('active');
+}
+
+export function closeNoticeModal() {
+    const modal = document.getElementById('notice-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+export function showUpcomingGameToast() {
+    showToast('🎮 Coming Soon! This game is in final development for the next update.', 'warn');
+}
+
+// Initialize Navigation Listeners
+export function initHomeNavigation() {
+    // Check URL parameters (e.g. ?view=game or ?tab=checkin or ?tab=referral)
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    const tabParam = urlParams.get('tab');
+
+    if (viewParam === 'game') {
+        switchView('game');
+    } else {
+        switchView('home');
+    }
+
+    if (tabParam === 'checkin') {
+        openDailyCheckInModal();
+    } else if (tabParam === 'referral') {
+        openReferralModal();
+    }
+
+    // Attach global hooks
+    window.switchAppView = switchView;
+    window.openGameWithLoader = openGameWithLoader;
+    window.openDailyCheckInModal = openDailyCheckInModal;
+    window.closeDailyCheckInModal = closeDailyCheckInModal;
+    window.openReferralModal = openReferralModal;
+    window.closeReferralModal = closeReferralModal;
+    window.openNoticeModal = openNoticeModal;
+    window.closeNoticeModal = closeNoticeModal;
+    window.showUpcomingGameToast = showUpcomingGameToast;
+    window.copyReferralCode = () => {
+        const code = referralState.inviteCode || localStorage.getItem('smarty91_invite_code') || 'SM9101';
+        copyText(code, `Invite Code ${code} copied!`);
+    };
+    window.copyReferralLink = () => {
+        const code = referralState.inviteCode || localStorage.getItem('smarty91_invite_code') || 'SM9101';
+        const link = `${window.location.origin}/login.html?ref=${code}`;
+        copyText(link, 'VIP Referral link copied!');
+    };
+
+    // Load initial check-in data in background
+    loadCheckInStatus();
+
+    // Initialize Social Proof & Multi-User Live Winning Engine
+    initSocialProofEngine();
+}
+
+/* ==========================================================
+   MULTI-USER SOCIAL PROOF & LIVE WINNING ENGINE (MASSIVE TRUST)
+   ========================================================== */
+
+const RANDOM_USERS = [
+    '98***412', '91***892', '70***419', '88***531', '99***712',
+    '63***881', '96***240', '84***915', '93***607', '79***118',
+    '95***432', '87***619', '90***328', '73***805', '92***114',
+    '86***993', '97***552', '89***401', '94***726', '76***389',
+    '91***543', '98***908', '80***144', '77***632', '93***219',
+    '85***467', '96***830', '74***991', '98***315', '91***220',
+    '70***984', '88***410', '99***129', '63***701', '94***556'
+];
+
+const GAME_MODES = ['Smarty91 30s', 'Smarty91 1Min', 'Smarty91 3Min', 'Smarty91 5Min'];
+
+const WIN_OUTCOMES = [
+    { type: 'RED', label: 'Red', colorClass: 'red', icon: '🔴', multiplier: '2X', minAmt: 980, maxAmt: 7840 },
+    { type: 'GREEN', label: 'Green', colorClass: 'green', icon: '🟢', multiplier: '2X', minAmt: 1470, maxAmt: 9800 },
+    { type: 'VIOLET', label: 'Violet', colorClass: 'violet', icon: '🟣', multiplier: '4.5X', minAmt: 3920, maxAmt: 19600 },
+    { type: 'NUMBER', label: 'Number 7', colorClass: 'gold', icon: '🎯', multiplier: '9X', minAmt: 8820, maxAmt: 35280 },
+    { type: 'NUMBER', label: 'Number 3', colorClass: 'gold', icon: '🎯', multiplier: '9X', minAmt: 4410, maxAmt: 26460 },
+    { type: 'NUMBER', label: 'Number 8', colorClass: 'gold', icon: '🎯', multiplier: '9X', minAmt: 6860, maxAmt: 39200 },
+    { type: 'NUMBER', label: 'Violet 0', colorClass: 'violet', icon: '👑', multiplier: '9X', minAmt: 14700, maxAmt: 58800 },
+    { type: 'WITHDRAWAL_UPI', label: 'Instant UPI Cashout', isWithdrawal: true, colorClass: 'gold', icon: '⚡', minAmt: 5000, maxAmt: 35000 },
+    { type: 'WITHDRAWAL_USDT', label: 'USDT TRC20 Cashout', isWithdrawal: true, colorClass: 'green', icon: '💎', minAmt: 15000, maxAmt: 90000 }
+];
+
+function getRandomElement(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getRandomAmount(min, max, step = 50) {
+    const raw = Math.floor(Math.random() * (max - min + 1)) + min;
+    return Math.floor(raw / step) * step;
+}
+
+function generateRandomEvent() {
+    const user = getRandomElement(RANDOM_USERS);
+    const game = getRandomElement(GAME_MODES);
+    const outcome = getRandomElement(WIN_OUTCOMES);
+    const amount = getRandomAmount(outcome.minAmt, outcome.maxAmt, 10);
+
+    return {
+        user,
+        game,
+        outcome,
+        amount,
+        time: 'Just now'
+    };
+}
+
+function initSocialProofEngine() {
+    // 1. Populate Top Marquee Ticker
+    const marqueeTrack = document.getElementById('home-live-marquee');
+    if (marqueeTrack) {
+        let marqueeHTML = '';
+        for (let i = 0; i < 20; i++) {
+            const ev = generateRandomEvent();
+            if (ev.outcome.isWithdrawal) {
+                marqueeHTML += `<span>⚡ User ${ev.user} withdrew ₹${ev.amount.toLocaleString('en-IN')} via ${ev.outcome.label.split(' ')[0]}</span>`;
+            } else {
+                marqueeHTML += `<span>${ev.outcome.icon} User ${ev.user} won ₹${ev.amount.toLocaleString('en-IN')} on ${ev.outcome.label}</span>`;
+            }
+        }
+        marqueeTrack.innerHTML = marqueeHTML;
+    }
+
+    // 2. Populate Initial Live Stream Feed
+    const streamContainer = document.getElementById('home-live-stream-list');
+    if (streamContainer) {
+        let streamHTML = '';
+        const initialTimes = ['Just now', '14s ago', '32s ago', '55s ago', '1m ago', '2m ago', '3m ago'];
+        for (let i = 0; i < initialTimes.length; i++) {
+            const ev = generateRandomEvent();
+            ev.time = initialTimes[i];
+            streamHTML += createStreamItemHTML(ev);
+        }
+        streamContainer.innerHTML = streamHTML;
+
+        // Start Auto-Prepend Loop (every 3.6s)
+        setInterval(() => {
+            if (document.hidden) return;
+            const newEv = generateRandomEvent();
+            const newItemNode = document.createElement('div');
+            newItemNode.innerHTML = createStreamItemHTML(newEv);
+            const firstChild = newItemNode.firstElementChild;
+            if (firstChild && streamContainer) {
+                streamContainer.insertBefore(firstChild, streamContainer.firstChild);
+                // Keep stream size bounded to 8 items
+                while (streamContainer.children.length > 8) {
+                    streamContainer.removeChild(streamContainer.lastChild);
+                }
+            }
+        }, 3600);
+    }
+
+    // 3. Start Floating Social Proof Toast Loop (every 5.2s)
+    initFloatingToastLoop();
+}
+
+function createStreamItemHTML(ev) {
+    const isW = !!ev.outcome.isWithdrawal;
+    const colorClass = ev.outcome.colorClass || 'red';
+    const amountStr = `+₹${ev.amount.toLocaleString('en-IN')}`;
+    const statusText = isW ? 'Approved' : 'Won Payout';
+
+    return `
+        <div class="stream-item-row">
+            <div class="stream-user-side">
+                <div class="stream-user-icon ${colorClass}">${ev.outcome.icon}</div>
+                <div class="stream-user-info">
+                    <div class="stream-phone">User ${ev.user}</div>
+                    <div class="stream-meta">
+                        <span class="stream-game-tag">${isW ? ev.outcome.label : ev.game}</span>
+                        <span>•</span>
+                        <span>${ev.time}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="stream-payout-side">
+                <div class="stream-won-amt ${isW ? 'withdrawal' : ''}">${amountStr}</div>
+                <div class="stream-status-pill ${isW ? 'withdrawal' : ''}">${statusText}</div>
+            </div>
+        </div>
+    `;
+}
+
+function initFloatingToastLoop() {
+    const toastEl = document.getElementById('home-floating-toast');
+    const toastIcon = document.getElementById('toast-avatar-icon');
+    const toastText = document.getElementById('toast-main-text');
+    const toastSub = document.getElementById('toast-sub-text');
+
+    if (!toastEl) return;
+
+    function triggerToast() {
+        if (document.hidden) return;
+        const ev = generateRandomEvent();
+        const isW = !!ev.outcome.isWithdrawal;
+
+        if (toastIcon) toastIcon.textContent = ev.outcome.icon;
+        if (toastText) {
+            if (isW) {
+                toastText.innerHTML = `User ${ev.user} withdrew <span class="green">₹${ev.amount.toLocaleString('en-IN')}</span>`;
+            } else {
+                toastText.innerHTML = `User ${ev.user} won <span class="green">₹${ev.amount.toLocaleString('en-IN')}</span> on ${ev.outcome.label}`;
+            }
+        }
+        if (toastSub) {
+            toastSub.textContent = `${isW ? 'Instant Payout' : ev.game} • Just now`;
+        }
+
+        toastEl.classList.add('show');
+
+        setTimeout(() => {
+            toastEl.classList.remove('show');
+        }, 3000);
+    }
+
+    // First toast after 2.5s, then every 5.5s
+    setTimeout(triggerToast, 2500);
+    setInterval(triggerToast, 5800);
+}
+

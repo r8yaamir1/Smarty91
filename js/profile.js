@@ -59,8 +59,6 @@ async function loadUserProfile() {
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Loading VIP Profile...');
-
         // 1. Fetch User details
         const meRes = await fetch('/api/auth/me', {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -105,10 +103,11 @@ async function loadUserProfile() {
         }
 
         renderProfileUI();
+        if (window.revealPageReady) {
+            window.revealPageReady('.profile-container');
+        }
     } catch (err) {
         showToast('Network error loading profile');
-    } finally {
-        if (window.SmartyLoader) window.SmartyLoader.hide();
     }
 }
 

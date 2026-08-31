@@ -116,17 +116,303 @@
         </symbol>
     </svg>
     <div id="app" data-v-app="">
-        <div class="WinGo__C" data-v-5d71c3fd="">
+        <!-- HOME DASHBOARD VIEW (STITCH VIP) -->
+        <div id="home-dashboard-view" class="home-dashboard-view">
+            <!-- Top Sticky Brand Header -->
+            <div class="home-header-top">
+                <div class="home-brand-block" onclick="window.switchAppView('home')">
+                    <div class="home-logo-circle">
+                        <img src="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" alt="Smarty91 Logo" />
+                    </div>
+                    <span class="home-brand-text">Smarty<span class="home-brand-num">91</span></span>
+                </div>
+                <div class="home-header-actions">
+                    <div class="home-icon-btn" onclick="window.openNoticeModal()" title="System Notice">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <span class="home-badge-dot"></span>
+                    </div>
+                    <div class="home-icon-btn" onclick="window.location.href='checkin.html'" title="Daily VIP Bonus">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                            <rect x="2" y="7" width="20" height="5"></rect>
+                            <line x1="12" y1="22" x2="12" y2="7"></line>
+                            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-Time Live Winning Marquee Ticker -->
+            <div class="home-live-ticker">
+                <div class="ticker-speaker-icon">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="#FFD700"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/></svg>
+                </div>
+                <div class="ticker-content-track">
+                    <div class="ticker-scroll-text" id="home-live-marquee">
+                        <span>🔥 User 98***34 won ₹1,960 on Red</span>
+                        <span>⚡ User 81***90 won ₹4,500 on Violet</span>
+                        <span>👑 User 70***12 won ₹9,800 on Number 7</span>
+                        <span>💎 User 99***01 won ₹2,450 on Green</span>
+                        <span>🎯 User 93***67 won ₹14,700 on Violet 0</span>
+                        <span>🔥 User 88***55 won ₹3,920 on Red</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Action Pills Row -->
+            <div class="home-quick-actions">
+                <div class="quick-pill-item" onclick="window.location.href='checkin.html'">
+                    <div class="quick-pill-icon gift">🎁</div>
+                    <span class="quick-pill-label">Daily Bonus</span>
+                </div>
+                <div class="quick-pill-item" onclick="window.location.href='referral.html'">
+                    <div class="quick-pill-icon agent">👑</div>
+                    <span class="quick-pill-label">VIP Agent</span>
+                </div>
+                <div class="quick-pill-item" onclick="window.location.href='payment.html?tab=deposit'">
+                    <div class="quick-pill-icon deposit">⚡</div>
+                    <span class="quick-pill-label">Recharge</span>
+                </div>
+                <div class="quick-pill-item" onclick="window.open('https://t.me/smart91prediction', '_blank')">
+                    <div class="quick-pill-icon telegram">✈️</div>
+                    <span class="quick-pill-label">24/7 Support</span>
+                </div>
+            </div>
+
+            <!-- Hero Banner: Daily Check-in -->
+            <div class="home-hero-banner" onclick="window.location.href='checkin.html'">
+                <div class="home-hero-content">
+                    <div class="home-hero-title">DAILY<span class="home-hero-highlight">CHECK-IN BONUS</span></div>
+                    <div class="home-hero-sub">
+                        <span>—</span> RECHARGE EVERYDAY <span>—</span>
+                    </div>
+                    <div class="home-hero-btn">
+                        <span>CLAIM BONUS</span>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </div>
+                </div>
+                <div class="home-hero-illustration">
+                    <svg viewBox="0 0 100 100" class="home-chest-art" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="42" fill="url(#hero-radial-glow)" opacity="0.5"/>
+                        <defs>
+                            <radialGradient id="hero-radial-glow" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#FFD700" stop-opacity="0.8"/>
+                                <stop offset="100%" stop-color="#FF2E4D" stop-opacity="0"/>
+                            </radialGradient>
+                            <linearGradient id="chest-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#FFE57F"/>
+                                <stop offset="50%" stop-color="#FFD700"/>
+                                <stop offset="100%" stop-color="#FF8F00"/>
+                            </linearGradient>
+                            <linearGradient id="chest-red" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#FF2E4D"/>
+                                <stop offset="100%" stop-color="#800414"/>
+                            </linearGradient>
+                        </defs>
+                        <rect x="20" y="44" width="60" height="38" rx="6" fill="url(#chest-red)" stroke="url(#chest-gold)" stroke-width="2.5"/>
+                        <path d="M16 44C16 31 28 24 50 24C72 24 84 31 84 44Z" fill="url(#chest-red)" stroke="url(#chest-gold)" stroke-width="2.5"/>
+                        <rect x="44" y="41" width="12" height="14" rx="3" fill="url(#chest-gold)" stroke="#FFF" stroke-width="1"/>
+                        <circle cx="50" cy="47" r="2.5" fill="#800414"/>
+                        <circle cx="33" cy="35" r="6" fill="url(#chest-gold)" stroke="#FFF" stroke-width="0.8"/>
+                        <circle cx="67" cy="33" r="7" fill="url(#chest-gold)" stroke="#FFF" stroke-width="0.8"/>
+                        <circle cx="50" cy="30" r="8" fill="url(#chest-gold)" stroke="#FFF" stroke-width="0.8"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Games Grid 3x3 -->
+            <div class="home-games-grid">
+                <!-- Card 1: UPCOMING (Flank Left - Increased Height) -->
+                <div class="game-card-upcoming game-card-flank" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 2: COLOUR PREDICTION (Active Working Game with Full-Fill Alive Artwork & Ultra Glass Effect) -->
+                <div class="game-card-active" id="game-card-colour-prediction" onclick="window.openGameWithLoader('game')" title="Play Colour Prediction VIP">
+                    <img src="https://plain-apac-prod-public.komododecks.com/202608/31/mG2VbthxURYBWjfn0UDF/image.png" alt="Colour Prediction" class="cp-card-bg-artwork" />
+                    <div class="cp-ultra-glass-surface"></div>
+                    <div class="cp-ultra-glass-beam"></div>
+                    <div class="cp-ultra-glass-edge"></div>
+                    <div class="cp-live-badge">
+                        <span class="cp-live-pulse-dot"></span>
+                        <span class="cp-live-tag-text">LIVE</span>
+                    </div>
+                </div>
+
+                <!-- Card 3: UPCOMING (Flank Right - Increased Height) -->
+                <div class="game-card-upcoming game-card-flank" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 4: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 5: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 6: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 7: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 8: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+
+                <!-- Card 9: UPCOMING -->
+                <div class="game-card-upcoming" onclick="window.showUpcomingGameToast()">
+                    <div class="upcoming-corner-tl"></div>
+                    <div class="upcoming-corner-br"></div>
+                    <div class="upcoming-radar-ring">
+                        <div class="upcoming-laser-line"></div>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FF2E4D" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                    <div class="upcoming-label">UPCOMING</div>
+                    <div class="upcoming-badge">Next Update</div>
+                </div>
+            </div>
+
+            <!-- Promotion Strip -->
+            <div class="home-promo-strip" onclick="window.location.href='referral.html'">
+                <div class="promo-left">
+                    <span class="promo-tag">PROMO</span>
+                    <div class="promo-text-wrap">
+                        <span class="promo-title">VIP PROMOTION PROGRAM</span>
+                        <span class="promo-sub">Play more, invite friends &amp; earn lifetime cash</span>
+                    </div>
+                </div>
+                <div class="promo-arrow">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+            </div>
+
+            <!-- VIP Social Proof & Live Winning Feed Hub (Building Massive Trust & Multi-User Social Proof) -->
+            <div class="home-trust-section">
+                <!-- Podium: Today's VIP Profit Leaders -->
+                <div class="home-podium-card">
+                    <div class="trust-card-header">
+                        <div class="trust-card-title">
+                            <span>👑</span>
+                            <span>TODAY'S <span class="gold-highlight">PROFIT STARS</span></span>
+                        </div>
+                        <span class="trust-live-tag">LIVE UPDATES</span>
+                    </div>
+
+                    <div class="podium-grid">
+                        <!-- Rank 2: Silver -->
+                        <div class="podium-item rank-2">
+                            <div class="podium-avatar">🥈</div>
+                            <div class="podium-user" id="podium-user-2">User 91***04</div>
+                            <div class="podium-won-val" id="podium-val-2">₹1,12,800</div>
+                        </div>
+
+                        <!-- Rank 1: Gold Champion -->
+                        <div class="podium-item rank-1">
+                            <span class="podium-crown">👑</span>
+                            <div class="podium-avatar">🥇</div>
+                            <div class="podium-user" id="podium-user-1">User 98***71</div>
+                            <div class="podium-won-val" id="podium-val-1">₹1,84,500</div>
+                        </div>
+
+                        <!-- Rank 3: Bronze -->
+                        <div class="podium-item rank-3">
+                            <div class="podium-avatar">🥉</div>
+                            <div class="podium-user" id="podium-user-3">User 88***51</div>
+                            <div class="podium-won-val" id="podium-val-3">₹76,400</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time Live Winning & Cashout Stream -->
+                <div class="home-live-stream-card">
+                    <div class="trust-card-header">
+                        <div class="trust-card-title">
+                            <span>⚡</span>
+                            <span>LIVE <span class="gold-highlight">WINNING STREAM</span></span>
+                        </div>
+                        <span class="trust-live-tag">REAL-TIME</span>
+                    </div>
+
+                    <div class="stream-list-container" id="home-live-stream-list">
+                        <!-- Populated dynamically by homeNavigation.js with multiple realistic users -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE WINGO GAME VIEW -->
+        <div id="wingo-game-view" class="WinGo__C" data-v-5d71c3fd="" style="display: none;">
             <!-- Header -->
             <div class="WinGo__C-head" data-v-5d71c3fd="">
-                <div class="WinGo__C-head-profile-trigger" id="header-profile-btn" onclick="window.location.href='profile.html'" title="VIP Profile & Account" style="display: flex; align-items: center; justify-content: center; width: 0.72rem; height: 0.72rem; border-radius: 50%; background: linear-gradient(135deg, #FF2E4D 0%, #800414 100%); border: 1.5px solid #FFD700; box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4); cursor: pointer; position: absolute; left: 0.34667rem; top: 50%; transform: translateY(-50%); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10;">
+                <div class="WinGo__C-head-profile-trigger" id="header-profile-btn" onclick="window.switchAppView('home')" title="Back to Home Dashboard" style="display: flex; align-items: center; justify-content: center; width: 0.72rem; height: 0.72rem; border-radius: 50%; background: linear-gradient(135deg, #FF2E4D 0%, #800414 100%); border: 1.5px solid #FFD700; box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4); cursor: pointer; position: absolute; left: 0.34667rem; top: 50%; transform: translateY(-50%); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 10;">
                     <svg viewBox="0 0 24 24" width="0.42rem" height="0.42rem" fill="none" stroke="#FFD700" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
+                        <polyline points="15 18 9 12 15 6"></polyline>
                     </svg>
-                    <span id="header-vip-tag" style="position: absolute; bottom: -0.06rem; right: -0.06rem; background: linear-gradient(135deg, #FFE082 0%, #FFD700 100%); color: #000; font-size: 0.16rem; font-weight: 900; padding: 0.01rem 0.06rem; border-radius: 0.15rem; border: 1px solid #7c0000; font-family: 'Cinzel', serif; box-shadow: 0 1px 3px rgba(0,0,0,0.6); line-height: 1; pointer-events: none;">VIP</span>
                 </div>
-                <div class="WinGo__C-head-logo" data-v-5d71c3fd="">
+                <div class="WinGo__C-head-logo" data-v-5d71c3fd="" onclick="window.switchAppView('home')" style="cursor: pointer;">
                     <img src="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" alt="Smarty91" class="header-circle-logo" />
                     <span class="header-brand-name">SMARTY<span class="header-brand-badge">91</span></span>
                 </div>
@@ -443,6 +729,200 @@
                     <circle cx="50" cy="50" r="20" fill="none"></circle>
                 </svg>
             </span>
+        </div>
+    </div>
+
+    <!-- UNIVERSAL BOTTOM NAVIGATION BAR (VIP) -->
+    <nav class="app-bottom-nav">
+        <!-- 1. Home -->
+        <button class="bottom-nav-item active" data-tab="home" onclick="window.navigateToPage('index.html', 'Loading Home...')" title="Home">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span class="bottom-nav-label">Home</span>
+        </button>
+
+        <!-- 2. Daily Sign In -->
+        <button class="bottom-nav-item" data-tab="checkin" onclick="window.navigateToPage('checkin.html', 'Loading Daily Sign In...')" title="Daily Sign In">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+                <circle cx="12" cy="15" r="2"></circle>
+            </svg>
+            <span class="bottom-nav-label">Daily Sign In</span>
+        </button>
+
+        <!-- 3. Referral -->
+        <button class="bottom-nav-item" data-tab="referral" onclick="window.navigateToPage('referral.html', 'Loading Referral Hub...')" title="Referral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span class="bottom-nav-label">Referral</span>
+        </button>
+
+        <!-- 4. Wallet -->
+        <button class="bottom-nav-item" data-tab="wallet" onclick="window.navigateToPage('payment.html', 'Loading Cashier & Wallet...')" title="Wallet & Cashier">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+                <circle cx="18" cy="15" r="1.5"></circle>
+            </svg>
+            <span class="bottom-nav-label">Wallet</span>
+        </button>
+
+        <!-- 5. Profile -->
+        <button class="bottom-nav-item" data-tab="profile" onclick="window.navigateToPage('profile.html', 'Loading Profile...')" title="User Profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span class="bottom-nav-label">Profile</span>
+        </button>
+    </nav>
+
+    <!-- DAILY SIGN-IN MODAL (VIP) -->
+    <div id="daily-signin-modal" class="vip-modal-backdrop">
+        <div class="vip-modal-container">
+            <div class="vip-modal-close-btn" onclick="window.closeDailyCheckInModal()">✕</div>
+            <div class="modal-header-badge">
+                <span>🎁</span> 7-DAY STREAK REWARDS
+            </div>
+            <div class="modal-main-title">DAILY SIGN-IN BONUS</div>
+            <div class="modal-sub-desc">Check in every consecutive day to unlock mega cash bonuses!</div>
+
+            <!-- Deposit Requirement Lock Alert (Visible if no deposits made) -->
+            <div id="checkin-deposit-lock" class="checkin-deposit-lock" style="display: none;">
+                <div class="checkin-deposit-lock-icon">🔒</div>
+                <div class="checkin-deposit-lock-text">
+                    <strong>Recharge Required:</strong> Complete your first deposit to activate the Daily Sign-in reward system!
+                </div>
+                <button class="checkin-deposit-lock-btn" onclick="window.location.href='payment.html?tab=deposit'">Recharge</button>
+            </div>
+
+            <!-- 7 Days Grid -->
+            <div id="rewards-7day-grid" class="rewards-7day-grid">
+                <!-- Dynamically Rendered by JS -->
+            </div>
+
+            <!-- Main Claim Action Button -->
+            <button id="modal-claim-btn" class="modal-claim-btn">
+                <span>🎁 Claim Today's Bonus</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- REFERRAL & PROMOTION MODAL (VIP) -->
+    <div id="referral-modal" class="vip-modal-backdrop">
+        <div class="vip-modal-container">
+            <div class="vip-modal-close-btn" onclick="window.closeReferralModal()">✕</div>
+            <div class="modal-header-badge">
+                <span>👑</span> VIP AGENT &amp; REFERRAL
+            </div>
+            <div class="modal-main-title">INVITE FRIENDS &amp; EARN</div>
+            <div class="modal-sub-desc">Earn ₹100 instant bonus per recharged friend + lifetime gaming commission!</div>
+
+            <!-- Referral Stats -->
+            <div class="referral-stats-grid">
+                <div class="ref-stat-card">
+                    <div id="ref-total-invites" class="ref-stat-num">0</div>
+                    <div class="ref-stat-label">Total Invites</div>
+                </div>
+                <div class="ref-stat-card">
+                    <div id="ref-active-deps" class="ref-stat-num">0</div>
+                    <div class="ref-stat-label">Recharged Users</div>
+                </div>
+                <div class="ref-stat-card">
+                    <div id="ref-total-commission" class="ref-stat-num">₹0</div>
+                    <div class="ref-stat-label">Total Commission</div>
+                </div>
+            </div>
+
+            <!-- Invite Code & Link Box -->
+            <div class="ref-link-box">
+                <div class="promo-text-wrap" style="overflow: hidden;">
+                    <span style="font-size: 8.5px; color: #8F95A5;">YOUR INVITE CODE</span>
+                    <span id="ref-code-val" class="ref-link-val" style="font-weight: 700; color: #FFD700; font-size: 13px;">SM9101</span>
+                </div>
+                <button class="ref-copy-btn" onclick="window.copyReferralCode()">COPY CODE</button>
+            </div>
+
+            <div class="ref-link-box">
+                <div class="promo-text-wrap" style="overflow: hidden; max-width: 68%;">
+                    <span style="font-size: 8.5px; color: #8F95A5;">INVITE LINK</span>
+                    <span id="ref-link-val" class="ref-link-val">https://smarty91.com/login.html?ref=...</span>
+                </div>
+                <button class="ref-copy-btn" onclick="window.copyReferralLink()">COPY LINK</button>
+            </div>
+
+            <!-- Rules Summary -->
+            <div class="ref-rules-list">
+                <p>• <strong>Direct Cash Bonus:</strong> ₹100 real money credited on every friend's first recharge.</p>
+                <p>• <strong>Lifetime Commission:</strong> Earn 0.6% on every game turnover from your referred players.</p>
+                <p>• <strong>Instant Withdrawal:</strong> Referral commission can be withdrawn directly to UPI anytime with 0 fees!</p>
+            </div>
+
+            <button class="modal-claim-btn" onclick="window.copyReferralLink()">
+                <span>🚀 Share Invite Link</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- NOTICE / SUPPORT MODAL -->
+    <div id="notice-modal" class="vip-modal-backdrop">
+        <div class="vip-modal-container">
+            <div class="vip-modal-close-btn" onclick="window.closeNoticeModal()">✕</div>
+            <div class="modal-header-badge">
+                <span>📢</span> OFFICIAL NOTICE
+            </div>
+            <div class="modal-main-title">SMARTY91 ANNOUNCEMENT</div>
+            <div class="modal-sub-desc">Welcome to India's most trusted colour prediction &amp; gaming platform!</div>
+
+            <div class="ref-rules-list" style="margin-bottom: 16px;">
+                <p>• <strong>Instant 24/7 UPI Withdrawals:</strong> Processed in 1-3 minutes directly to your bank account.</p>
+                <p>• <strong>Safe &amp; Fair Play:</strong> All outcomes are strictly audited and verified with provably fair RNG.</p>
+                <p>• <strong>24/7 VIP Support:</strong> Contact our official Telegram channel anytime for instant assistance.</p>
+            </div>
+
+            <button class="modal-claim-btn" onclick="window.open('https://t.me/smart91prediction', '_blank')">
+                <span>💬 Open Official Telegram Support</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- VIP GAME SYNCING & LAUNCH LOADER OVERLAY -->
+    <div id="game-sync-overlay" class="game-sync-overlay">
+        <div class="game-sync-card">
+            <div class="game-sync-pulse-aura"></div>
+            <div class="game-sync-avatar-wrap">
+                <img src="https://plain-apac-prod-public.komododecks.com/202608/31/mG2VbthxURYBWjfn0UDF/image.png" class="game-sync-avatar" alt="Colour Prediction" />
+                <div class="game-sync-spinner-ring"></div>
+            </div>
+            <div class="game-sync-title">COLOUR PREDICTION</div>
+            <div class="game-sync-subtitle">Smarty91 VIP Live Arena</div>
+            
+            <div class="game-sync-meter-track">
+                <div class="game-sync-meter-fill" id="game-sync-meter-bar"></div>
+            </div>
+            
+            <div class="game-sync-status-row">
+                <div class="game-sync-dot"></div>
+                <span id="game-sync-status-text">Connecting to VIP Game Server...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- REAL-TIME LIVE WINNING FLOATING TOAST -->
+    <div id="home-floating-toast" class="home-floating-toast">
+        <div class="toast-avatar" id="toast-avatar-icon">🔥</div>
+        <div class="toast-body">
+            <div class="toast-text" id="toast-main-text">User 98***34 won <span class="green">₹9,800</span></div>
+            <div class="toast-sub" id="toast-sub-text">Smarty91 30s • Just now</div>
         </div>
     </div>
 

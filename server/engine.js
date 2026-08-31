@@ -1,6 +1,12 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { firebaseSync } from './firebaseSync.js';
 import { notifyNewDeposit, notifyNewWithdrawal } from './telegramAlert.js';
+
+const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users_store.json');
+const TOKEN_SECRET = process.env.SESSION_SECRET || 'smarty91_vip_secure_master_session_secret_2026';
 
 // Number Properties mapping (0-9)
 export const NUMBER_PROPERTIES = {
@@ -88,6 +94,10 @@ class Smarty91ServerEngine {
         this.userTokens = new Map(); // token -> userId
         this.referralCodes = new Map(); // inviteCode -> userId
         
+        // Ensure disk directory exists and load persistent users immediately
+        this._ensureDataDir();
+        this._loadUsersFromDisk();
+
         // Transaction Ledger: Array of { id, userId, type, amount, balanceBefore, balanceAfter, referenceId, timestamp, description }
         this.ledger = [];
 
@@ -132,6 +142,54 @@ class Smarty91ServerEngine {
         };
     }
 
+    _ensureDataDir() {
+        try {
+            if (!fs.existsSync(DATA_DIR)) {
+                fs.mkdirSync(DATA_DIR, { recursive: true });
+            }
+        } catch (e) {
+            console.warn('[Storage] Data dir creation error:', e.message);
+        }
+    }
+
+    _loadUsersFromDisk() {
+        try {
+            if (fs.existsSync(USERS_FILE)) {
+                const raw = fs.readFileSync(USERS_FILE, 'utf8');
+                if (raw && raw.trim()) {
+                    const data = JSON.parse(raw);
+                    if (Array.isArray(data)) {
+                        let count = 0;
+                        data.forEach(u => {
+                            if (u && u.id) {
+                                this.users.set(u.id, u);
+                                if (u.inviteCode) {
+                                    this.referralCodes.set(u.inviteCode, u.id);
+                                }
+                                count++;
+                            }
+                        });
+                        console.log(`[Storage] Loaded ${count} permanent user accounts from disk.`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[Storage] Load users from disk warning:', e.message);
+        }
+    }
+
+    _saveUsersToDisk() {
+        try {
+            this._ensureDataDir();
+            const usersArray = Array.from(this.users.values());
+            const tempFile = USERS_FILE + '.tmp';
+            fs.writeFileSync(tempFile, JSON.stringify(usersArray, null, 2), 'utf8');
+            fs.renameSync(tempFile, USERS_FILE);
+        } catch (e) {
+            console.warn('[Storage] Save users to disk warning:', e.message);
+        }
+    }
+
     _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {
         if (!this.users.has(userId)) {
             const defaultUser = {
@@ -148,6 +206,7 @@ class Smarty91ServerEngine {
             };
             this.users.set(userId, defaultUser);
             this.referralCodes.set('SM9101', userId);
+            this._saveUsersToDisk();
 
             this.ledger.push({
                 id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -177,6 +236,18 @@ class Smarty91ServerEngine {
         return code;
     }
 
+    _createSessionToken(userId, phone = '') {
+        const payload = Buffer.from(JSON.stringify({
+            uid: userId,
+            p: phone || '',
+            t: Date.now()
+        })).toString('base64url');
+        const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('hex');
+        const token = `JWT_${payload}.${sig}`;
+        this.userTokens.set(token, userId);
+        return token;
+    }
+
     registerUser({ phone, password, inviteCode, securityPin }) {
         const cleanPhone = String(phone).trim();
         if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
@@ -186,7 +257,8 @@ class Smarty91ServerEngine {
             throw new Error('Password must be at least 6 characters');
         }
 
-        // Check if user already exists
+        // Check in memory and re-check disk store
+        this._loadUsersFromDisk();
         for (const u of this.users.values()) {
             if (u.phone === cleanPhone) {
                 throw new Error('An account with this mobile number already exists. Please log in');
@@ -225,12 +297,12 @@ class Smarty91ServerEngine {
         this.users.set(userId, newUser);
         this.referralCodes.set(userInviteCode, userId);
 
-        // Generate session token
-        const token = 'JWT_' + crypto.randomBytes(24).toString('hex');
-        this.userTokens.set(token, userId);
-
-        // Permanently persist full new user profile into Firestore
+        // Permanently persist to local disk and Firestore Cloud
+        this._saveUsersToDisk();
         firebaseSync.saveUser(newUser);
+
+        // Generate persistent stateless HMAC session token
+        const token = this._createSessionToken(userId, cleanPhone);
 
         return {
             success: true,
@@ -255,6 +327,7 @@ class Smarty91ServerEngine {
             throw new Error('New password must be at least 6 characters');
         }
 
+        this._loadUsersFromDisk();
         let targetUser = null;
         for (const u of this.users.values()) {
             if (u.phone === cleanPhone) {
@@ -278,10 +351,11 @@ class Smarty91ServerEngine {
 
         targetUser.passwordHash = this._hashPassword(newPassword);
 
-        // Permanently update user document in Firestore
+        // Permanently update user document in Disk & Firestore
+        this._saveUsersToDisk();
         firebaseSync.saveUser(targetUser);
 
-        // Invalidate previous sessions
+        // Invalidate in-memory tokens
         for (const [token, uid] of this.userTokens.entries()) {
             if (uid === targetUser.id) {
                 this.userTokens.delete(token);
@@ -305,6 +379,7 @@ class Smarty91ServerEngine {
 
     loginUser({ phone, password }) {
         const cleanPhone = String(phone).trim();
+        this._loadUsersFromDisk();
         let targetUser = null;
         for (const u of this.users.values()) {
             if (u.phone === cleanPhone) {
@@ -326,8 +401,7 @@ class Smarty91ServerEngine {
             throw new Error('Incorrect password');
         }
 
-        const token = 'JWT_' + crypto.randomBytes(24).toString('hex');
-        this.userTokens.set(token, targetUser.id);
+        const token = this._createSessionToken(targetUser.id, targetUser.phone);
 
         return {
             success: true,
@@ -346,9 +420,43 @@ class Smarty91ServerEngine {
     getUserFromToken(token) {
         if (!token) return null;
         const cleanToken = token.replace('Bearer ', '').trim();
-        const userId = this.userTokens.get(cleanToken);
-        if (!userId) return null;
-        return this.users.get(userId) || null;
+        if (!cleanToken) return null;
+
+        // 1. Check in-memory cache
+        const cachedUserId = this.userTokens.get(cleanToken);
+        if (cachedUserId && this.users.has(cachedUserId)) {
+            return this.users.get(cachedUserId);
+        }
+
+        // 2. Cryptographic signature verification (persists across server restarts & rebuilds)
+        if (cleanToken.startsWith('JWT_') && cleanToken.includes('.')) {
+            try {
+                const body = cleanToken.slice(4);
+                const [payloadB64, sig] = body.split('.');
+                if (payloadB64 && sig) {
+                    const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(payloadB64).digest('hex');
+                    if (sig === expectedSig) {
+                        const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
+                        const data = JSON.parse(payloadJson);
+                        if (data && data.uid) {
+                            let user = this.users.get(data.uid);
+                            if (!user) {
+                                this._loadUsersFromDisk();
+                                user = this.users.get(data.uid);
+                            }
+                            if (user) {
+                                this.userTokens.set(cleanToken, user.id);
+                                return user;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // Invalid token format
+            }
+        }
+
+        return null;
     }
 
     _seedInitialHistory() {
@@ -1162,8 +1270,8 @@ class Smarty91ServerEngine {
         if (!user) throw new Error('User account not found');
 
         const numAmount = Number(amount);
-        if (isNaN(numAmount) || numAmount < 200) {
-            throw new Error('Minimum withdrawal amount is ₹200');
+        if (isNaN(numAmount) || numAmount < 500) {
+            throw new Error('Minimum withdrawal amount is ₹500');
         }
         if (numAmount > 100000) {
             throw new Error('Maximum withdrawal amount is ₹1,00,000 per request');
@@ -1179,15 +1287,15 @@ class Smarty91ServerEngine {
             }
         }
 
-        const isUsdt = channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().startsWith('T'));
+        const isUsdt = channel === 'USDT' || channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().length >= 10);
 
         let cleanAcc = String(accountNumber || '').trim();
         let cleanIfsc = String(ifsc || '').trim().toUpperCase();
         let cleanUsdtAddress = String(usdtAddress || '').trim();
 
         if (isUsdt) {
-            if (!cleanUsdtAddress || !cleanUsdtAddress.startsWith('T') || cleanUsdtAddress.length < 30) {
-                throw new Error('Please enter a valid Tron TRC-20 USDT Wallet Address starting with "T" (e.g. TEX8NYBX...)');
+            if (!cleanUsdtAddress || cleanUsdtAddress.length < 15) {
+                throw new Error('Please enter a valid USDT Wallet Address');
             }
         } else {
             if (cleanAcc && cleanAcc.length < 6) {
@@ -1210,14 +1318,14 @@ class Smarty91ServerEngine {
             id: txId,
             userId,
             type: 'WITHDRAWAL',
-            channel: isUsdt ? 'USDT_TRC20' : 'BANK',
+            channel: isUsdt ? 'USDT' : 'BANK',
             amount: numAmount,
             usdtAmount: isUsdt ? Number(usdtEquivalent) : null,
             usdtAddress: isUsdt ? cleanUsdtAddress : null,
             accountHolderName: isUsdt ? `USDT Wallet (${cleanUsdtAddress.slice(0, 6)}...)` : (accountHolderName || user.username || 'Account Holder'),
-            bankName: isUsdt ? 'USDT TRC-20 Wallet' : (bankName || 'Bank Transfer'),
+            bankName: isUsdt ? 'USDT Crypto Wallet' : (bankName || 'Bank Transfer'),
             accountNumber: isUsdt ? cleanUsdtAddress : (cleanAcc || 'XXXXXX'),
-            ifsc: isUsdt ? 'TRC20' : (cleanIfsc || 'SBIN0001234'),
+            ifsc: isUsdt ? 'USDT' : (cleanIfsc || 'SBIN0001234'),
             upiId: isUsdt ? cleanUsdtAddress : (upiId || `${user.phone || '9876543210'}@upi`),
             status: 'PENDING',
             createdAt: new Date().toISOString(),
@@ -1474,6 +1582,186 @@ class Smarty91ServerEngine {
             if (uid === user.id) this.userTokens.delete(token);
         }
         return { success: true, message: `Password reset successfully for ${user.username}` };
+    }
+
+    // ==========================================
+    // 6. DAILY SIGN-IN BONUS SYSTEM (Requires min 1 Deposit)
+    // ==========================================
+
+    _getTodayDateKey() {
+        // Use Indian Standard Time (IST UTC+5:30) date key YYYY-MM-DD
+        const now = new Date();
+        const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        return istTime.toISOString().slice(0, 10);
+    }
+
+    _getYesterdayDateKey() {
+        const now = new Date();
+        const istYesterday = new Date(now.getTime() + (5.5 * 60 * 60 * 1000) - (24 * 60 * 60 * 1000));
+        return istYesterday.toISOString().slice(0, 10);
+    }
+
+    getDailyCheckInStatus(userId = 'default_user') {
+        const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
+        const todayKey = this._getTodayDateKey();
+        const yesterdayKey = this._getYesterdayDateKey();
+
+        // Check if user has made at least 1 approved deposit
+        const hasApprovedDeposit = Boolean(
+            user.hasDeposited || 
+            this.transactions.some(t => t.userId === userId && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+        );
+
+        user.checkInHistory = user.checkInHistory || [];
+        user.checkInStreak = user.checkInStreak || 0;
+        user.lastCheckInDate = user.lastCheckInDate || null;
+
+        const claimedToday = user.lastCheckInDate === todayKey;
+
+        // Calculate expected streak day for today's claim
+        let currentStreak = user.checkInStreak;
+        if (!claimedToday) {
+            if (user.lastCheckInDate === yesterdayKey) {
+                // Consecutive day
+                currentStreak = (user.checkInStreak % 7) + 1;
+            } else {
+                // Streak broken or brand new
+                currentStreak = 1;
+            }
+        }
+
+        const rewardsTable = [
+            { day: 1, amount: 5, label: 'Day 1' },
+            { day: 2, amount: 10, label: 'Day 2' },
+            { day: 3, amount: 15, label: 'Day 3' },
+            { day: 4, amount: 20, label: 'Day 4' },
+            { day: 5, amount: 25, label: 'Day 5' },
+            { day: 6, amount: 30, label: 'Day 6' },
+            { day: 7, amount: 50, label: 'Day 7 (Mega)' }
+        ];
+
+        const totalClaimedAmount = user.checkInHistory.reduce((sum, h) => sum + Number(h.amount || 0), 0);
+
+        return {
+            success: true,
+            hasDeposited: hasApprovedDeposit,
+            claimedToday,
+            streakDay: currentStreak,
+            lastCheckInDate: user.lastCheckInDate,
+            totalClaimedAmount,
+            rewardsTable,
+            history: user.checkInHistory.slice(-14).reverse()
+        };
+    }
+
+    claimDailyCheckIn(userId = 'default_user') {
+        const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
+        const todayKey = this._getTodayDateKey();
+        const yesterdayKey = this._getYesterdayDateKey();
+
+        // 1. Check deposit requirement
+        const hasApprovedDeposit = Boolean(
+            user.hasDeposited || 
+            this.transactions.some(t => t.userId === userId && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+        );
+
+        if (!hasApprovedDeposit) {
+            const err = new Error('Recharge required! Daily Check-In bonuses are unlocked after making your first deposit.');
+            err.code = 'DEPOSIT_REQUIRED';
+            throw err;
+        }
+
+        // 2. Check if already claimed today
+        if (user.lastCheckInDate === todayKey) {
+            throw new Error('You have already claimed today’s check-in bonus! Please return tomorrow.');
+        }
+
+        // 3. Compute Streak
+        let nextStreak = 1;
+        if (user.lastCheckInDate === yesterdayKey) {
+            nextStreak = ((user.checkInStreak || 0) % 7) + 1;
+        } else {
+            nextStreak = 1;
+        }
+
+        const rewardsMap = { 1: 5, 2: 10, 3: 15, 4: 20, 5: 25, 6: 30, 7: 50 };
+        const rewardAmount = rewardsMap[nextStreak] || 5;
+
+        // 4. Credit balance
+        const balanceBefore = user.balance;
+        user.balance = Number((user.balance + rewardAmount).toFixed(2));
+        user.checkInStreak = nextStreak;
+        user.lastCheckInDate = todayKey;
+        
+        user.checkInHistory = user.checkInHistory || [];
+        user.checkInHistory.push({
+            date: todayKey,
+            day: nextStreak,
+            amount: rewardAmount,
+            claimedAt: new Date().toISOString()
+        });
+
+        const txId = 'CHK_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        this.ledger.unshift({
+            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            userId,
+            type: 'DAILY_CHECKIN_BONUS',
+            amount: rewardAmount,
+            balanceBefore,
+            balanceAfter: user.balance,
+            referenceId: txId,
+            timestamp: new Date().toISOString(),
+            description: `Day ${nextStreak} Daily Sign-In Bonus Credited: ₹${rewardAmount}`
+        });
+
+        firebaseSync.updateUserBalance(userId, user.balance, `Daily Sign-in bonus Day ${nextStreak} (₹${rewardAmount})`);
+        firebaseSync.saveUser(user);
+
+        return {
+            success: true,
+            amount: rewardAmount,
+            streakDay: nextStreak,
+            newBalance: user.balance,
+            message: `🎉 Success! Day ${nextStreak} Daily Bonus of ₹${rewardAmount} credited to your wallet!`
+        };
+    }
+
+    getReferralSummary(userId = 'default_user') {
+        const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
+        const inviteCode = user.inviteCode || 'SM9101';
+
+        // Find all referred users
+        const referredList = [];
+        let totalBonusEarned = 0;
+
+        for (const u of this.users.values()) {
+            if (u.referredBy === userId || u.referredBy === inviteCode || (u.referredBy && String(u.referredBy).toUpperCase() === String(inviteCode).toUpperCase())) {
+                const hasDep = Boolean(u.hasDeposited || this.transactions.some(t => t.userId === u.id && t.type === 'DEPOSIT' && t.status === 'APPROVED'));
+                const commEarned = hasDep ? 100 : 0;
+                totalBonusEarned += commEarned;
+
+                const phoneStr = String(u.phone || u.username || '9876543210');
+                const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
+
+                referredList.push({
+                    userId: u.id,
+                    phone: maskedPhone,
+                    hasDeposited: hasDep,
+                    joinedAt: u.createdAt || new Date().toISOString(),
+                    bonusEarned: commEarned
+                });
+            }
+        }
+
+        return {
+            success: true,
+            inviteCode,
+            totalInvites: referredList.length,
+            activeDepositors: referredList.filter(r => r.hasDeposited).length,
+            totalCommissionEarned: totalBonusEarned,
+            rewardPerDeposit: 100,
+            referrals: referredList.reverse()
+        };
     }
 }
 

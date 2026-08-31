@@ -1,33 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" translate="no" class="notranslate">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" />
     <link rel="apple-touch-icon" href="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" />
-    <title>Deposit & Withdrawal Cashier - Smarty91</title>
-    <meta name="description" content="Official Smarty91 Clean 3-Stage Checkout & Direct Bank Withdrawal Portal">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>VIP Cashier & Wallet - Smarty91</title>
+    <meta name="description" content="Official Smarty91 VIP Instant Cashier, UPI & USDT Deposit and Bank Withdrawal">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Cinzel:wght@700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/premium-theme.css">
     <script src="js/loader.js"></script>
     <script src="js/services/authGate.js"></script>
     <style>
         :root {
-            --brand-red: #E51837;
-            --brand-red-dark: #B80A22;
-            --brand-red-light: #FF3B56;
-            --brand-red-subtle: #FFF1F3;
-            --text-dark: #0F172A;
-            --text-muted: #64748B;
-            --text-light: #94A3B8;
-            --bg-page: #F8FAFC;
-            --bg-card: #FFFFFF;
-            --border-color: #E2E8F0;
-            --border-focus: #E51837;
-            --accent-green: #10B981;
-            --accent-gold: #F59E0B;
-            --accent-gold-light: #FEF3C7;
+            --red-primary: #E51837;
+            --red-deep: #800414;
+            --red-dark: #B80A22;
+            --gold-accent: #FFD700;
+            --gold-light: #FFF099;
+            --gold-glow: rgba(255, 215, 0, 0.25);
+            --bg-dark: #080A10;
+            --card-bg: #121522;
+            --card-elevated: #1a1e30;
+            --card-border: rgba(229, 24, 55, 0.3);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --green-emerald: #10B981;
+            --green-glow: rgba(16, 185, 129, 0.2);
+            --text-main: #FFFFFF;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
         }
 
         * {
@@ -35,12 +38,12 @@
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         body {
-            background-color: var(--bg-page);
-            color: var(--text-dark);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -53,514 +56,551 @@
             width: 100%;
             max-width: 480px;
             min-height: 100vh;
-            background: #FFFFFF;
+            background: linear-gradient(180deg, #131625 0%, #080A10 100%);
             display: flex;
             flex-direction: column;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
             position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.7);
+            padding-bottom: 30px;
         }
 
-        /* Top Red Header */
-        .cashier-header {
-            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
-            color: #FFFFFF;
-            padding: 0.85rem 1rem 1.1rem 1rem;
+        /* Top Sticky Red/Gold Header */
+        .cashier-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, var(--red-deep) 0%, var(--red-dark) 100%);
+            border-bottom: 1.5px solid rgba(255, 215, 0, 0.35);
             position: sticky;
             top: 0;
-            z-index: 50;
-            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.2);
+            z-index: 100;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
         }
 
-        .header-nav {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.85rem;
-        }
-
-        .back-circle-btn {
+        .cashier-back-btn {
             width: 36px;
             height: 36px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.18);
-            border: 1px solid rgba(255, 255, 255, 0.25);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #FFFFFF;
             cursor: pointer;
+            color: #ffffff;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.25);
             text-decoration: none;
-            transition: background 0.15s, transform 0.1s;
+            transition: transform 0.15s, background 0.15s;
         }
-        .back-circle-btn:active {
+        .cashier-back-btn:active {
             transform: scale(0.92);
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.5);
         }
 
-        .header-title {
+        .cashier-header-title {
+            font-family: 'Cinzel', serif;
             font-size: 1.05rem;
-            font-weight: 800;
-            letter-spacing: 0.3px;
-        }
-
-        .support-link-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.18);
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            font-weight: 900;
+            letter-spacing: 1px;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 40%, #FFD700 80%, #D4AF37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            margin: 0;
             display: flex;
             align-items: center;
-            justify-content: center;
-            color: #FFFFFF;
-            cursor: pointer;
+            gap: 6px;
         }
 
-        /* Balance summary in header */
-        .header-balance-card {
-            background: rgba(0, 0, 0, 0.18);
-            border-radius: 12px;
-            padding: 0.75rem 0.9rem;
+        .header-brand-logo {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 1px solid #FFD700;
+            object-fit: cover;
+        }
+
+        /* Balance Banner */
+        .wallet-banner {
+            margin: 12px 14px 6px 14px;
+            background: linear-gradient(135deg, rgba(229, 24, 55, 0.2) 0%, rgba(18, 21, 34, 0.9) 100%);
+            border: 1.5px solid rgba(255, 215, 0, 0.3);
+            border-radius: 14px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
         }
 
-        .balance-label {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.85);
+        .wallet-banner::after {
+            content: '';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 70px;
+            height: 70px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .wallet-banner-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .balance-amount {
-            font-size: 1.4rem;
+        .wallet-banner-amount {
+            font-size: 1.45rem;
             font-weight: 900;
-            color: #FFFFFF;
+            color: #FFD700;
             font-family: 'JetBrains Mono', monospace;
             letter-spacing: -0.5px;
+            margin-top: 1px;
+            text-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
         }
 
-        .balance-sub-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .wallet-bonus-chip {
+            background: rgba(229, 24, 55, 0.2);
+            color: #ff6b81;
+            border: 1px solid rgba(229, 24, 55, 0.4);
+            font-weight: 800;
             font-size: 0.72rem;
-            color: rgba(255, 255, 255, 0.9);
-            margin-top: 2px;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            display: inline-block;
         }
 
-        .bonus-tag-inline {
-            background: #FEF3C7;
-            color: #B45309;
-            font-weight: 700;
-            font-size: 0.68rem;
-            padding: 1px 6px;
-            border-radius: 4px;
-        }
-
-        /* Top Segment Navigation Tabs (Deposit, Withdraw, History) */
+        /* Nav Tabs (Deposit, Withdraw, Passbook) */
         .cashier-tab-bar {
             display: flex;
-            background: #FFFFFF;
-            border-bottom: 1px solid var(--border-color);
+            background: rgba(18, 21, 34, 0.95);
+            border-bottom: 1.5px solid rgba(229, 24, 55, 0.25);
+            padding: 0 14px;
+            gap: 8px;
             position: sticky;
-            top: 136px;
-            z-index: 40;
+            top: 60px;
+            z-index: 90;
         }
 
-        .tab-btn {
+        .tab-button {
             flex: 1;
-            padding: 0.85rem 0;
+            padding: 11px 0;
             text-align: center;
-            font-size: 0.88rem;
+            font-size: 0.84rem;
             font-weight: 700;
             color: var(--text-muted);
-            border-bottom: 2.5px solid transparent;
+            border-bottom: 3px solid transparent;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
+            background: transparent;
+            border-top: none;
+            border-left: none;
+            border-right: none;
         }
 
-        .tab-btn.active {
-            color: var(--brand-red);
-            border-bottom-color: var(--brand-red);
-            background: var(--brand-red-subtle);
+        .tab-button.active {
+            color: #FFD700;
+            border-bottom-color: #FFD700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
         }
 
-        /* Main Content Container */
-        .cashier-content {
+        .tab-button.active svg {
+            stroke: #FFD700;
+        }
+
+        /* Content Container */
+        .tab-content-body {
+            padding: 12px 14px;
             flex: 1;
-            padding: 1rem;
-            background: var(--bg-page);
         }
 
-        /* --- 3-STAGE STEP WIZARD BAR FOR DEPOSIT --- */
-        .wizard-steps-container {
-            background: #FFFFFF;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.75rem 0.5rem;
-            margin-bottom: 1rem;
+        /* 3-Step Wizard Tracker */
+        .wizard-tracker {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            margin-bottom: 14px;
+            padding: 10px 14px;
+            background: rgba(18, 21, 34, 0.8);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
         }
 
         .step-item {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-        }
-
-        .step-circle {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: #E2E8F0;
-            color: #64748B;
-            font-size: 0.75rem;
-            font-weight: 800;
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 4px;
+            gap: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-dim);
             transition: all 0.2s ease;
         }
 
-        .step-item.active .step-circle {
-            background: var(--brand-red);
-            color: #FFFFFF;
-            box-shadow: 0 2px 6px rgba(229, 24, 55, 0.35);
+        .step-item.active {
+            color: #FFD700;
         }
 
-        .step-item.completed .step-circle {
-            background: var(--accent-green);
-            color: #FFFFFF;
+        .step-item.completed {
+            color: var(--green-emerald);
         }
 
-        .step-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: #64748B;
+        .step-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 800;
         }
 
-        .step-item.active .step-label {
-            color: var(--brand-red);
+        .step-item.active .step-badge {
+            background: #FFD700;
+            color: #080A10;
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .step-item.completed .step-badge {
+            background: var(--green-emerald);
+            color: #ffffff;
+            border-color: var(--green-emerald);
         }
 
         .step-line {
+            flex: 1;
             height: 2px;
-            flex: 0.6;
-            background: #E2E8F0;
-            margin-top: -16px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 0 6px;
         }
 
         .step-line.completed {
-            background: var(--accent-green);
+            background: var(--green-emerald);
         }
 
-        /* Cards & Section Boxes */
-        .clean-card {
-            background: #FFFFFF;
-            border: 1px solid var(--border-color);
+        /* Glass Card */
+        .glass-panel {
+            background: var(--card-bg);
+            border: 1px solid rgba(229, 24, 55, 0.25);
             border-radius: 14px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
 
-        .card-header-title {
-            font-size: 0.92rem;
+        .panel-heading {
+            font-size: 0.82rem;
             font-weight: 800;
-            color: var(--text-dark);
-            margin-bottom: 0.75rem;
+            color: #ffffff;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
-        /* Grid for Amount Selection */
-        .amount-grid {
+        /* Channels Grid */
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .payment-channel-card {
+            background: var(--card-elevated);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 10px 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .payment-channel-card:active {
+            transform: scale(0.97);
+        }
+
+        .payment-channel-card.selected {
+            border-color: #FFD700;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.12) 0%, rgba(229, 24, 55, 0.12) 100%);
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.25);
+        }
+
+        .payment-channel-card.usdt-card.selected {
+            border-color: var(--green-emerald);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(18, 21, 34, 0.9) 100%);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+        }
+
+        .channel-icon-box {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+
+        .channel-info-title {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .channel-info-sub {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        /* Amount Selection Grid */
+        .amount-selection-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
-            margin-bottom: 1rem;
+            margin-bottom: 12px;
         }
 
         .amount-pill-card {
-            background: #FFFFFF;
-            border: 1.5px solid var(--border-color);
-            border-radius: 10px;
-            padding: 0.75rem 0.25rem;
+            background: var(--card-elevated);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 10px 6px 8px 6px;
             text-align: center;
             cursor: pointer;
             position: relative;
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
         }
 
-        /* --- STAGE 1: AMOUNT & BONUS CARDS (VIP OBSIDIAN BLACK SCREEN) --- */
-        .deposit-stage-1-card {
-            background: #090C15;
-            border: 1.5px solid #1E2638;
-            border-radius: 16px;
-            padding: 1.2rem 1rem;
-            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            margin-bottom: 1rem;
-        }
-
-        .deposit-stage-1-card .card-header-title {
-            color: #FFFFFF;
-            font-size: 0.95rem;
-            font-weight: 800;
-        }
-
-        .deposit-stage-1-card .card-header-title span:last-child {
-            background: rgba(255, 255, 255, 0.08);
-            color: #94A3B8 !important;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 0.72rem;
-            font-weight: 700;
-        }
-
-        .amount-pill-card {
-            background: #121726;
-            border: 1.5px solid #222C42;
-            border-radius: 12px;
-            padding: 0.75rem 0.4rem;
-            text-align: center;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .amount-pill-card:hover {
-            border-color: #384869;
-            transform: translateY(-1px);
+        .amount-pill-card:active {
+            transform: scale(0.96);
         }
 
         .amount-pill-card.selected {
-            border-color: #FF3855;
-            background: rgba(229, 24, 55, 0.16);
-            box-shadow: 0 0 18px rgba(229, 24, 55, 0.45), inset 0 0 12px rgba(229, 24, 55, 0.15);
-            transform: translateY(-2px);
-        }
-
-        .pill-amount {
-            font-size: 1.1rem;
-            font-weight: 900;
-            color: #FFFFFF;
-            display: block;
-            margin-top: 2px;
-            font-family: 'Outfit', sans-serif;
-            letter-spacing: 0.2px;
-        }
-
-        .amount-pill-card.selected .pill-amount {
-            color: #FFFFFF;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            border-color: var(--red-primary);
+            background: linear-gradient(135deg, rgba(229, 24, 55, 0.18) 0%, rgba(18, 21, 34, 0.9) 100%);
+            box-shadow: 0 0 14px rgba(229, 24, 55, 0.35);
         }
 
         .pill-bonus-badge {
             position: absolute;
-            top: -9px;
+            top: -7px;
             right: 4px;
-            background: linear-gradient(135deg, #FF3855 0%, #B80A22 100%);
-            color: #FFFFFF;
-            font-size: 0.6rem;
-            font-weight: 900;
-            padding: 2px 6px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 215, 0, 0.4);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-            letter-spacing: 0.2px;
-            white-space: nowrap;
-        }
-
-        .pill-subtext {
-            font-size: 0.68rem;
-            color: #10B981;
-            font-weight: 700;
-            margin-top: 3px;
-            display: block;
-        }
-
-        /* Custom Input Box */
-        .deposit-stage-1-card .form-field-label {
-            color: #94A3B8;
-            font-size: 0.78rem;
-            font-weight: 700;
-            margin-bottom: 0.4rem;
-        }
-
-        .input-group-clean {
-            display: flex;
-            align-items: center;
-            background: #121726;
-            border: 1.5px solid #222C42;
-            border-radius: 12px;
-            padding: 0.65rem 0.85rem;
-            transition: all 0.2s ease;
-        }
-
-        .input-group-clean:focus-within {
-            border-color: #FF3855;
-            background: #151C2E;
-            box-shadow: 0 0 15px rgba(229, 24, 55, 0.35);
-        }
-
-        .input-currency-symbol {
-            font-size: 1.2rem;
-            font-weight: 900;
-            color: #FFD700;
-            margin-right: 0.5rem;
-            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-        }
-
-        .clean-input {
-            flex: 1;
-            border: none;
-            background: transparent;
-            outline: none;
-            font-size: 1.1rem;
+            background: var(--red-primary);
+            color: #ffffff;
+            font-size: 0.58rem;
             font-weight: 800;
-            color: #FFFFFF;
-            font-family: 'Outfit', sans-serif;
+            padding: 1px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.3px;
+            box-shadow: 0 2px 6px rgba(229, 24, 55, 0.5);
         }
 
-        .clean-input::placeholder {
-            color: #64748B;
-            font-weight: 500;
-            font-size: 0.9rem;
+        .pill-amount-text {
+            font-size: 1.05rem;
+            font-weight: 900;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
         }
 
-        /* GLOWING ALIVE RED BONUS CARD */
-        .bonus-highlight-box {
-            background: linear-gradient(135deg, #B80A22 0%, #E51837 50%, #800414 100%);
-            border: 1.5px solid #FFD700;
-            border-radius: 14px;
-            padding: 0.9rem 1rem;
-            margin-top: 1rem;
-            margin-bottom: 1.1rem;
+        .pill-extra-text {
+            font-size: 0.62rem;
+            color: #f87171;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        /* Red Coupon Voucher Strip */
+        .coupon-voucher-strip {
+            background: linear-gradient(135deg, rgba(229, 24, 55, 0.16) 0%, rgba(128, 4, 20, 0.1) 100%);
+            border: 1.5px dashed rgba(229, 24, 55, 0.6);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 8px 28px rgba(229, 24, 55, 0.55), 0 0 18px rgba(255, 215, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.4);
-            animation: aliveBonusPulse 2.4s ease-in-out infinite alternate;
+            box-shadow: 0 3px 12px rgba(229, 24, 55, 0.15);
         }
 
-        @keyframes aliveBonusPulse {
-            0% {
-                box-shadow: 0 6px 20px rgba(229, 24, 55, 0.45), 0 0 12px rgba(255, 215, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.3);
-                border-color: rgba(255, 215, 0, 0.6);
-            }
-            100% {
-                box-shadow: 0 10px 32px rgba(229, 24, 55, 0.7), 0 0 24px rgba(255, 215, 0, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.5);
-                border-color: #FFD700;
-            }
-        }
-
-        /* Alive Shimmer Sweep Beam */
-        .bonus-highlight-box::before {
+        .coupon-voucher-strip::before, .coupon-voucher-strip::after {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -60%;
-            width: 50%;
-            height: 200%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
-            transform: rotate(25deg);
-            animation: aliveShimmerSweep 3.2s infinite ease-in-out;
-            pointer-events: none;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: var(--bg-dark);
+            border: 1.5px dashed rgba(229, 24, 55, 0.6);
+            border-radius: 50%;
         }
+        .coupon-voucher-strip::before { left: -7px; }
+        .coupon-voucher-strip::after { right: -7px; }
 
-        @keyframes aliveShimmerSweep {
-            0% { left: -60%; opacity: 0; }
-            20% { opacity: 1; }
-            60% { left: 140%; opacity: 1; }
-            100% { left: 140%; opacity: 0; }
-        }
-
-        .bonus-highlight-left {
+        .coupon-strip-left {
             display: flex;
             align-items: center;
-            gap: 12px;
-            position: relative;
-            z-index: 2;
+            gap: 10px;
         }
 
-        .bonus-gift-icon {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 215, 0, 0.2);
-            border: 1px solid #FFD700;
-            border-radius: 50%;
+        .coupon-gift-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(229, 24, 55, 0.25);
+            border: 1px solid rgba(229, 24, 55, 0.5);
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.3rem;
-            box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
-            animation: giftBounce 2s ease-in-out infinite;
+            color: #f87171;
             flex-shrink: 0;
         }
 
-        @keyframes giftBounce {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-3px) scale(1.06); }
+        .coupon-header-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .bonus-highlight-title {
-            font-size: 0.92rem;
-            font-weight: 900;
-            color: #FFFFFF;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-            letter-spacing: 0.2px;
+        .coupon-main-title {
+            font-size: 0.84rem;
+            font-weight: 800;
+            color: #ffffff;
         }
 
-        .bonus-highlight-desc {
-            font-size: 0.74rem;
-            color: #FFF3D6;
+        .coupon-tag-badge {
+            font-size: 0.56rem;
+            font-weight: 800;
+            background: var(--red-primary);
+            color: #ffffff;
+            padding: 1px 6px;
+            border-radius: 3px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .coupon-desc-text {
+            font-size: 0.68rem;
+            color: #cbd5e1;
             margin-top: 2px;
-            font-weight: 600;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
 
-        .bonus-highlight-val {
-            font-size: 1.25rem;
+        .coupon-amount-display {
+            font-size: 1.15rem;
             font-weight: 900;
-            color: #FFD700;
-            font-family: 'Outfit', sans-serif;
-            text-shadow: 0 0 12px rgba(255, 215, 0, 0.7);
-            position: relative;
-            z-index: 2;
+            color: #f87171;
+            font-family: 'JetBrains Mono', monospace;
+            border-left: 1.5px dashed rgba(229, 24, 55, 0.45);
+            padding-left: 10px;
+            margin-left: 8px;
             white-space: nowrap;
         }
 
-        /* Primary Action Buttons */
-        .primary-action-btn {
-            width: 100%;
-            background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 100%);
-            color: #FFFFFF;
-            border: none;
+        /* Inputs */
+        .currency-input-wrapper {
+            display: flex;
+            align-items: center;
+            background: rgba(10, 13, 20, 0.9);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
             border-radius: 10px;
-            padding: 0.85rem 1rem;
-            font-size: 0.95rem;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            transition: border-color 0.2s ease;
+        }
+
+        .currency-input-wrapper:focus-within {
+            border-color: var(--red-primary);
+            box-shadow: 0 0 10px rgba(229, 24, 55, 0.3);
+        }
+
+        .currency-prefix {
+            font-size: 1.05rem;
+            font-weight: 900;
+            color: #FFD700;
+            margin-right: 6px;
+        }
+
+        .custom-number-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .custom-number-input::placeholder {
+            color: var(--text-dim);
+            font-weight: 500;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.82rem;
+        }
+
+        .quick-chips-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .quick-chip-btn {
+            background: var(--card-elevated);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.15s;
+        }
+
+        .quick-chip-btn:active {
+            background: rgba(229, 24, 55, 0.2);
+            color: #ffffff;
+            border-color: var(--red-primary);
+        }
+
+        /* Action Buttons */
+        .btn-vip-primary {
+            width: 100%;
+            background: linear-gradient(135deg, var(--red-primary) 0%, var(--red-dark) 100%);
+            color: #ffffff;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.92rem;
             font-weight: 800;
             letter-spacing: 0.3px;
             cursor: pointer;
@@ -568,299 +608,284 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            box-shadow: 0 4px 12px rgba(229, 24, 55, 0.25);
-            transition: all 0.15s ease;
+            box-shadow: 0 4px 16px rgba(229, 24, 55, 0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
         }
 
-        .primary-action-btn:active {
+        .btn-vip-primary:active {
             transform: scale(0.98);
-            box-shadow: 0 2px 6px rgba(229, 24, 55, 0.2);
         }
 
-        .secondary-btn-clean {
+        .btn-vip-secondary {
             width: 100%;
-            background: #F1F5F9;
-            color: #475569;
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            font-size: 0.88rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 0.6rem;
-            transition: background 0.15s;
-        }
-
-        /* Payment Channel Cards (Stage 2) with Official Logos */
-        .payment-channel-card {
-            background: #FFFFFF;
-            border: 1.5px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.85rem 1rem;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .payment-channel-card:hover {
-            border-color: #CBD5E1;
-        }
-
-        .payment-channel-card.selected {
-            border-color: var(--brand-red);
-            background: var(--brand-red-subtle);
-            box-shadow: 0 0 0 1px var(--brand-red);
-        }
-
-        .channel-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .channel-logo-img {
-            width: 38px;
-            height: 38px;
-            object-fit: contain;
-            border-radius: 8px;
-            background: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            padding: 2px;
-        }
-
-        .channel-info-title {
-            font-size: 0.9rem;
-            font-weight: 800;
-            color: var(--text-dark);
-        }
-
-        .channel-info-desc {
-            font-size: 0.72rem;
+            background: var(--card-elevated);
             color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .channel-radio {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid #CBD5E1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin-top: 8px;
+            transition: all 0.15s;
         }
 
-        .payment-channel-card.selected .channel-radio {
-            border-color: var(--brand-red);
+        .btn-vip-secondary:active {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
         }
 
-        .payment-channel-card.selected .channel-radio::after {
-            content: '';
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--brand-red);
-        }
-
-        /* --- STAGE 3: 10-MINUTE COUNTDOWN TIMER & QR --- */
-        .timer-header-banner {
-            background: #FEF2F2;
-            border: 1px solid #FECACA;
+        /* Stage 3 Dynamic QR & Countdown */
+        .timer-warning-card {
+            background: linear-gradient(135deg, rgba(229, 24, 55, 0.15) 0%, rgba(18, 21, 34, 0.9) 100%);
+            border: 1px solid rgba(229, 24, 55, 0.4);
             border-radius: 12px;
-            padding: 0.85rem;
+            padding: 10px;
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 12px;
         }
 
-        .timer-label {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #991B1B;
+        .timer-badge-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #f87171;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
 
-        .countdown-digits {
-            font-size: 1.8rem;
+        .timer-digits-val {
+            font-size: 1.6rem;
             font-weight: 900;
-            color: var(--brand-red);
+            color: #ff4757;
             font-family: 'JetBrains Mono', monospace;
-            margin: 4px 0;
+            margin: 2px 0;
             letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
         }
 
-        .timer-sub-warning {
-            font-size: 0.72rem;
-            color: #7F1D1D;
-        }
-
-        /* Clean QR display card */
-        .qr-display-box {
-            background: #FFFFFF;
-            border: 1px solid var(--border-color);
+        .qr-display-panel {
+            background: var(--card-bg);
+            border: 1.5px solid rgba(255, 215, 0, 0.3);
             border-radius: 14px;
-            padding: 1.2rem 1rem;
+            padding: 14px;
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         }
 
-        .qr-code-img {
-            width: 190px;
-            height: 190px;
-            margin: 0.5rem auto;
+        .qr-image-frame {
+            width: 170px;
+            height: 170px;
+            margin: 8px auto;
             display: block;
             border-radius: 10px;
-            border: 1px solid #E2E8F0;
+            border: 2px solid #ffffff;
             padding: 6px;
-            background: #FFFFFF;
+            background: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
         }
 
-        .upi-copy-row {
-            background: #F8FAFC;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.5rem 0.75rem;
+        .copy-pill-bar {
+            background: var(--card-elevated);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 8px 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-top: 0.75rem;
+            margin-top: 10px;
         }
 
-        .upi-id-text {
+        .copy-pill-value {
             font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            font-size: 0.88rem;
-            color: var(--text-dark);
+            font-weight: 800;
+            font-size: 0.85rem;
+            color: #FFD700;
         }
 
-        .copy-pill-btn {
-            background: var(--brand-red);
-            color: #FFFFFF;
+        .btn-copy-action {
+            background: var(--red-primary);
+            color: #ffffff;
             border: none;
             border-radius: 6px;
-            padding: 4px 10px;
-            font-size: 0.75rem;
-            font-weight: 700;
+            padding: 5px 12px;
+            font-size: 0.72rem;
+            font-weight: 800;
             cursor: pointer;
-            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s;
         }
 
-        .copy-pill-btn:active {
-            background: var(--brand-red-dark);
+        .btn-copy-action:active {
+            transform: scale(0.94);
+            background: var(--red-dark);
         }
 
-        /* Form input labels */
-        .form-field-label {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: var(--text-dark);
-            margin-bottom: 0.35rem;
-            display: block;
-        }
-
-        .form-group-spaced {
-            margin-bottom: 0.85rem;
-        }
-
-        /* Instructions Accordion / Step List */
-        .step-guide-list {
-            background: #F8FAFC;
+        .instruction-box {
+            background: rgba(18, 21, 34, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 10px;
-            padding: 0.75rem 0.9rem;
-            margin-bottom: 1rem;
-            font-size: 0.75rem;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 0.72rem;
             color: var(--text-muted);
             line-height: 1.5;
         }
 
-        .step-guide-list ol {
+        .instruction-box ol {
             padding-left: 1.1rem;
         }
 
-        .step-guide-list li {
-            margin-bottom: 4px;
+        .instruction-box li {
+            margin-bottom: 3px;
         }
 
-        /* History Table & Cards */
-        .history-card-item {
-            background: #FFFFFF;
-            border: 1px solid var(--border-color);
+        /* Withdrawal Form */
+        .form-group-item {
+            margin-bottom: 10px;
+        }
+
+        .form-group-label {
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .form-text-input {
+            width: 100%;
+            background: rgba(10, 13, 20, 0.9);
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 0.86rem;
+            color: #ffffff;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-text-input:focus {
+            border-color: var(--red-primary);
+            box-shadow: 0 0 8px rgba(229, 24, 55, 0.3);
+        }
+
+        .form-text-input::placeholder {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        /* History Filter Pills */
+        .history-filter-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .filter-chip-btn {
+            background: var(--card-elevated);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .filter-chip-btn.active {
+            background: var(--red-primary);
+            color: #ffffff;
+            border-color: var(--red-primary);
+            box-shadow: 0 2px 8px rgba(229, 24, 55, 0.4);
+        }
+
+        /* Passbook Record Cards */
+        .passbook-item-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
-            padding: 0.85rem;
-            margin-bottom: 0.65rem;
+            padding: 10px 12px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
 
-        .history-left-title {
-            font-size: 0.85rem;
+        .passbook-item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
             font-weight: 800;
-            color: var(--text-dark);
+            color: #ffffff;
         }
 
-        .history-time {
-            font-size: 0.7rem;
-            color: var(--text-light);
+        .passbook-item-date {
+            font-size: 0.68rem;
+            color: var(--text-dim);
             margin-top: 2px;
-        }
-
-        .history-right-val {
-            text-align: right;
-        }
-
-        .history-amount {
-            font-size: 0.95rem;
-            font-weight: 800;
-            font-family: 'JetBrains Mono', monospace;
         }
 
         .status-badge {
             display: inline-block;
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             font-weight: 800;
             padding: 2px 6px;
             border-radius: 4px;
-            margin-top: 2px;
+            margin-top: 3px;
             text-transform: uppercase;
-        }
-
-        .status-badge.pending {
-            background: #FEF3C7;
-            color: #B45309;
+            letter-spacing: 0.3px;
         }
 
         .status-badge.approved {
-            background: #DCFCE7;
-            color: #15803D;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.4);
         }
 
         .status-badge.rejected {
-            background: #FEE2E2;
-            color: #B91C1C;
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
         }
 
-        /* Floating Toast */
+        /* Toast Popup */
         #cashier-toast {
             display: none;
             position: fixed;
-            top: 20px;
+            top: 25px;
             left: 50%;
             transform: translateX(-50%);
-            background: #0F172A;
-            color: #FFFFFF;
-            padding: 0.65rem 1.2rem;
-            border-radius: 30px;
+            background: #1e293b;
+            color: #ffffff;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+            padding: 8px 18px;
+            border-radius: 24px;
             font-size: 0.82rem;
-            font-weight: 700;
-            z-index: 9999;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            font-weight: 800;
+            z-index: 99999;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.7);
             text-align: center;
             max-width: 90%;
         }
@@ -868,563 +893,564 @@
 </head>
 <body>
     <div class="cashier-container">
-        <!-- TOP RED HEADER -->
-        <header class="cashier-header">
-            <div class="header-nav">
-                <a href="index.html" class="back-circle-btn" title="Back to Game">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-                </a>
-                <div class="header-title" id="page-main-title" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <img src="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" alt="Smarty91" style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #FFD700; object-fit: cover; box-shadow: 0 2px 6px rgba(0,0,0,0.3);" />
-                    <span>VIP Cashier</span>
+        <!-- TOP APP BAR (Clean, Compact, Unified Brand Header) -->
+        <header class="cashier-top-bar">
+            <div class="home-brand-block" onclick="window.location.href='index.html'">
+                <div class="home-logo-circle">
+                    <img src="https://plain-apac-prod-public.komododecks.com/202608/30/R5mYT3Hlk72jXCVLqTOb/image.png" alt="Smarty91 Logo" />
                 </div>
-                <a href="profile.html" class="support-link-btn" title="Profile">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                </a>
+                <span class="home-brand-text">Smarty<span class="home-brand-num">91</span></span>
             </div>
-
-            <!-- Header Balance Display -->
-            <div class="header-balance-card">
-                <div>
-                    <div class="balance-label">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                            <line x1="6" y1="12" x2="18" y2="12"></line>
-                        </svg>
-                        Main Balance
-                    </div>
-                    <div class="balance-amount" id="header-user-balance">₹0.00</div>
-                </div>
-                <div style="text-align: right;">
-                    <div class="balance-sub-row">
-                        Bonus: <span id="header-user-bonus" class="bonus-tag-inline">₹0.00</span>
-                    </div>
-                    <div style="font-size: 0.68rem; color: rgba(255,255,255,0.7); margin-top: 4px;" id="header-user-phone">
-                        VIP User
-                    </div>
-                </div>
+            <div class="home-icon-btn" onclick="window.open('https://t.me/smart91prediction', '_blank')" title="24/7 Support">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
             </div>
         </header>
 
-        <!-- TOP TAB SWITCHER (Deposit, Withdraw, History) -->
+        <!-- TOP WALLET BALANCE BANNER -->
+        <div class="wallet-banner">
+            <div>
+                <div class="wallet-banner-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2.2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+                    Total Wallet Balance
+                </div>
+                <div class="wallet-banner-amount" id="header-user-balance">₹0.00</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px;">
+                    Bonus: <span id="header-user-bonus" class="wallet-bonus-chip">₹0.00</span>
+                </div>
+                <div style="font-size: 0.68rem; color: #FFD700; font-weight: 700;" id="header-user-phone">VIP Player</div>
+            </div>
+        </div>
+
+        <!-- TABS BAR (Deposit, Withdraw, Passbook) -->
         <nav class="cashier-tab-bar">
-            <div class="tab-btn active" id="tab-btn-deposit" onclick="switchCashierTab('deposit')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Deposit
-            </div>
-            <div class="tab-btn" id="tab-btn-withdraw" onclick="switchCashierTab('withdraw')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Withdraw
-            </div>
-            <div class="tab-btn" id="tab-btn-history" onclick="switchCashierTab('history')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                Passbook
-            </div>
+            <button type="button" class="tab-button active" id="tab-btn-deposit" onclick="switchCashierTab('deposit')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+                <span>Deposit</span>
+            </button>
+            <button type="button" class="tab-button" id="tab-btn-withdraw" onclick="switchCashierTab('withdraw')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>
+                <span>Withdraw</span>
+            </button>
+            <button type="button" class="tab-button" id="tab-btn-history" onclick="switchCashierTab('history')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span>Passbook</span>
+            </button>
         </nav>
 
-        <!-- CASHIER MAIN CONTENT -->
-        <main class="cashier-content">
+        <!-- MAIN VIEWPORT -->
+        <main class="tab-content-body">
 
             <!-- ============================================================ -->
-            <!-- TAB 1: DEPOSIT SECTION (3-STAGE WIZARD FLOW) -->
+            <!-- 1. DEPOSIT VIEW -->
             <!-- ============================================================ -->
             <section id="section-deposit" style="display: block;">
-                <!-- 3-STAGE PROGRESS BAR -->
-                <div class="wizard-steps-container">
+
+                <!-- 3-STEP WIZARD PROGRESS TRACKER -->
+                <div class="wizard-tracker">
                     <div class="step-item active" id="wizard-step-1-indicator">
-                        <div class="step-circle">1</div>
-                        <div class="step-label">Amount</div>
+                        <span class="step-badge">1</span>
+                        <span>Amount</span>
                     </div>
                     <div class="step-line" id="wizard-line-1"></div>
                     <div class="step-item" id="wizard-step-2-indicator">
-                        <div class="step-circle">2</div>
-                        <div class="step-label">Payment Type</div>
+                        <span class="step-badge">2</span>
+                        <span>Channel</span>
                     </div>
                     <div class="step-line" id="wizard-line-2"></div>
                     <div class="step-item" id="wizard-step-3-indicator">
-                        <div class="step-circle">3</div>
-                        <div class="step-label">Pay & Verify</div>
+                        <span class="step-badge">3</span>
+                        <span>Pay & Verify</span>
                     </div>
                 </div>
 
-                <!-- STAGE 1: AMOUNT & BONUS SELECTION (BLACK SCREEN & GLOWING RED BONUS) -->
+                <!-- STAGE 1: AMOUNT SELECTION -->
                 <div id="deposit-stage-1" style="display: block;">
-                    <div class="clean-card deposit-stage-1-card">
-                        <div class="card-header-title">
+                    <div class="glass-panel">
+                        <div class="panel-heading">
                             <span>Select Deposit Amount</span>
-                            <span style="font-size: 0.72rem; color: #94A3B8; font-weight: 600;">Min ₹200</span>
+                            <span style="font-size: 0.68rem; color: #FFD700; font-weight: 700; background: rgba(255,215,0,0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255,215,0,0.3);">Min ₹200</span>
                         </div>
 
-                        <!-- Amount Quick Select Grid with Tier Bonuses -->
-                        <div class="amount-grid">
+                        <!-- Amount Quick Select Grid with 100% Match Bonus -->
+                        <div class="amount-selection-grid">
                             <div class="amount-pill-card selected" onclick="selectDepositAmount(200, 200)">
                                 <span class="pill-bonus-badge">100% BONUS</span>
-                                <span class="pill-amount">₹200</span>
-                                <span class="pill-subtext">+₹200 Bonus</span>
+                                <span class="pill-amount-text">₹200</span>
+                                <span class="pill-extra-text">+₹200 Extra</span>
                             </div>
-                            <div class="amount-pill-card" onclick="selectDepositAmount(500, 150)">
-                                <span class="pill-bonus-badge">+₹150</span>
-                                <span class="pill-amount">₹500</span>
-                                <span class="pill-subtext">+30% Extra</span>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(500, 500)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount-text">₹500</span>
+                                <span class="pill-extra-text">+₹500 Extra</span>
                             </div>
-                            <div class="amount-pill-card" onclick="selectDepositAmount(1000, 250)">
-                                <span class="pill-bonus-badge">+₹250</span>
-                                <span class="pill-amount">₹1,000</span>
-                                <span class="pill-subtext">+25% Extra</span>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(1000, 1000)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount-text">₹1,000</span>
+                                <span class="pill-extra-text">+₹1,000 Extra</span>
                             </div>
-                            <div class="amount-pill-card" onclick="selectDepositAmount(2000, 400)">
-                                <span class="pill-bonus-badge">+₹400</span>
-                                <span class="pill-amount">₹2,000</span>
-                                <span class="pill-subtext">+20% Extra</span>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(2000, 2000)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount-text">₹2,000</span>
+                                <span class="pill-extra-text">+₹2,000 Extra</span>
                             </div>
-                            <div class="amount-pill-card" onclick="selectDepositAmount(5000, 1250)">
-                                <span class="pill-bonus-badge">+₹1,250</span>
-                                <span class="pill-amount">₹5,000</span>
-                                <span class="pill-subtext">+25% VIP</span>
+                            <div class="amount-pill-card" onclick="selectDepositAmount(5000, 5000)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount-text">₹5,000</span>
+                                <span class="pill-extra-text">+₹5,000 Extra</span>
                             </div>
-                            <div class="amount-pill-card" onclick="selectDepositAmount(10000, 3000)">
-                                <span class="pill-bonus-badge">+₹3,000</span>
-                                <span class="pill-amount">₹10,000</span>
-                                <span class="pill-subtext">+30% High Roller</span>
-                            </div>
-                        </div>
-
-                        <!-- Custom Amount Input -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Or Enter Custom Amount (₹200 - ₹1,00,000)</label>
-                            <div class="input-group-clean">
-                                <span class="input-currency-symbol">₹</span>
-                                <input type="number" id="custom-deposit-input" class="clean-input" placeholder="e.g. 500" value="200" min="200" max="100000" oninput="handleCustomDepositChange(this.value)">
+                            <div class="amount-pill-card" onclick="selectDepositAmount(10000, 10000)">
+                                <span class="pill-bonus-badge">100% BONUS</span>
+                                <span class="pill-amount-text">₹10,000</span>
+                                <span class="pill-extra-text">+₹10,000 Extra</span>
                             </div>
                         </div>
 
-                        <!-- Highlighted Bonus Preview Card -->
-                        <div class="bonus-highlight-box" id="bonus-preview-box">
-                            <div class="bonus-highlight-left">
-                                <div class="bonus-gift-icon">🎁</div>
-                                <div>
-                                    <div class="bonus-highlight-title" id="bonus-card-title">100% First Deposit Match Bonus</div>
-                                    <div class="bonus-highlight-desc" id="bonus-card-desc">Deposit ₹200 and receive total ₹400 play credit</div>
-                                </div>
-                            </div>
-                            <div class="bonus-highlight-val" id="bonus-card-amount">+₹200</div>
+                        <!-- Custom Input -->
+                        <div class="currency-input-wrapper">
+                            <span class="currency-prefix">₹</span>
+                            <input type="number" id="custom-deposit-input" class="custom-number-input" placeholder="Or enter custom amount (Min 200)" value="200" min="200" max="100000" oninput="handleCustomDepositChange(this.value)">
                         </div>
 
-                        <button type="button" class="primary-action-btn" onclick="goToDepositStage(2)">
-                            <span>Proceed to Payment Type</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                <polyline points="12 5 19 12 12 19"></polyline>
-                            </svg>
-                        </button>
+                        <div class="quick-chips-row">
+                            <button type="button" class="quick-chip-btn" onclick="addCustomVal(100)">+₹100</button>
+                            <button type="button" class="quick-chip-btn" onclick="addCustomVal(500)">+₹500</button>
+                            <button type="button" class="quick-chip-btn" onclick="addCustomVal(1000)">+₹1,000</button>
+                            <button type="button" class="quick-chip-btn" onclick="addCustomVal(5000)">+₹5,000</button>
+                        </div>
                     </div>
+
+                    <!-- Red Coupon Voucher Strip -->
+                    <div class="coupon-voucher-strip" id="bonus-preview-box">
+                        <div class="coupon-strip-left">
+                            <div class="coupon-gift-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                                    <line x1="7" y1="16" x2="12" y2="16"></line>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="coupon-header-line">
+                                    <span class="coupon-main-title" id="bonus-card-title">100% Deposit Match Bonus</span>
+                                    <span class="coupon-tag-badge">COUPON APPLIED</span>
+                                </div>
+                                <div class="coupon-desc-text" id="bonus-card-desc">Deposit ₹200 and receive total ₹400 play credit (Instant 2X)</div>
+                            </div>
+                        </div>
+                        <div class="coupon-amount-display" id="bonus-card-amount">+₹200</div>
+                    </div>
+
+                    <!-- Proceed to Step 2 Button -->
+                    <button type="button" class="btn-vip-primary" onclick="goToDepositStage(2)">
+                        <span>Proceed to Select Payment Channel</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </button>
                 </div>
 
-                <!-- STAGE 2: PAYMENT TYPE SELECTION (Official Logos + Featured USDT) -->
+
+                <!-- STAGE 2: CHANNEL SELECTION -->
                 <div id="deposit-stage-2" style="display: none;">
-                    <div class="clean-card">
-                        <div class="card-header-title">
+                    <div class="glass-panel">
+                        <div class="panel-heading">
                             <span>Select Payment Channel</span>
-                            <span style="font-size: 0.85rem; font-weight: 800; color: var(--brand-red);" id="stage-2-amount-display">₹200</span>
+                            <span style="font-size: 0.76rem; color: #FFD700; font-family: 'JetBrains Mono', monospace; font-weight: 800;" id="stage-2-amount-display">₹200</span>
                         </div>
 
-                        <!-- Channel 0: USDT TRC-20 (Crypto AUTOMATIC & FEATURED) -->
-                        <div class="payment-channel-card selected" onclick="selectPaymentChannel('USDT_TRC20', this)" style="border: 1.5px solid #059669; background: #ECFDF5; box-shadow: 0 4px 14px rgba(16,185,129,0.18);">
-                            <div class="channel-left">
-                                <div style="width: 38px; height: 38px; background: #059669; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(16,185,129,0.4);">
+                        <div class="channels-grid">
+                            <!-- USDT Crypto (Highlighted & Selected by Default) -->
+                            <div class="payment-channel-card selected usdt-card" style="grid-column: span 2; border: 1.5px solid #10b981; background: linear-gradient(135deg, rgba(5,150,105,0.2) 0%, rgba(18,21,34,0.95) 100%);" onclick="selectPaymentChannel('USDT', this)">
+                                <div class="channel-icon-box" style="background: #059669; box-shadow: 0 0 10px rgba(16,185,129,0.4);">
                                     <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
                                         <circle cx="16" cy="16" r="16" fill="#26A17B"/>
                                         <path d="M17.9 14.8v-1.6h5.3V10H8.8v3.2h5.3v1.6c-4.4.2-7.7 1.1-7.7 2.2 0 1.1 3.3 2 7.7 2.2v5.1h3.8v-5.1c4.4-.2 7.7-1.1 7.7-2.2 0-1.1-3.3-2-7.7-2.2zm-1.9 3.1c-3.1 0-5.7-.6-5.7-1.3s2.6-1.3 5.7-1.3 5.7.6 5.7 1.3-2.6 1.3-5.7 1.3z" fill="#FFF"/>
                                     </svg>
                                 </div>
-                                <div>
-                                    <div class="channel-info-title" style="color: #047857; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                                        <span>⚡ USDT TRC-20 (Crypto)</span>
-                                        <span style="font-size: 0.65rem; background: #059669; color: #FFF; padding: 2px 6px; border-radius: 4px; font-weight: 800;">RECOMMENDED & AUTO</span>
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <div class="channel-info-title" style="color: #34d399; font-weight: 800; font-size: 0.92rem;">USDT Crypto</div>
+                                        <span style="font-size: 0.62rem; font-weight: 800; background: #059669; color: #fff; padding: 2px 7px; border-radius: 4px;">FAST & INSTANT</span>
                                     </div>
-                                    <div class="channel-info-desc" style="color: #065F46; font-weight: 600;">Instant 0% Fee • Blockchain Auto-Credit (1 USDT = ₹90)</div>
+                                    <div class="channel-info-sub" style="color: #34d399; font-size: 0.72rem; margin-top: 2px;">Automatic Credit • 0% Fee • 24/7</div>
                                 </div>
                             </div>
-                            <div class="channel-radio"></div>
-                        </div>
 
-                        <!-- Channel 1: Google Pay -->
-                        <div class="payment-channel-card" onclick="selectPaymentChannel('GPAY', this)">
-                            <div class="channel-left">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="Google Pay" class="channel-logo-img">
+                            <div class="payment-channel-card" onclick="selectPaymentChannel('BHIM_UPI', this)">
+                                <div class="channel-icon-box">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
                                 <div>
-                                    <div class="channel-info-title">Google Pay (GPay)</div>
-                                    <div class="channel-info-desc">Instant 0% fee deposit via GPay UPI</div>
+                                    <div class="channel-info-title">Fast UPI / QR</div>
+                                    <div class="channel-info-sub">0% Fee • Instant</div>
                                 </div>
                             </div>
-                            <div class="channel-radio"></div>
-                        </div>
 
-                        <!-- Channel 2: PhonePe -->
-                        <div class="payment-channel-card" onclick="selectPaymentChannel('PHONEPE', this)">
-                            <div class="channel-left">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" class="channel-logo-img">
+                            <div class="payment-channel-card" onclick="selectPaymentChannel('PHONEPE', this)">
+                                <div class="channel-icon-box">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
                                 <div>
                                     <div class="channel-info-title">PhonePe</div>
-                                    <div class="channel-info-desc">Fast UPI auto-redirect / QR</div>
+                                    <div class="channel-info-sub">UPI & Wallet</div>
                                 </div>
                             </div>
-                            <div class="channel-radio"></div>
-                        </div>
 
-                        <!-- Channel 3: Paytm -->
-                        <div class="payment-channel-card" onclick="selectPaymentChannel('PAYTM', this)">
-                            <div class="channel-left">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" class="channel-logo-img">
+                            <div class="payment-channel-card" onclick="selectPaymentChannel('GPAY', this)">
+                                <div class="channel-icon-box">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="GPay" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
                                 <div>
-                                    <div class="channel-info-title">Paytm UPI</div>
-                                    <div class="channel-info-desc">Pay directly from Paytm Wallet/UPI</div>
+                                    <div class="channel-info-title">Google Pay</div>
+                                    <div class="channel-info-sub">UPI Direct</div>
                                 </div>
                             </div>
-                            <div class="channel-radio"></div>
-                        </div>
 
-                        <!-- Channel 4: BHIM & All UPI Apps -->
-                        <div class="payment-channel-card" onclick="selectPaymentChannel('BHIM_UPI', this)">
-                            <div class="channel-left">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" alt="UPI" class="channel-logo-img">
+                            <div class="payment-channel-card" onclick="selectPaymentChannel('PAYTM', this)">
+                                <div class="channel-icon-box">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_%28standalone%29.svg" alt="Paytm" style="width: 100%; height: 100%; object-fit: contain;">
+                                </div>
                                 <div>
-                                    <div class="channel-info-title">Any UPI / QR Scan</div>
-                                    <div class="channel-info-desc">BHIM, CRED, Amazon Pay & Bank UPI</div>
+                                    <div class="channel-info-title">Paytm</div>
+                                    <div class="channel-info-sub">UPI & Wallet</div>
                                 </div>
                             </div>
-                            <div class="channel-radio"></div>
-                        </div>
-
-                        <button type="button" class="primary-action-btn" onclick="startDepositCheckoutPhase()">
-                            <span>Generate QR & Pay Now</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                <polyline points="12 5 19 12 12 19"></polyline>
-                            </svg>
-                        </button>
-
-                        <button type="button" class="secondary-btn-clean" onclick="goToDepositStage(1)">
-                            ← Change Amount
-                        </button>
-                    </div>
-                </div>
-
-                <!-- STAGE 3: 10-MINUTE COUNTDOWN & DYNAMIC QR -->
-                <div id="deposit-stage-3" style="display: none;">
-                    <!-- 10 Minute Countdown Banner -->
-                    <div class="timer-header-banner">
-                        <div class="timer-label">Payment Session Expires In</div>
-                        <div class="countdown-digits" id="checkout-timer-display">10:00</div>
-                        <div class="timer-sub-warning" id="checkout-timer-warning">Please complete payment before this timer reaches 00:00</div>
-                    </div>
-
-                    <!-- USDT TRC-20 AUTO CHECKOUT CONTAINER -->
-                    <div id="usdt-checkout-box" style="display: none;">
-                        <div class="qr-display-box" style="border: 1.5px solid #059669; background: #ECFDF5;">
-                            <div style="font-size: 0.8rem; font-weight: 800; color: #065F46;">⚡ Crypto USDT TRC-20 Payable</div>
-                            <div style="font-size: 1.8rem; font-weight: 900; color: #047857; font-family: 'JetBrains Mono', monospace; margin: 4px 0;" id="usdt-payable-amount">
-                                $2.22 USDT
-                            </div>
-                            <div style="font-size: 0.75rem; color: #059669; font-weight: 700;" id="usdt-inr-conversion-display">
-                                Equivalent to ₹200.00 (@ ₹90.00 / USDT)
-                            </div>
-                            <div style="font-size: 0.72rem; color: var(--accent-green); font-weight: 800; margin-top: 2px;" id="usdt-stage3-bonus-display">
-                                + Includes ₹200.00 VIP Bonus
-                            </div>
-
-                            <!-- USDT QR Code -->
-                            <img id="usdt-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh" alt="USDT TRC20 QR" class="qr-code-img" style="border: 2px solid #059669;">
-
-                            <!-- USDT Address Copy Card -->
-                            <div class="upi-copy-row" style="background: #FFFFFF; border-color: #A7F3D0;">
-                                <div style="flex: 1; overflow: hidden; padding-right: 8px;">
-                                    <div style="font-size: 0.65rem; color: #047857; text-align: left; font-weight: 700;">Merchant USDT (TRC-20) Address</div>
-                                    <div class="upi-id-text" id="usdt-merchant-address" style="color: #065F46; font-size: 0.78rem; word-break: break-all;">TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh</div>
-                                </div>
-                                <button type="button" class="copy-pill-btn" onclick="copyUsdtAddress()" style="background: #059669; color: #FFF;">Copy Address</button>
-                            </div>
-                        </div>
-
-                        <!-- Step Guide List for USDT -->
-                        <div class="step-guide-list" style="background: #F0FDF4; border: 1px solid #BBF7D0;">
-                            <div style="font-weight: 800; color: #065F46; margin-bottom: 4px;">📌 How to deposit with USDT (TRC-20):</div>
-                            <ol>
-                                <li>Open Trust Wallet, Binance, OKX, Bybit or any Crypto wallet app.</li>
-                                <li>Send exact USDT amount via <b>Tron (TRC-20) Network</b> to address above.</li>
-                                <li>Copy the <b>64-character Transaction Hash (TxID)</b> from your transaction details.</li>
-                                <li>Paste TxID below and tap <b>Verify & Credit USDT</b> for instant auto credit!</li>
-                            </ol>
-                        </div>
-
-                        <!-- TxID Submission Card -->
-                        <div class="clean-card" style="border-color: #059669;">
-                            <div class="form-group-spaced">
-                                <label class="form-field-label" style="color: #047857;">Enter Transaction Hash / TxID <span style="color: var(--brand-red);">*</span></label>
-                                <div class="input-group-clean">
-                                    <input type="text" id="usdt-txid-input" class="clean-input" maxlength="80" placeholder="e.g. 5a2b3c4d... (64 hex characters)" autocomplete="off" style="font-family: monospace; font-size: 0.85rem;">
-                                </div>
-                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
-                                    TxID is the transaction hash string generated on Tron blockchain.
-                                </div>
-                            </div>
-
-                            <button type="button" id="submit-usdt-deposit-btn" class="primary-action-btn" onclick="submitUsdtDepositTx()" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
-                                <span>⚡ Verify & Credit USDT Automatically</span>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </button>
-
-                            <button type="button" class="secondary-btn-clean" onclick="cancelDepositSession()">
-                                Cancel & Return
-                            </button>
                         </div>
                     </div>
 
-                    <!-- STANDARD UPI CHECKOUT CONTAINER -->
-                    <div id="upi-checkout-box" style="display: block;">
-                        <!-- Clean QR & Payment Details Box -->
-                        <div class="qr-display-box">
-                            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Amount Payable</div>
-                            <div style="font-size: 1.6rem; font-weight: 900; color: var(--brand-red); font-family: 'JetBrains Mono', monospace;" id="stage-3-amount-display">
-                                ₹200.00
-                            </div>
-                            <div style="font-size: 0.72rem; color: var(--accent-green); font-weight: 700;" id="stage-3-bonus-display">
-                                + Includes ₹200 VIP Bonus
-                            </div>
+                    <button type="button" class="btn-vip-primary" onclick="startDepositCheckoutPhase()">
+                        <span>Generate Instant Payment QR</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </button>
 
-                            <!-- Dynamic QR generated for exact amount -->
-                            <img id="dynamic-qr-image" src="" alt="Scan & Pay UPI QR" class="qr-code-img">
-
-                            <!-- Direct App Deep Link Button (On Mobile) -->
-                            <a id="upi-direct-app-link" href="#" class="primary-action-btn" style="margin-top: 0.75rem; text-decoration: none;">
-                                <span>Open In UPI App</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                    <polyline points="15 3 21 3 21 9"></polyline>
-                                    <line x1="10" y1="14" x2="21" y2="3"></line>
-                                </svg>
-                            </a>
-
-                            <!-- UPI ID Copy Card -->
-                            <div class="upi-copy-row">
-                                <div>
-                                    <div style="font-size: 0.65rem; color: var(--text-light); text-align: left;">Official UPI ID</div>
-                                    <div class="upi-id-text" id="upi-merchant-id">6289140468@axl</div>
-                                </div>
-                                <button type="button" class="copy-pill-btn" onclick="copyUpiId()">Copy UPI ID</button>
-                            </div>
-                        </div>
-
-                        <!-- Step Guide List -->
-                        <div class="step-guide-list">
-                            <div style="font-weight: 800; color: var(--text-dark); margin-bottom: 4px;">📌 How to complete deposit:</div>
-                            <ol>
-                                <li>Scan QR code with GPay, PhonePe, Paytm or any UPI app.</li>
-                                <li>Pay exact amount shown above.</li>
-                                <li>Copy the <b>12-digit UTR / Ref Number</b> from transaction details.</li>
-                                <li>Paste UTR below and tap <b>Submit UTR Verification</b>.</li>
-                            </ol>
-                        </div>
-
-                        <!-- UTR Submission Card -->
-                        <div class="clean-card">
-                            <div class="form-group-spaced">
-                                <label class="form-field-label">Enter 12-Digit UPI Reference / UTR Number <span style="color: var(--brand-red);">*</span></label>
-                                <div class="input-group-clean">
-                                    <input type="text" id="utr-number-input" class="clean-input" maxlength="20" placeholder="e.g. 423589123456" autocomplete="off">
-                                </div>
-                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
-                                    UTR is found in your UPI app receipt under 'UPI Transaction ID' or 'Ref No.'
-                                </div>
-                            </div>
-
-                            <button type="button" id="submit-deposit-btn" class="primary-action-btn" onclick="submitDepositUTR()">
-                                <span>Submit UTR Verification</span>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                </svg>
-                            </button>
-
-                            <button type="button" class="secondary-btn-clean" onclick="cancelDepositSession()">
-                                Cancel & Return
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ============================================================ -->
-            <!-- TAB 2: WITHDRAWAL SECTION (CLEAN WHITE & RED / USDT HIGHLIGHT) -->
-            <!-- ============================================================ -->
-            <section id="section-withdraw" style="display: none;">
-                <div class="clean-card">
-                    <!-- Withdrawal Mode Switcher -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.2rem; background: #F1F5F9; padding: 4px; border-radius: 12px;">
-                        <button type="button" id="wtab-usdt-btn" class="withdraw-tab-pill active" onclick="switchWithdrawMethod('USDT_TRC20')" style="padding: 0.75rem 0.5rem; border-radius: 9px; border: none; font-size: 0.78rem; font-weight: 900; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; box-shadow: 0 4px 12px rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: center; gap: 4px;">
-                            <span>⚡ USDT TRC-20</span>
-                            <span style="font-size: 0.6rem; background: #10B981; color: #FFF; padding: 1px 4px; border-radius: 4px;">FAST</span>
-                        </button>
-                        <button type="button" id="wtab-bank-btn" class="withdraw-tab-pill" onclick="switchWithdrawMethod('BANK')" style="padding: 0.75rem 0.5rem; border-radius: 9px; border: none; font-size: 0.78rem; font-weight: 800; cursor: pointer; transition: all 0.2s; background: transparent; color: #64748B; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                            <span>🏛️ Bank Transfer</span>
-                        </button>
-                    </div>
-
-                    <!-- FORM 1: USDT TRC-20 WITHDRAWAL -->
-                    <div id="withdraw-usdt-form-container" style="display: block;">
-                        <div class="card-header-title" style="margin-bottom: 1rem;">
-                            <span style="color: #047857;">Withdraw to USDT TRC-20 Wallet</span>
-                            <span style="font-size: 0.72rem; color: #059669; font-weight: 800;">Instant Crypto Payout</span>
-                        </div>
-
-                        <!-- Withdrawal Amount -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Withdrawal Amount in INR (Min ₹200)</label>
-                            <div class="input-group-clean" style="border-color: #059669;">
-                                <span class="input-currency-symbol" style="color: #059669;">₹</span>
-                                <input type="number" id="withdraw-usdt-amount-input" class="clean-input" placeholder="Min ₹200" min="200" max="100000" oninput="calculateUsdtPayoutAmount(this.value)">
-                            </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #059669; margin-top: 4px; font-weight: 700;">
-                                <span>You Get: <b id="withdraw-usdt-get-amount" style="font-size: 0.85rem; color: #047857;">$0.00 USDT</b> (@ ₹90/USDT)</span>
-                                <span style="color: var(--brand-red); cursor: pointer;" onclick="withdrawAllBalanceUsdt()">Withdraw All</span>
-                            </div>
-                        </div>
-
-                        <!-- Player Tron Address -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Your USDT (TRC-20) Wallet Address <span style="color: var(--brand-red);">*</span></label>
-                            <div class="input-group-clean">
-                                <input type="text" id="withdraw-usdt-address-input" class="clean-input" placeholder="e.g. TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh" autocomplete="off" style="font-family: monospace; font-size: 0.85rem;">
-                            </div>
-                            <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
-                                Address must start with 'T' (Tron TRC-20 network). Double-check before submitting.
-                            </div>
-                        </div>
-
-                        <!-- Security PIN -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">6-Digit Security PIN</label>
-                            <div class="input-group-clean">
-                                <input type="password" id="withdraw-usdt-pin-input" class="clean-input" maxlength="6" placeholder="Enter Security PIN (or last 4 digits of phone)">
-                            </div>
-                        </div>
-
-                        <button type="button" id="submit-usdt-withdraw-btn" class="primary-action-btn" onclick="submitUsdtWithdrawalRequest()" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); box-shadow: 0 4px 12px rgba(16,185,129,0.3);">
-                            <span>⚡ Submit USDT TRC-20 Withdrawal</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                <polyline points="12 5 19 12 12 19"></polyline>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- FORM 2: BANK ACCOUNT WITHDRAWAL -->
-                    <div id="withdraw-bank-form-container" style="display: none;">
-                        <div class="card-header-title" style="margin-bottom: 1rem;">
-                            <span>Withdraw to Bank Account</span>
-                            <span style="font-size: 0.72rem; color: var(--accent-green); font-weight: 700;">2-24 Hrs Payout</span>
-                        </div>
-
-                        <!-- Withdrawal Amount -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Withdrawal Amount (₹200 - ₹1,00,000)</label>
-                            <div class="input-group-clean">
-                                <span class="input-currency-symbol">₹</span>
-                                <input type="number" id="withdraw-amount-input" class="clean-input" placeholder="Min ₹200" min="200" max="100000">
-                            </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
-                                <span>Available: <b id="withdraw-available-bal">₹0.00</b></span>
-                                <span style="color: var(--brand-red); cursor: pointer; font-weight: 700;" onclick="withdrawAllBalance()">Withdraw All</span>
-                            </div>
-                        </div>
-
-                        <!-- Bank Account Details -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Bank Account Holder Name</label>
-                            <div class="input-group-clean">
-                                <input type="text" id="withdraw-holder-input" class="clean-input" placeholder="Name as in Bank Passbook">
-                            </div>
-                        </div>
-
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Bank Account Number</label>
-                            <div class="input-group-clean">
-                                <input type="tel" id="withdraw-account-input" class="clean-input" placeholder="Enter bank account number">
-                            </div>
-                        </div>
-
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Bank IFSC Code</label>
-                            <div class="input-group-clean">
-                                <input type="text" id="withdraw-ifsc-input" class="clean-input" placeholder="e.g. SBIN0001234" style="text-transform: uppercase;">
-                            </div>
-                        </div>
-
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">Bank Name</label>
-                            <div class="input-group-clean">
-                                <input type="text" id="withdraw-bank-name-input" class="clean-input" placeholder="e.g. State Bank of India / HDFC">
-                            </div>
-                        </div>
-
-                        <!-- Security PIN -->
-                        <div class="form-group-spaced">
-                            <label class="form-field-label">6-Digit Security PIN</label>
-                            <div class="input-group-clean">
-                                <input type="password" id="withdraw-pin-input" class="clean-input" maxlength="6" placeholder="Enter Security PIN (or last 4 digits of phone)">
-                            </div>
-                        </div>
-
-                        <button type="button" id="submit-withdraw-btn" class="primary-action-btn" onclick="submitWithdrawalRequest()">
-                            <span>Submit Withdrawal Request</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                <polyline points="12 5 19 12 12 19"></polyline>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ============================================================ -->
-            <!-- TAB 3: PASSBOOK & TRANSACTION HISTORY -->
-            <!-- ============================================================ -->
-            <section id="section-history" style="display: none;">
-                <div class="card-header-title" style="margin-bottom: 0.5rem;">
-                    <span>Recent Transactions</span>
-                    <button type="button" onclick="loadWalletData()" style="background: transparent; border: none; color: var(--brand-red); font-size: 0.78rem; font-weight: 700; cursor: pointer;">
-                        🔄 Refresh
+                    <button type="button" class="btn-vip-secondary" onclick="goToDepositStage(1)">
+                        ← Change Amount
                     </button>
                 </div>
 
-                <!-- History items container -->
-                <div id="history-items-list">
-                    <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
-                        Loading transaction passbook...
+
+                <!-- STAGE 3: CHECKOUT & QR VERIFICATION -->
+                <div id="deposit-stage-3" style="display: none;">
+                    <!-- 10-Minute Countdown Clock -->
+                    <div class="timer-warning-card">
+                        <div class="timer-badge-label">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            Payment Session Expires In
+                        </div>
+                        <div class="timer-digits-val" id="checkout-timer-display">10:00</div>
+                        <div style="font-size: 0.68rem; color: var(--text-muted);">Please complete transfer before timer reaches 00:00</div>
+                    </div>
+
+                    <!-- USDT Checkout Box -->
+                    <div id="usdt-checkout-box" style="display: none;">
+                        <div class="qr-display-panel" style="border-color: #059669; background: rgba(5, 150, 105, 0.1);">
+                            <div style="font-size: 0.78rem; font-weight: 800; color: #34d399;">USDT Payable Amount</div>
+                            <div style="font-size: 1.55rem; font-weight: 900; color: #ffffff; font-family: 'JetBrains Mono', monospace; margin: 3px 0;" id="usdt-payable-amount">
+                                $2.22 USDT
+                            </div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;" id="usdt-inr-conversion-display">
+                                Equivalent to ₹200.00 (@ ₹90.00 / USDT)
+                            </div>
+                            <div style="font-size: 0.72rem; color: #34d399; font-weight: 800; margin-top: 3px;" id="usdt-stage3-bonus-display">
+                                + Includes ₹200.00 VIP Bonus
+                            </div>
+
+                            <img id="usdt-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh" alt="USDT QR" class="qr-image-frame" style="border-color: #059669;">
+
+                            <div class="copy-pill-bar">
+                                <div style="flex: 1; overflow: hidden; padding-right: 8px; text-align: left;">
+                                    <div style="font-size: 0.64rem; color: var(--text-muted);">USDT Address</div>
+                                    <div class="copy-pill-value" id="usdt-merchant-address" style="color: #34d399; font-size: 0.75rem; word-break: break-all;">TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh</div>
+                                </div>
+                                <button type="button" class="btn-copy-action" onclick="copyUsdtAddress()" style="background: #059669;">
+                                    <span>Copy</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="instruction-box">
+                            <div style="font-weight: 800; color: #34d399; margin-bottom: 4px;">📌 How to deposit USDT:</div>
+                            <ol>
+                                <li>Transfer USDT to the address above.</li>
+                                <li>Enter your <b>Transaction ID / Reference Number</b> below.</li>
+                                <li>Tap <b>Verify & Credit USDT</b> for instant credit.</li>
+                            </ol>
+                        </div>
+
+                        <div class="glass-panel">
+                            <div class="form-group-item">
+                                <label class="form-group-label" style="color: #34d399;">Transaction ID / Reference No. <span style="color: var(--red-primary);">*</span></label>
+                                <input type="text" id="usdt-txid-input" class="form-text-input" maxlength="80" placeholder="e.g. 5a2b3c4d..." autocomplete="off" style="font-family: monospace;">
+                            </div>
+
+                            <button type="button" id="submit-usdt-deposit-btn" class="btn-vip-primary" onclick="submitUsdtDepositTx()" style="background: #059669; border-color: #34d399;">
+                                <span>Verify & Credit USDT</span>
+                            </button>
+
+                            <button type="button" class="btn-vip-secondary" onclick="goToDepositStage(2)">
+                                ← Change Payment Channel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- UPI CHECKOUT BOX -->
+                    <div id="upi-checkout-box" style="display: block;">
+                        <div class="qr-display-panel">
+                            <div style="font-size: 0.74rem; font-weight: 700; color: var(--text-muted);">Amount Payable</div>
+                            <div style="font-size: 1.6rem; font-weight: 900; color: #FFD700; font-family: 'JetBrains Mono', monospace; margin: 3px 0;" id="stage-3-amount-display">
+                                ₹200.00
+                            </div>
+                            <div style="font-size: 0.74rem; color: #f87171; font-weight: 800;" id="stage-3-bonus-display">
+                                + Includes ₹200.00 100% Match Bonus
+                            </div>
+
+                            <img id="dynamic-qr-image" src="" alt="UPI Dynamic QR" class="qr-image-frame">
+
+                            <div class="copy-pill-bar">
+                                <div style="flex: 1; overflow: hidden; padding-right: 8px; text-align: left;">
+                                    <div style="font-size: 0.64rem; color: var(--text-muted);">Merchant UPI ID</div>
+                                    <div class="copy-pill-value" id="upi-merchant-id">6289140468@axl</div>
+                                </div>
+                                <button type="button" class="btn-copy-action" onclick="copyUpiAddress()">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <span>Copy</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Direct App Deep Link Button for Mobile -->
+                        <a id="upi-direct-app-link" href="#" class="btn-vip-primary" style="margin-bottom: 12px; text-decoration: none;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                            <span>Open In UPI App (GPay / PhonePe)</span>
+                        </a>
+
+                        <div class="instruction-box">
+                            <div style="font-weight: 800; color: #ffffff; margin-bottom: 4px;">📌 2-Step Fast Verification:</div>
+                            <ol>
+                                <li>Scan QR code with GPay / PhonePe / Paytm / BHIM and complete payment.</li>
+                                <li>Enter the <b>12-digit UTR / Ref Number</b> below and tap Submit.</li>
+                            </ol>
+                        </div>
+
+                        <!-- 12-Digit UTR Input Form -->
+                        <div class="glass-panel">
+                            <div class="form-group-item">
+                                <label class="form-group-label">Enter 12-Digit UTR / Reference No. <span style="color: var(--red-primary);">*</span></label>
+                                <input type="text" id="utr-ref-input" class="form-text-input" maxlength="12" placeholder="e.g. 423918273645 (12 digits)" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; letter-spacing: 1.5px; font-weight: 800;">
+                            </div>
+
+                            <button type="button" id="submit-utr-btn" class="btn-vip-primary" onclick="submitUtrDeposit()">
+                                <span>Submit UTR & Verify Deposit</span>
+                            </button>
+
+                            <button type="button" class="btn-vip-secondary" onclick="goToDepositStage(2)">
+                                ← Change Payment Channel
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
-        </main>
 
-        <!-- Notification Toast -->
-        <div id="cashier-toast"></div>
+
+            <!-- ============================================================ -->
+            <!-- 2. WITHDRAWAL VIEW -->
+            <!-- ============================================================ -->
+            <section id="section-withdraw" style="display: none;">
+                <!-- Available Balance Header -->
+                <div class="glass-panel" style="display: flex; align-items: center; justify-content: space-between; border-color: rgba(16, 185, 129, 0.4);">
+                    <div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">Withdrawable Balance</div>
+                        <div style="font-size: 1.45rem; font-weight: 900; color: #10b981; font-family: 'JetBrains Mono', monospace; margin-top: 1px;" id="withdraw-available-bal">
+                            ₹0.00
+                        </div>
+                    </div>
+                    <div style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 800;">
+                        Min ₹500
+                    </div>
+                </div>
+
+                <!-- Withdrawal Method Switcher (USDT Highlighted by default vs Bank) -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                    <button type="button" id="wtab-usdt-btn" onclick="switchWithdrawMethod('USDT')" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 8px; font-weight: 800; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.35); transition: all 0.2s;">
+                        <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+                            <circle cx="16" cy="16" r="16" fill="#26A17B"/>
+                            <path d="M17.9 14.8v-1.6h5.3V10H8.8v3.2h5.3v1.6c-4.4.2-7.7 1.1-7.7 2.2 0 1.1 3.3 2 7.7 2.2v5.1h3.8v-5.1c4.4-.2 7.7-1.1 7.7-2.2 0-1.1-3.3-2-7.7-2.2zm-1.9 3.1c-3.1 0-5.7-.6-5.7-1.3s2.6-1.3 5.7-1.3 5.7.6 5.7 1.3-2.6 1.3-5.7 1.3z" fill="#FFF"/>
+                        </svg>
+                        <span>USDT Crypto</span>
+                    </button>
+
+                    <button type="button" id="wtab-bank-btn" onclick="switchWithdrawMethod('BANK')" style="background: var(--card-elevated); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                        <span>Bank Transfer</span>
+                    </button>
+                </div>
+
+                <!-- 1. USDT WITHDRAWAL FORM (Default Selected) -->
+                <div id="withdraw-usdt-form-container" class="glass-panel" style="border-color: rgba(16, 185, 129, 0.4); display: block;">
+                    <div class="panel-heading">
+                        <span style="display: flex; align-items: center; gap: 6px; color: #34d399;">
+                            <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+                                <circle cx="16" cy="16" r="16" fill="#26A17B"/>
+                                <path d="M17.9 14.8v-1.6h5.3V10H8.8v3.2h5.3v1.6c-4.4.2-7.7 1.1-7.7 2.2 0 1.1 3.3 2 7.7 2.2v5.1h3.8v-5.1c4.4-.2 7.7-1.1 7.7-2.2 0-1.1-3.3-2-7.7-2.2zm-1.9 3.1c-3.1 0-5.7-.6-5.7-1.3s2.6-1.3 5.7-1.3 5.7.6 5.7 1.3-2.6 1.3-5.7 1.3z" fill="#FFF"/>
+                            </svg>
+                            USDT Crypto Withdrawal
+                        </span>
+                        <span style="font-size: 0.68rem; color: #34d399; font-weight: 700;">0% Fee • Instant</span>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label class="form-group-label">Your USDT Wallet Address <span style="color: #34d399;">*</span></label>
+                        <input type="text" id="withdraw-usdt-address-input" class="form-text-input" placeholder="Enter your USDT wallet address (e.g. TEX8NYBX...)" required style="font-family: monospace; border-color: rgba(16,185,129,0.3);">
+                    </div>
+
+                    <div class="form-group-item">
+                        <label class="form-group-label">Withdrawal Amount in ₹ (₹500 - ₹50,000) <span style="color: var(--red-primary);">*</span></label>
+                        <div class="currency-input-wrapper" style="border-color: rgba(16,185,129,0.3);">
+                            <span class="currency-prefix" style="color: #34d399;">₹</span>
+                            <input type="number" id="withdraw-usdt-amount-input" class="custom-number-input" placeholder="Min 500" min="500" max="50000" required oninput="calculateUsdtPayoutAmount(this.value)">
+                            <button type="button" class="quick-chip-btn" onclick="withdrawAllBalanceUsdt()" style="margin-left: 6px; background: #059669; color: #fff; border: none;">MAX</button>
+                        </div>
+                    </div>
+
+                    <!-- Live Conversion Box -->
+                    <div style="background: rgba(5, 150, 105, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9px; padding: 10px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;">You will receive:</span>
+                        <span id="withdraw-usdt-get-amount" style="font-size: 1.1rem; font-weight: 900; color: #34d399; font-family: 'JetBrains Mono', monospace;">$0.00 USDT</span>
+                    </div>
+
+                    <button type="button" id="submit-usdt-withdraw-btn" class="btn-vip-primary" onclick="submitUsdtWithdrawalRequest()" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); border-color: #34d399; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);">
+                        <span>Confirm USDT Withdrawal</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </button>
+                </div>
+
+                <!-- 2. BANK WITHDRAWAL FORM -->
+                <div id="withdraw-bank-form-container" class="glass-panel" style="display: none;">
+                    <div class="panel-heading">
+                        <span style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                            Direct Bank Transfer
+                        </span>
+                        <span style="font-size: 0.68rem; color: var(--text-muted);">Instant NEFT / IMPS</span>
+                    </div>
+
+                    <form id="withdraw-form" onsubmit="handleWithdrawalSubmit(event)">
+                        <div class="form-group-item">
+                            <label class="form-group-label">Account Holder Full Name</label>
+                            <input type="text" id="withdraw-holder-name" class="form-text-input" placeholder="Enter bank registered name">
+                        </div>
+
+                        <div class="form-group-item">
+                            <label class="form-group-label">Bank Account Number</label>
+                            <input type="text" id="withdraw-acc-num" class="form-text-input" placeholder="Enter 9-18 digit account number" inputmode="numeric">
+                        </div>
+
+                        <div class="form-group-item">
+                            <label class="form-group-label">Bank IFSC Code</label>
+                            <input type="text" id="withdraw-ifsc" class="form-text-input" placeholder="e.g. SBIN0001234" maxlength="11" style="text-transform: uppercase;">
+                        </div>
+
+                        <div class="form-group-item">
+                            <label class="form-group-label">Registered Mobile Number</label>
+                            <input type="tel" id="withdraw-mobile" class="form-text-input" placeholder="10-digit mobile number" maxlength="10">
+                        </div>
+
+                        <div class="form-group-item">
+                            <label class="form-group-label">Withdrawal Amount (₹500 - ₹50,000)</label>
+                            <div class="currency-input-wrapper">
+                                <span class="currency-prefix">₹</span>
+                                <input type="number" id="withdraw-amount-input" class="custom-number-input" placeholder="Min 500" min="500" max="50000">
+                                <button type="button" class="quick-chip-btn" onclick="fillMaxWithdraw()" style="margin-left: 6px; background: var(--red-primary); color: #fff; border: none;">MAX</button>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="withdraw-submit-btn" class="btn-vip-primary" style="margin-top: 10px;">
+                            <span>Confirm Bank Withdrawal</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+
+            <!-- ============================================================ -->
+            <!-- 3. PASSBOOK / HISTORY VIEW -->
+            <!-- ============================================================ -->
+            <section id="section-history" style="display: none;">
+                <div class="history-filter-bar">
+                    <button type="button" class="filter-chip-btn active" onclick="filterTransactions('ALL', this)">All</button>
+                    <button type="button" class="filter-chip-btn" onclick="filterTransactions('DEPOSIT', this)">Deposits</button>
+                    <button type="button" class="filter-chip-btn" onclick="filterTransactions('WITHDRAWAL', this)">Withdrawals</button>
+                    <button type="button" class="filter-chip-btn" onclick="filterTransactions('BONUS', this)">VIP Bonuses</button>
+                </div>
+
+                <div id="history-list-container">
+                    <!-- Dynamic rendering via payment.js -->
+                    <div style="text-align: center; padding: 30px; color: var(--text-dim);">
+                        Loading transaction history...
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
-    <script type="module" src="js/payment.js"></script>
+    <!-- TOAST POPUP NOTIFICATION -->
+    <div id="cashier-toast"></div>
+
+    <!-- UNIVERSAL BOTTOM NAVIGATION BAR (VIP) -->
+    <nav class="app-bottom-nav">
+        <button class="bottom-nav-item" data-tab="home" onclick="window.navigateToPage('index.html', 'Loading Home...')" title="Home">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span class="bottom-nav-label">Home</span>
+        </button>
+
+        <button class="bottom-nav-item" data-tab="checkin" onclick="window.navigateToPage('checkin.html', 'Loading Daily Sign In...')" title="Daily Sign In">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+                <circle cx="12" cy="15" r="2"></circle>
+            </svg>
+            <span class="bottom-nav-label">Daily Sign In</span>
+        </button>
+
+        <button class="bottom-nav-item" data-tab="referral" onclick="window.navigateToPage('referral.html', 'Loading Referral Hub...')" title="Referral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span class="bottom-nav-label">Referral</span>
+        </button>
+
+        <button class="bottom-nav-item active" data-tab="wallet" onclick="window.navigateToPage('payment.html', 'Loading Cashier & Wallet...')" title="Wallet & Cashier">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                <line x1="1" y1="10" x2="23" y2="10"></line>
+                <circle cx="18" cy="15" r="1.5"></circle>
+            </svg>
+            <span class="bottom-nav-label">Wallet</span>
+        </button>
+
+        <button class="bottom-nav-item" data-tab="profile" onclick="window.navigateToPage('profile.html', 'Loading Profile...')" title="User Profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span class="bottom-nav-label">Profile</span>
+        </button>
+    </nav>
+
+    <!-- PAYMENT CONTROLLER JAVASCRIPT -->
+    <script src="js/payment.js"></script>
 </body>
 </html>
