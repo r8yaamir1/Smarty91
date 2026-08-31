@@ -220,12 +220,21 @@ export async function placeBet(betData) {
     const targetMode = normalizeMode(betData.mode || betData.gameType || activeModeKey);
     const modeState = gameModes[targetMode];
 
-    const totalAmount = betData.betAmount;
+    const totalAmount = Number(betData.betAmount) || 0;
     if (totalAmount <= 0) return { success: false, message: 'Invalid bet amount' };
 
-    const currentBalance = getBalance();
+    let currentBalance = getBalance();
+    
+    // If client balance appears insufficient, attempt an immediate fresh sync with the server before failing
     if (totalAmount > currentBalance) {
-        return { success: false, message: 'Insufficient balance' };
+        try {
+            currentBalance = await syncServerBalance(false);
+        } catch (e) {}
+    }
+
+    // Only reject if even after live sync the balance is insufficient
+    if (totalAmount > currentBalance) {
+        return { success: false, message: 'Insufficient wallet balance. Please recharge.' };
     }
 
     try {

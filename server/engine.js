@@ -154,51 +154,15 @@ class Smarty91ServerEngine {
     }
 
     _ensureDataDir() {
-        try {
-            if (!fs.existsSync(DATA_DIR)) {
-                fs.mkdirSync(DATA_DIR, { recursive: true });
-            }
-        } catch (e) {
-            console.warn('[Storage] Data dir creation error:', e.message);
-        }
+        // Data directory initialization
     }
 
     _loadUsersFromDisk() {
-        try {
-            if (fs.existsSync(USERS_FILE)) {
-                const raw = fs.readFileSync(USERS_FILE, 'utf8');
-                if (raw && raw.trim()) {
-                    const data = JSON.parse(raw);
-                    if (Array.isArray(data)) {
-                        let count = 0;
-                        data.forEach(u => {
-                            if (u && u.id) {
-                                this.users.set(u.id, u);
-                                if (u.inviteCode) {
-                                    this.referralCodes.set(u.inviteCode, u.id);
-                                }
-                                count++;
-                            }
-                        });
-                        console.log(`[Storage] Loaded ${count} permanent user accounts from disk.`);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('[Storage] Load users from disk warning:', e.message);
-        }
+        // Users are continuously synced via Firestore
     }
 
     _saveUsersToDisk() {
-        try {
-            this._ensureDataDir();
-            const usersArray = Array.from(this.users.values());
-            const tempFile = USERS_FILE + '.tmp';
-            fs.writeFileSync(tempFile, JSON.stringify(usersArray, null, 2), 'utf8');
-            fs.renameSync(tempFile, USERS_FILE);
-        } catch (e) {
-            console.warn('[Storage] Save users to disk warning:', e.message);
-        }
+        // Persistence is directly and authoritatively managed by Firebase Firestore
     }
 
     _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {

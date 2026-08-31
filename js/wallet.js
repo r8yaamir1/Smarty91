@@ -5,9 +5,17 @@ import { subscribeToUserBalance } from './services/firebaseClient.js';
 let currentBalance = Number(localStorage.getItem('smarty91_cached_balance')) || 0.00;
 
 let activeBalanceListener = null;
+let activeUserId = null;
 
 // Dynamic listener setup that can be re-run whenever login state changes
 export function setupBalanceListener() {
+    const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
+    
+    // If listener is already active for this exact user, don't duplicate unless forced
+    if (activeBalanceListener && activeUserId === currentUserId) {
+        return;
+    }
+
     if (activeBalanceListener) {
         try {
             activeBalanceListener(); // Unsubscribe previous listener
@@ -15,11 +23,12 @@ export function setupBalanceListener() {
         activeBalanceListener = null;
     }
 
-    const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
+    activeUserId = currentUserId;
+
     try {
         activeBalanceListener = subscribeToUserBalance(currentUserId, (userData) => {
-            if (userData && typeof userData.balance === 'number') {
-                currentBalance = userData.balance;
+            if (userData && (typeof userData.balance === 'number' || !isNaN(Number(userData.balance)))) {
+                currentBalance = Number(userData.balance) || 0.00;
                 localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
                 renderBalance();
             }
@@ -32,14 +41,18 @@ export function setupBalanceListener() {
 // Initial listener setup
 setupBalanceListener();
 
-// Listen for balance changes across other tabs
+// Listen for balance changes across other tabs or local storage updates
 window.addEventListener('storage', (e) => {
-    if (e.key === 'smarty91_cached_balance' && e.newValue) {
+    if (e.key === 'smarty91_cached_balance' && e.newValue !== null) {
         const val = Number(e.newValue);
         if (!isNaN(val)) {
             currentBalance = val;
             renderBalance();
         }
+    }
+    if (e.key === 'smarty91_user_id') {
+        setupBalanceListener();
+        syncServerBalance();
     }
 });
 

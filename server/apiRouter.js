@@ -25,15 +25,13 @@ const getAuthUser = (req) => {
     return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
 };
 
-// Helper to resolve current logged-in user or guest asynchronously with fresh Firestore state
+// Helper to resolve current logged-in user asynchronously with fresh Firestore state
 const getAuthUserAsync = async (req) => {
     const authHeader = req.headers.authorization;
     if (authHeader) {
         const user = await serverEngine.resolveUserFromToken(authHeader);
         if (user) return user;
     }
-    // Strict block: Do not ever return a fake cached default_user if a token is not present
-    // Returning dummy accounts automatically overwrites people's wallets with 0 balance.
     return null;
 };
 
@@ -306,6 +304,9 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
 apiRouter.post('/bets/place', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to place bets.' });
+        }
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
         const result = await serverEngine.placeBet({
             userId: authUser.id,
@@ -328,6 +329,9 @@ apiRouter.post('/bets/place', async (req, res) => {
 apiRouter.get('/bets/my-history/:mode', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.json({ success: true, mode: req.params.mode, page: 1, totalPages: 1, totalItems: 0, items: [] });
+        }
         const mode = req.params.mode;
         const page = parseInt(req.query.page, 10) || 1;
         const limitAmount = parseInt(req.query.limit, 10) || 10;

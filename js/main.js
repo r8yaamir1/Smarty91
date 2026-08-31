@@ -14,7 +14,6 @@ import { initAudio } from './audio.js';
 import { initWalletModals, updateHeaderUserUI, renderBalance, syncServerBalance, setupBalanceListener } from './wallet.js';
 import { initGameRecord } from './gameRecord.js';
 import { initAllEvents } from './events.js';
-import { initAdminPanel } from './adminPanel.js';
 import { initHomeNavigation } from './homeNavigation.js';
 
 function initViewportLock() {
@@ -62,7 +61,6 @@ async function bootstrap() {
     initWalletModals();
     initAllEvents();
     initGameRecord();
-    initAdminPanel();
     initHomeNavigation();
     console.log('Smarty91 VIP ready!');
 }
