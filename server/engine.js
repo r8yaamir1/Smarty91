@@ -262,6 +262,15 @@ class Smarty91ServerEngine {
         if (inviteCode) {
             const cleanInvite = String(inviteCode).trim().toUpperCase();
             referrerId = this.referralCodes.get(cleanInvite) || null;
+            if (!referrerId) {
+                for (const u of this.users.values()) {
+                    if ((u.inviteCode && u.inviteCode.toUpperCase() === cleanInvite) || (u.id && u.id.toUpperCase() === cleanInvite)) {
+                        referrerId = u.id;
+                        this.referralCodes.set(cleanInvite, u.id);
+                        break;
+                    }
+                }
+            }
         }
 
         let userInviteCode = this._generateInviteCode();
@@ -1002,6 +1011,9 @@ class Smarty91ServerEngine {
         firebaseSync.updateUserBalance(userId, user.balance, `Bet on ${mode} round ${activePeriodId}`).catch(e => console.warn('[Bet Balance Sync]', e.message));
         firebaseSync.saveTransaction(ledgerEntry).catch(e => console.warn('[Ledger Save]', e.message));
 
+        // 1% Lifetime Betting Commission to Referrer
+        this._processReferralBetCommission(user, totalAmount, mode, activePeriodId, betId);
+
         return {
             success: true,
             bet: betOrder,
@@ -1347,15 +1359,8 @@ class Smarty91ServerEngine {
                 description: `USDT TRC-20 deposit auto-credited: $${usdtVal} USDT (₹${numAmount}) + ₹${bonusAmount} Bonus`
             });
 
-            notifyNewDeposit({
-                userId,
-                phone: userObj.phone || userObj.username || userId,
-                amount: numAmount,
-                bonusAmount,
-                utrNumber: `USDT: ${cleanTxid}`,
-                channel: 'USDT_TRC20 (AUTO-APPROVED)',
-                txId
-            }).catch(e => console.warn('[Telegram Deposit Alert]', e.message));
+            userObj.hasDeposited = true;
+            this._processReferralDepositCommission(userObj, numAmount, txId);
 
             return {
                 success: true,
@@ -1586,40 +1591,9 @@ class Smarty91ServerEngine {
                     description: `Deposit approved: UTR ${tx.utrNumber}`
                 });
 
-                // Check First Deposit Referral Reward: Referrer gets ₹100 instant real balance!
-                if (!user.hasDeposited && user.referredBy) {
-                    user.hasDeposited = true;
-                    const referrer = this.users.get(user.referredBy);
-                    if (referrer) {
-                        const refBalBefore = referrer.balance;
-                        referrer.balance += 100.00; // Flat ₹100 real balance bonus
-                        const refBalAfter = referrer.balance;
-
-                        this.ledger.unshift({
-                            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                            userId: referrer.id,
-                            type: 'REFERRAL_REWARD',
-                            amount: 100.00,
-                            balanceBefore: refBalBefore,
-                            balanceAfter: refBalAfter,
-                            referenceId: tx.id,
-                            timestamp: new Date().toISOString(),
-                            description: `Instant ₹100 Referral Bonus for invited friend's first deposit (User: ${user.phone})`
-                        });
-
-                        firebaseSync.updateUserBalance(referrer.id, referrer.balance, 'Referral deposit reward ₹100');
-                        
-                        const refLogMsg = `Awarded ₹100 Referral Reward to ${referrer.phone} for first deposit of ${user.phone}`;
-                        this.auditLogs.unshift({
-                            id: 'AUDIT_' + Date.now(),
-                            action: 'REFERRAL_REWARD_CREDITED',
-                            details: refLogMsg,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                } else {
-                    user.hasDeposited = true;
-                }
+                // 10% Instant Deposit Referral Commission & Progression Milestone check
+                user.hasDeposited = true;
+                this._processReferralDepositCommission(user, tx.amount, tx.id);
 
                 // Credit VIP bonus balance if eligible
                 if (tx.bonusAmount && tx.bonusAmount > 0) {
@@ -1874,19 +1848,210 @@ class Smarty91ServerEngine {
         };
     }
 
+    _getReferrer(user) {
+        if (!user || !user.referredBy) return null;
+        let referrer = this.users.get(user.referredBy);
+        if (!referrer) {
+            const cleanRef = String(user.referredBy).trim().toUpperCase();
+            const refUserId = this.referralCodes.get(cleanRef);
+            if (refUserId) {
+                referrer = this.users.get(refUserId);
+            } else {
+                for (const u of this.users.values()) {
+                    if ((u.inviteCode && u.inviteCode.toUpperCase() === cleanRef) || u.id === user.referredBy) {
+                        referrer = u;
+                        break;
+                    }
+                }
+            }
+        }
+        if (referrer && referrer.id !== user.id) {
+            return referrer;
+        }
+        return null;
+    }
+
+    _processReferralDepositCommission(depositingUser, depositAmount, txReferenceId = '') {
+        try {
+            if (!depositingUser || Number(depositAmount) <= 0) return;
+            const referrer = this._getReferrer(depositingUser);
+            if (!referrer) return;
+
+            // 10% Instant Deposit Commission
+            const commission = Number((Number(depositAmount) * 0.10).toFixed(2));
+            if (commission <= 0) return;
+
+            const refBalBefore = referrer.balance;
+            referrer.balance = Number((referrer.balance + commission).toFixed(2));
+            referrer.totalReferralCommission = Number(((referrer.totalReferralCommission || 0) + commission).toFixed(2));
+            referrer.depositCommissionEarned = Number(((referrer.depositCommissionEarned || 0) + commission).toFixed(2));
+            const refBalAfter = referrer.balance;
+
+            const phoneStr = String(depositingUser.phone || depositingUser.username || 'Friend');
+            const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
+
+            const ledgerEntry = {
+                id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                userId: referrer.id,
+                type: 'REFERRAL_DEPOSIT_COMMISSION',
+                amount: commission,
+                balanceBefore: refBalBefore,
+                balanceAfter: refBalAfter,
+                referenceId: txReferenceId || ('DEP_' + Date.now()),
+                timestamp: new Date().toISOString(),
+                description: `⚡ 10% Deposit Bonus: ₹${commission} from invited friend (${maskedPhone}) on ₹${depositAmount} recharge`
+            };
+
+            this.ledger.unshift(ledgerEntry);
+            this._saveUsersToDisk();
+
+            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `10% Deposit Referral Bonus ₹${commission}`);
+            firebaseSync.saveTransaction(ledgerEntry);
+
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'REFERRAL_DEPOSIT_COMMISSION',
+                details: `Awarded ₹${commission} (10%) to ${referrer.phone} for ₹${depositAmount} deposit from ${depositingUser.phone}`,
+                timestamp: new Date().toISOString()
+            });
+
+            // Check progression milestones
+            this._checkAndAwardReferralMilestones(referrer.id);
+        } catch (e) {
+            console.warn('[Referral Deposit Commission Error]', e.message);
+        }
+    }
+
+    _processReferralBetCommission(bettingUser, betAmount, mode = 'Wingo', periodId = '', betId = '') {
+        try {
+            if (!bettingUser || Number(betAmount) <= 0) return;
+            const referrer = this._getReferrer(bettingUser);
+            if (!referrer) return;
+
+            // 1% Lifetime Betting Commission on turnover
+            const commission = Number((Number(betAmount) * 0.01).toFixed(2));
+            if (commission <= 0) return;
+
+            const refBalBefore = referrer.balance;
+            referrer.balance = Number((referrer.balance + commission).toFixed(2));
+            referrer.totalReferralCommission = Number(((referrer.totalReferralCommission || 0) + commission).toFixed(2));
+            referrer.betCommissionEarned = Number(((referrer.betCommissionEarned || 0) + commission).toFixed(2));
+            const refBalAfter = referrer.balance;
+
+            const phoneStr = String(bettingUser.phone || bettingUser.username || 'Friend');
+            const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
+
+            const ledgerEntry = {
+                id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                userId: referrer.id,
+                type: 'REFERRAL_BET_COMMISSION',
+                amount: commission,
+                balanceBefore: refBalBefore,
+                balanceAfter: refBalAfter,
+                referenceId: betId || ('BET_' + Date.now()),
+                timestamp: new Date().toISOString(),
+                description: `🎯 1% Bet Commission: ₹${commission} from invited friend (${maskedPhone}) in ${mode} [${periodId}]`
+            };
+
+            this.ledger.unshift(ledgerEntry);
+            this._saveUsersToDisk();
+
+            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `1% Bet Referral Commission ₹${commission}`);
+            firebaseSync.saveTransaction(ledgerEntry);
+        } catch (e) {
+            console.warn('[Referral Bet Commission Error]', e.message);
+        }
+    }
+
+    _checkAndAwardReferralMilestones(referrerId) {
+        try {
+            const referrer = this.users.get(referrerId);
+            if (!referrer) return;
+
+            const inviteCode = referrer.inviteCode;
+            let activeCount = 0;
+            for (const u of this.users.values()) {
+                if (u.id === referrer.id) continue;
+                if (u.referredBy === referrer.id || u.referredBy === inviteCode || (u.referredBy && String(u.referredBy).toUpperCase() === String(inviteCode).toUpperCase())) {
+                    const hasDep = Boolean(u.hasDeposited || this.transactions.some(t => t.userId === u.id && t.type === 'DEPOSIT' && t.status === 'APPROVED'));
+                    if (hasDep) activeCount++;
+                }
+            }
+
+            referrer.awardedMilestones = referrer.awardedMilestones || [];
+
+            const milestones = [
+                { count: 1, bonus: 20.00, title: 'Tier 1 Agent Welcome Bonus' },
+                { count: 3, bonus: 50.00, title: 'VIP Bronze Agent Milestone' },
+                { count: 5, bonus: 150.00, title: '5-Friend Super Agent Milestone' },
+                { count: 10, bonus: 500.00, title: 'Master VIP Agent 10-Friends Bonus' },
+                { count: 25, bonus: 1500.00, title: 'Millionaire VIP Agent 25-Friends Bonus' }
+            ];
+
+            for (const ms of milestones) {
+                if (activeCount >= ms.count && !referrer.awardedMilestones.includes(ms.count)) {
+                    referrer.awardedMilestones.push(ms.count);
+                    const refBalBefore = referrer.balance;
+                    referrer.balance = Number((referrer.balance + ms.bonus).toFixed(2));
+                    referrer.totalReferralCommission = Number(((referrer.totalReferralCommission || 0) + ms.bonus).toFixed(2));
+                    referrer.milestoneBonusEarned = Number(((referrer.milestoneBonusEarned || 0) + ms.bonus).toFixed(2));
+                    const refBalAfter = referrer.balance;
+
+                    const ledgerEntry = {
+                        id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        userId: referrer.id,
+                        type: 'REFERRAL_MILESTONE_BONUS',
+                        amount: ms.bonus,
+                        balanceBefore: refBalBefore,
+                        balanceAfter: refBalAfter,
+                        referenceId: `MS_${ms.count}_${Date.now()}`,
+                        timestamp: new Date().toISOString(),
+                        description: `👑 ${ms.title}: ₹${ms.bonus} Milestone Reward for reaching ${ms.count} active recharged players!`
+                    };
+
+                    this.ledger.unshift(ledgerEntry);
+                    this._saveUsersToDisk();
+
+                    firebaseSync.updateUserBalance(referrer.id, referrer.balance, `Referral Milestone ${ms.count} Bonus ₹${ms.bonus}`);
+                    firebaseSync.saveTransaction(ledgerEntry);
+
+                    this.auditLogs.unshift({
+                        id: 'AUDIT_' + Date.now(),
+                        action: 'REFERRAL_MILESTONE_AWARDED',
+                        details: `Awarded ${ms.title} (₹${ms.bonus}) to ${referrer.phone} for ${activeCount} active referrals`,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[Referral Milestone Error]', e.message);
+        }
+    }
+
     getReferralSummary(userId = 'default_user') {
         const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
         const inviteCode = user.inviteCode || 'SM9101';
 
         // Find all referred users
         const referredList = [];
-        let totalBonusEarned = 0;
+        let totalDepositVolume = 0;
+        let totalBetVolume = 0;
 
         for (const u of this.users.values()) {
+            if (u.id === user.id) continue;
             if (u.referredBy === userId || u.referredBy === inviteCode || (u.referredBy && String(u.referredBy).toUpperCase() === String(inviteCode).toUpperCase())) {
-                const hasDep = Boolean(u.hasDeposited || this.transactions.some(t => t.userId === u.id && t.type === 'DEPOSIT' && t.status === 'APPROVED'));
-                const commEarned = hasDep ? 100 : 0;
-                totalBonusEarned += commEarned;
+                const userDeposits = this.transactions.filter(t => t.userId === u.id && t.type === 'DEPOSIT' && t.status === 'APPROVED');
+                const hasDep = Boolean(u.hasDeposited || userDeposits.length > 0);
+                const depSum = userDeposits.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+                totalDepositVolume += depSum;
+
+                const userBets = Array.from(this.bets.values()).filter(b => b.userId === u.id);
+                const betSum = userBets.reduce((acc, b) => acc + (Number(b.totalAmount) || 0), 0);
+                totalBetVolume += betSum;
+
+                const depCommFromUser = Number((depSum * 0.10).toFixed(2));
+                const betCommFromUser = Number((betSum * 0.01).toFixed(2));
+                const totalCommFromUser = Number((depCommFromUser + betCommFromUser).toFixed(2));
 
                 const phoneStr = String(u.phone || u.username || '9876543210');
                 const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
@@ -1895,20 +2060,77 @@ class Smarty91ServerEngine {
                     userId: u.id,
                     phone: maskedPhone,
                     hasDeposited: hasDep,
-                    joinedAt: u.createdAt || new Date().toISOString(),
-                    bonusEarned: commEarned
+                    depositCount: userDeposits.length,
+                    totalDeposited: depSum,
+                    totalBets: userBets.length,
+                    totalBetAmount: betSum,
+                    depositCommission: depCommFromUser,
+                    betCommission: betCommFromUser,
+                    totalCommission: totalCommFromUser,
+                    joinedAt: u.createdAt || new Date().toISOString()
                 });
             }
         }
 
+        const activeCount = referredList.filter(r => r.hasDeposited).length;
+        const totalInvites = referredList.length;
+
+        // Calculate total earnings from ledger entries
+        const userLedgers = this.ledger.filter(l => l.userId === user.id);
+        const depCommLedger = userLedgers.filter(l => l.type === 'REFERRAL_DEPOSIT_COMMISSION' || l.type === 'REFERRAL_REWARD').reduce((s, l) => s + Math.max(0, Number(l.amount) || 0), 0);
+        const betCommLedger = userLedgers.filter(l => l.type === 'REFERRAL_BET_COMMISSION').reduce((s, l) => s + Math.max(0, Number(l.amount) || 0), 0);
+        const milestoneLedger = userLedgers.filter(l => l.type === 'REFERRAL_MILESTONE_BONUS').reduce((s, l) => s + Math.max(0, Number(l.amount) || 0), 0);
+
+        const depComm = Number((user.depositCommissionEarned !== undefined ? user.depositCommissionEarned : (depCommLedger || (totalDepositVolume * 0.10))).toFixed(2));
+        const betComm = Number((user.betCommissionEarned !== undefined ? user.betCommissionEarned : (betCommLedger || (totalBetVolume * 0.01))).toFixed(2));
+        const milestoneComm = Number((user.milestoneBonusEarned !== undefined ? user.milestoneBonusEarned : milestoneLedger).toFixed(2));
+        const totalEarned = Number((user.totalReferralCommission !== undefined ? user.totalReferralCommission : (depComm + betComm + milestoneComm)).toFixed(2));
+
+        const awardedMs = user.awardedMilestones || [];
+
+        const milestoneDefinitions = [
+            { count: 1, bonus: 20, title: '1 Active Friend', desc: '10% Deposit + 1% Bet Active', isUnlocked: activeCount >= 1, isAwarded: awardedMs.includes(1) },
+            { count: 3, bonus: 50, title: '3 Active Friends', desc: 'Bronze Agent + ₹50 Bonus', isUnlocked: activeCount >= 3, isAwarded: awardedMs.includes(3) },
+            { count: 5, bonus: 150, title: '5 Friends (SUPER AGENT)', desc: '5/5 Milestone Complete + ₹150 Bonus', isUnlocked: activeCount >= 5, isAwarded: awardedMs.includes(5), isFeatured: true },
+            { count: 10, bonus: 500, title: '10 Active Friends', desc: 'Master Agent + ₹500 Bonus', isUnlocked: activeCount >= 10, isAwarded: awardedMs.includes(10) },
+            { count: 25, bonus: 1500, title: '25 Active Friends', desc: 'VIP Millionaire + ₹1,500 Bonus', isUnlocked: activeCount >= 25, isAwarded: awardedMs.includes(25) }
+        ];
+
+        // 5-Friend Target Progression
+        const target5 = 5;
+        const progress5Percent = Math.min(100, Math.round((activeCount / target5) * 100));
+
+        // Recent 15 commission records for live feed
+        const recentCommissions = userLedgers
+            .filter(l => l.type && l.type.startsWith('REFERRAL_'))
+            .slice(0, 15)
+            .map(l => ({
+                id: l.id,
+                type: l.type,
+                amount: l.amount,
+                timestamp: l.timestamp,
+                description: l.description
+            }));
+
         return {
             success: true,
             inviteCode,
-            totalInvites: referredList.length,
-            activeDepositors: referredList.filter(r => r.hasDeposited).length,
-            totalCommissionEarned: totalBonusEarned,
-            rewardPerDeposit: 100,
-            referrals: referredList.reverse()
+            totalInvites,
+            activeDepositors: activeCount,
+            totalCommissionEarned: totalEarned,
+            depositCommissionEarned: depComm,
+            betCommissionEarned: betComm,
+            milestoneBonusEarned: milestoneComm,
+            progression: {
+                current: activeCount,
+                target: target5,
+                percent: progress5Percent,
+                isCompleted: activeCount >= target5,
+                remaining: Math.max(0, target5 - activeCount)
+            },
+            milestones: milestoneDefinitions,
+            referrals: referredList.reverse(),
+            recentCommissions
         };
     }
 
