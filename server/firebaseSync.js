@@ -14,7 +14,8 @@ import {
     orderBy,
     limit,
     getDocs,
-    increment
+    increment,
+    runTransaction
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -469,6 +470,101 @@ class FirebaseSyncManager {
         }
     }
 
+    async placeBetTransaction(userId, totalAmount, betOrder, ledgerEntry) {
+        if (!this._checkQuota()) throw new Error('System busy');
+        return await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await transaction.get(userRef);
+            if (!userSnap.exists()) {
+                throw new Error("User account not found in database");
+            }
+
+            const userData = userSnap.data();
+            const currentBalance = Number(userData.balance || 0);
+            
+            if (currentBalance < totalAmount) {
+                throw new Error("Insufficient wallet balance");
+            }
+
+            const newBalance = Number((currentBalance - totalAmount).toFixed(2));
+            
+            // Deduct balance
+            transaction.update(userRef, { 
+                balance: newBalance,
+                lastUpdatedReason: 'Bet placed',
+                updatedAt: new Date().toISOString()
+            });
+
+            // Save Bet
+            const betRef = doc(db, 'bets', betOrder.id);
+            transaction.set(betRef, {
+                ...betOrder,
+                updatedAt: new Date().toISOString()
+            });
+
+            // Save Ledger
+            if (ledgerEntry) {
+                const ledgerRef = doc(db, 'transactions', ledgerEntry.id);
+                transaction.set(ledgerRef, {
+                    ...ledgerEntry,
+                    balanceBefore: currentBalance,
+                    balanceAfter: newBalance,
+                    timestamp: Date.now(),
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
+            return newBalance;
+        });
+    }
+
+    async settleWinningBetTransaction(userId, payoutAmount, betOrder, ledgerEntry) {
+        if (!this._checkQuota()) return;
+        return await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, 'users', userId);
+            const userSnap = await transaction.get(userRef);
+            
+            let currentBalance = 0;
+            if (userSnap.exists()) {
+                currentBalance = Number(userSnap.data().balance || 0);
+            } else {
+                // If the user somehow doesn't exist, we must recreate their profile securely
+                // However, they placed a bet, so they must exist. 
+                throw new Error("User account not found for settlement");
+            }
+
+            const newBalance = Number((currentBalance + payoutAmount).toFixed(2));
+            
+            transaction.update(userRef, {
+                balance: newBalance,
+                lastUpdatedReason: 'Round win payout',
+                updatedAt: new Date().toISOString()
+            });
+
+            const betRef = doc(db, 'bets', betOrder.id);
+            transaction.update(betRef, {
+                status: betOrder.status,
+                payoutAmount: betOrder.payoutAmount,
+                resultNumber: betOrder.resultNumber,
+                resultColor: betOrder.resultColor,
+                resultSize: betOrder.resultSize,
+                settledAt: betOrder.settledAt,
+                updatedAt: new Date().toISOString()
+            });
+
+            if (ledgerEntry) {
+                const ledgerRef = doc(db, 'transactions', ledgerEntry.id);
+                transaction.set(ledgerRef, {
+                    ...ledgerEntry,
+                    balanceBefore: currentBalance,
+                    balanceAfter: newBalance,
+                    timestamp: Date.now(),
+                    updatedAt: new Date().toISOString()
+                });
+            }
+        });
+    }
+
     async saveUser(user) {
         if (!user || !this._checkQuota()) return;
         try {
@@ -489,6 +585,32 @@ class FirebaseSyncManager {
             }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
+        }
+    }
+
+    async getUserBets(userId, mode) {
+        if (!this._checkQuota()) return [];
+        try {
+            const betsCol = collection(db, 'bets');
+            // Query without orderBy to eliminate the requirement for composite index
+            const q = query(betsCol, where('userId', '==', userId), where('mode', '==', mode));
+            const querySnap = await getDocs(q);
+            const userBets = [];
+            querySnap.forEach(docSnap => {
+                userBets.push(docSnap.data());
+            });
+            
+            // Sort in-memory descending by placedAt
+            userBets.sort((a, b) => {
+                const timeA = a.placedAt ? (typeof a.placedAt === 'string' ? new Date(a.placedAt).getTime() : a.placedAt) : 0;
+                const timeB = b.placedAt ? (typeof b.placedAt === 'string' ? new Date(b.placedAt).getTime() : b.placedAt) : 0;
+                return timeB - timeA;
+            });
+            
+            return userBets.slice(0, 500);
+        } catch (e) {
+            console.warn('[Firebase] getUserBets error:', e.message);
+            return [];
         }
     }
 

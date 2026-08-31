@@ -812,47 +812,30 @@ class Smarty91ServerEngine {
             bet.payoutAmount = settlement.payoutAmount;
             bet.settledAt = new Date().toISOString();
 
-            await firebaseSync.updateBetSettlement(bet);
-
             if (settlement.isWin && settlement.payoutAmount > 0) {
-                // Always fetch the freshest user document from Firestore to avoid race conditions
-                let user = null;
+                const ledgerEntry = {
+                    id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                    userId: bet.userId,
+                    type: 'BET_WIN_CREDIT',
+                    amount: settlement.payoutAmount,
+                    referenceId: bet.id,
+                    description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
+                };
+
                 try {
-                    user = await firebaseSync.fetchUserFromFirestore(bet.userId);
+                    await firebaseSync.settleWinningBetTransaction(bet.userId, settlement.payoutAmount, bet, ledgerEntry);
                 } catch (err) {
-                    console.warn('[Server] Direct Firestore fetch failed during round payout:', err.message);
+                    console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
+                    // Fallback to separate operations in worst case scenarios
+                    await firebaseSync.updateBetSettlement(bet);
+                    await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout');
                 }
-
-                if (!user) {
-                    user = this.users.get(bet.userId) || this._ensureDefaultUser(bet.userId, 0.00);
-                }
-
-                if (user) {
-                    const balanceBefore = user.balance;
-                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
-                    const balanceAfter = user.balance;
-
-                    this.users.set(bet.userId, user);
-
-                    this.ledger.unshift({
-                        id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                        userId: bet.userId,
-                        type: 'BET_WIN_CREDIT',
-                        amount: settlement.payoutAmount,
-                        balanceBefore,
-                        balanceAfter,
-                        referenceId: bet.id,
-                        timestamp: new Date().toISOString(),
-                        description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
-                    });
-
-                    if (user.isDummy) {
-                        await firebaseSync.incrementUserBalance(user.id, settlement.payoutAmount, 'Round win payout (Atomic fallback)');
-                    } else {
-                        await firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
-                    }
-                }
+            } else {
+                await firebaseSync.updateBetSettlement(bet);
             }
+
+            // Remove from active cache since the bet is fully settled
+            this.bets.delete(bet.id);
         }
 
         // 3. Check if Pause was scheduled for after current round completes
@@ -952,35 +935,6 @@ class Smarty91ServerEngine {
             throw new Error(`Maximum bet amount is ₹${this.config.maxBetAmount}`);
         }
 
-        // Fetch fresh user data from Firestore to have absolute up-to-date balance check
-        let user = null;
-        try {
-            user = await firebaseSync.fetchUserFromFirestore(userId);
-        } catch (e) {
-            console.warn('[Server] Direct Firestore fetch failed during placeBet:', e.message);
-        }
-
-        if (!user) {
-            user = this._ensureDefaultUser(userId);
-        }
-
-        if (user.isDummy) {
-            throw new Error('Server balance sync in progress. Please wait a second and retry');
-        }
-
-        if (user.isBlocked) {
-            throw new Error('Account is restricted. Contact support');
-        }
-
-        if (user.balance < totalAmount) {
-            throw new Error('Insufficient wallet balance');
-        }
-
-        // Atomic Wallet Deduction
-        const balanceBefore = user.balance;
-        user.balance = Number((user.balance - totalAmount).toFixed(2));
-        const balanceAfter = user.balance;
-
         const feePercent = this.config.serviceFeePercent;
         const serviceFee = Number((totalAmount * (feePercent / 100)).toFixed(2));
         const contractAmount = Number((totalAmount - serviceFee).toFixed(2));
@@ -1014,29 +968,30 @@ class Smarty91ServerEngine {
             settledAt: null
         };
 
-        this.bets.set(betId, betOrder);
-
-        // Save bet order and update balance in Firestore
-        await firebaseSync.saveBet(betOrder);
-        await firebaseSync.updateUserBalance(user.id, user.balance, 'Bet placed');
-
-        // Record in Ledger
-        this.ledger.unshift({
+        const ledgerEntry = {
             id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             userId,
             type: 'BET_DEBIT',
             amount: -totalAmount,
-            balanceBefore,
-            balanceAfter,
             referenceId: betId,
-            timestamp: new Date().toISOString(),
             description: `Bet on ${mode} round ${periodId} (${selectionLabel})`
-        });
+        };
+
+        // Execute absolute atomic database transaction
+        let newBalance = 0;
+        try {
+            newBalance = await firebaseSync.placeBetTransaction(userId, totalAmount, betOrder, ledgerEntry);
+        } catch (error) {
+            throw new Error(error.message || 'Failed to place bet due to server state. Please try again.');
+        }
+
+        // Cache the active bet for the current round engine calculations
+        this.bets.set(betId, betOrder);
 
         return {
             success: true,
             bet: betOrder,
-            newBalance: user.balance
+            newBalance: newBalance
         };
     }
 

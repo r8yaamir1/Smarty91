@@ -49,19 +49,45 @@ export function subscribeToGamePeriod(mode, callback) {
 }
 
 export function subscribeToGameHistory(mode, callback) {
-    const historyCol = collection(db, 'game_history');
-    const q = query(
-        historyCol,
-        where('mode', '==', mode),
-        orderBy('timestamp', 'desc'),
-        limit(50)
-    );
-    return onSnapshot(q, (snapshot) => {
-        const history = [];
-        snapshot.forEach(doc => history.push(doc.data()));
-        callback(history);
+    const summaryDoc = doc(db, 'game_history_summary', mode);
+    return onSnapshot(summaryDoc, (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.data();
+            if (data && Array.isArray(data.rounds)) {
+                // Return pre-compiled history sorted by timestamp/settledAt descending
+                const sorted = [...data.rounds].sort((a, b) => {
+                    const tA = Number(a.timestamp || a.settledAt || 0);
+                    const tB = Number(b.timestamp || b.settledAt || 0);
+                    return tB - tA;
+                });
+                callback(sorted);
+                return;
+            }
+        }
+        
+        // Fallback: query game_history collection without orderBy to avoid index errors, then sort in-memory
+        try {
+            const historyCol = collection(db, 'game_history');
+            const q = query(historyCol, where('mode', '==', mode), limit(100));
+            onSnapshot(q, (snap) => {
+                const history = [];
+                snap.forEach(d => history.push(d.data()));
+                history.sort((a, b) => {
+                    const tA = Number(a.timestamp || a.settledAt || 0);
+                    const tB = Number(b.timestamp || b.settledAt || 0);
+                    return tB - tA;
+                });
+                if (history.length > 0) {
+                    callback(history.slice(0, 50));
+                }
+            }, (err) => {
+                console.warn(`Firestore history fallback sync warning [${mode}]:`, err);
+            });
+        } catch (e) {
+            console.warn(`Firestore history fallback setup error [${mode}]:`, e);
+        }
     }, (err) => {
-        console.warn(`Firestore history sync warning [${mode}]:`, err);
+        console.warn(`Firestore history summary sync warning [${mode}]:`, err);
     });
 }
 

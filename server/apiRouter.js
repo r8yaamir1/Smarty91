@@ -32,7 +32,9 @@ const getAuthUserAsync = async (req) => {
         const user = await serverEngine.resolveUserFromToken(authHeader);
         if (user) return user;
     }
-    return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
+    // Strict block: Do not ever return a fake cached default_user if a token is not present
+    // Returning dummy accounts automatically overwrites people's wallets with 0 balance.
+    return null;
 };
 
 // -------------------------------------------------------------
@@ -305,7 +307,7 @@ apiRouter.post('/bets/place', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
-        const result = serverEngine.placeBet({
+        const result = await serverEngine.placeBet({
             userId: authUser.id,
             mode,
             periodId,
@@ -328,21 +330,20 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
         const authUser = await getAuthUserAsync(req);
         const mode = req.params.mode;
         const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 10;
+        const limitAmount = parseInt(req.query.limit, 10) || 10;
 
-        const userBets = Array.from(serverEngine.bets.values())
-            .filter(b => b.userId === authUser.id && b.mode === mode)
-            .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
+        // Fetch user bets from absolute database truth
+        const userBets = await firebaseSync.getUserBets(authUser.id, mode);
 
-        const start = (page - 1) * limit;
-        const items = userBets.slice(start, start + limit);
-        const totalPages = Math.max(1, Math.ceil(userBets.length / limit));
+        const start = (page - 1) * limitAmount;
+        const items = userBets.slice(start, start + limitAmount);
+        const totalPages = Math.max(1, Math.ceil(userBets.length / limitAmount));
 
         res.json({
             success: true,
             mode,
             page,
-            limit,
+            limit: limitAmount,
             totalPages,
             totalItems: userBets.length,
             items
@@ -374,11 +375,24 @@ apiRouter.get('/wallet/summary', async (req, res) => {
 apiRouter.get('/wallet/balance', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
-        const user = serverEngine.users.get(authUser.id) || authUser;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: 'Unauthorized. Please login again.' });
+        }
+        
+        let freshUser = null;
+        try {
+            freshUser = await firebaseSync.fetchUserFromFirestore(authUser.id);
+        } catch(e) {
+            console.warn('[API] Could not fetch fresh balance:', e.message);
+        }
+
+        const balance = freshUser ? freshUser.balance : authUser.balance;
+        const bonusBalance = freshUser ? (freshUser.bonusBalance || 0) : (authUser.bonusBalance || 0);
+
         res.json({
             success: true,
-            balance: user ? user.balance : 0,
-            bonusBalance: user ? (user.bonusBalance || 0) : 0,
+            balance: Number(balance) || 0,
+            bonusBalance: Number(bonusBalance) || 0,
             currency: '₹'
         });
     } catch (err) {
