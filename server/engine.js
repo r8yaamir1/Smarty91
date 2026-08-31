@@ -203,6 +203,23 @@ class Smarty91ServerEngine {
 
     _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {
         if (!this.users.has(userId)) {
+            if (userId !== 'default_user') {
+                console.warn(`[Engine] Refusing to create dummy cached user for real account to prevent balance overwrite: ${userId}`);
+                return {
+                    id: userId,
+                    username: `usr_${userId.replace('usr_', '')}`,
+                    phone: userId.replace('usr_', ''),
+                    passwordHash: '',
+                    balance: 0.00,
+                    inviteCode: '',
+                    referredBy: null,
+                    hasDeposited: false,
+                    isBlocked: false,
+                    isDummy: true,
+                    createdAt: new Date().toISOString()
+                };
+            }
+
             const defaultUser = {
                 id: userId,
                 username: 'Guest Player',
@@ -576,6 +593,15 @@ class Smarty91ServerEngine {
         return null;
     }
 
+    async ensureUserLoaded(userId) {
+        if (!userId || userId === 'default_user') return;
+        try {
+            await firebaseSync.fetchUserFromFirestore(userId);
+        } catch (err) {
+            console.warn(`[Engine] Auto-fetch user ${userId} error:`, err.message);
+        }
+    }
+
     _seedInitialHistory() {
         ['30s', '1m', '3m', '5m'].forEach(mode => {
             const state = this.modes[mode];
@@ -820,7 +846,11 @@ class Smarty91ServerEngine {
                         description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
                     });
 
-                    await firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
+                    if (user.isDummy) {
+                        await firebaseSync.incrementUserBalance(user.id, settlement.payoutAmount, 'Round win payout (Atomic fallback)');
+                    } else {
+                        await firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
+                    }
                 }
             }
         }
@@ -932,6 +962,10 @@ class Smarty91ServerEngine {
 
         if (!user) {
             user = this._ensureDefaultUser(userId);
+        }
+
+        if (user.isDummy) {
+            throw new Error('Server balance sync in progress. Please wait a second and retry');
         }
 
         if (user.isBlocked) {

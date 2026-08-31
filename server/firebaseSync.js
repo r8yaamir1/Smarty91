@@ -13,7 +13,8 @@ import {
     where,
     orderBy,
     limit,
-    getDocs
+    getDocs,
+    increment
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -507,6 +508,31 @@ class FirebaseSyncManager {
             }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
+        }
+    }
+
+    async incrementUserBalance(userId, amount, reason = '') {
+        if (!this._checkQuota()) return;
+        try {
+            const userRef = doc(db, 'users', userId);
+            await updateDoc(userRef, {
+                balance: increment(Number(amount)),
+                lastUpdatedReason: reason,
+                updatedAt: new Date().toISOString()
+            });
+        } catch (e) {
+            console.warn('[Firebase] incrementUserBalance error, attempting setDoc fallback:', e.message);
+            try {
+                const userRef = doc(db, 'users', userId);
+                await setDoc(userRef, {
+                    id: userId,
+                    balance: increment(Number(amount)),
+                    lastUpdatedReason: reason,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (err) {
+                this._handleQuotaError(err);
+            }
         }
     }
 
