@@ -11,7 +11,7 @@ try {
 }
 
 import { initAudio } from './audio.js';
-import { initWalletModals, updateHeaderUserUI, renderBalance } from './wallet.js';
+import { initWalletModals, updateHeaderUserUI, renderBalance, syncServerBalance, setupBalanceListener } from './wallet.js';
 import { initGameRecord } from './gameRecord.js';
 import { initAllEvents } from './events.js';
 import { initAdminPanel } from './adminPanel.js';
@@ -39,11 +39,25 @@ function initViewportLock() {
     }, { passive: false });
 }
 
-function bootstrap() {
+async function bootstrap() {
     console.log('Initializing Smarty91 VIP...');
     initViewportLock();
     initAudio();
     updateHeaderUserUI();
+    
+    // Ensure real-time Firestore subscription starts with current user credentials
+    setupBalanceListener();
+
+    // Block initial UI rendering if token exists to fetch 100% accurate, up-to-date balance from the server/database
+    const token = localStorage.getItem('smarty91_auth_token');
+    if (token) {
+        try {
+            await syncServerBalance(false);
+        } catch (e) {
+            console.warn('Initial balance sync on startup failed:', e);
+        }
+    }
+
     renderBalance();
     initWalletModals();
     initAllEvents();

@@ -447,18 +447,24 @@ class Smarty91ServerEngine {
 
     async loginUser({ phone, password }) {
         const cleanPhone = String(phone).trim();
-        this._loadUsersFromDisk();
+        
+        // 1. Always prioritize fetching the absolute latest user from Firestore (Source of Truth)
         let targetUser = null;
-        for (const u of this.users.values()) {
-            if (u.phone === cleanPhone) {
-                targetUser = u;
-                break;
-            }
+        try {
+            targetUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
+        } catch (e) {
+            console.warn('[Server] Direct Firestore phone fetch failed during login:', e.message);
         }
 
+        // 2. Fallback to local memory / disk (if offline, or Firestore quota exceeded)
         if (!targetUser) {
-            // Check Firestore directly (essential after server restart or redeploy)
-            targetUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
+            this._loadUsersFromDisk();
+            for (const u of this.users.values()) {
+                if (u.phone === cleanPhone) {
+                    targetUser = u;
+                    break;
+                }
+            }
         }
 
         if (!targetUser) {
@@ -533,9 +539,6 @@ class Smarty91ServerEngine {
     }
 
     async resolveUserFromToken(token) {
-        let user = this.getUserFromToken(token);
-        if (user) return user;
-
         if (!token) return null;
         const cleanToken = token.replace('Bearer ', '').trim();
         if (cleanToken.startsWith('JWT_') && cleanToken.includes('.')) {
@@ -548,7 +551,19 @@ class Smarty91ServerEngine {
                         const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
                         const data = JSON.parse(payloadJson);
                         if (data && data.uid) {
-                            user = await firebaseSync.fetchUserFromFirestore(data.uid);
+                            // Always prioritize fetching fresh database document (Source of Truth)
+                            let user = null;
+                            try {
+                                user = await firebaseSync.fetchUserFromFirestore(data.uid);
+                            } catch (e) {
+                                console.warn('[Server] Direct Firestore fetch failed during token resolution:', e.message);
+                            }
+
+                            if (!user) {
+                                // Fallback to in-memory check
+                                user = this.getUserFromToken(token);
+                            }
+
                             if (user) {
                                 this.userTokens.set(cleanToken, user.id);
                                 return user;

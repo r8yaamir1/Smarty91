@@ -3,7 +3,34 @@ import { walletService } from './services/walletService.js';
 import { subscribeToUserBalance } from './services/firebaseClient.js';
 
 let currentBalance = Number(localStorage.getItem('smarty91_cached_balance')) || 0.00;
-const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
+
+let activeBalanceListener = null;
+
+// Dynamic listener setup that can be re-run whenever login state changes
+export function setupBalanceListener() {
+    if (activeBalanceListener) {
+        try {
+            activeBalanceListener(); // Unsubscribe previous listener
+        } catch (e) {}
+        activeBalanceListener = null;
+    }
+
+    const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
+    try {
+        activeBalanceListener = subscribeToUserBalance(currentUserId, (userData) => {
+            if (userData && typeof userData.balance === 'number') {
+                currentBalance = userData.balance;
+                localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+                renderBalance();
+            }
+        });
+    } catch (e) {
+        console.warn('Realtime balance listener warning:', e);
+    }
+}
+
+// Initial listener setup
+setupBalanceListener();
 
 // Listen for balance changes across other tabs
 window.addEventListener('storage', (e) => {
@@ -37,19 +64,6 @@ window.handleUserProfileClick = function() {
     }
     window.location.href = 'profile.html';
 };
-
-// Subscribe to real-time Firestore balance updates
-try {
-    subscribeToUserBalance(currentUserId, (userData) => {
-        if (userData && typeof userData.balance === 'number') {
-            currentBalance = userData.balance;
-            localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
-            renderBalance();
-        }
-    });
-} catch (e) {
-    console.warn('Realtime balance listener warning:', e);
-}
 
 export async function syncServerBalance(showLoader = false) {
     if (showLoader && window.SmartyLoader) window.SmartyLoader.show('Updating VIP Wallet...');

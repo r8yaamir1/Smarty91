@@ -25,6 +25,16 @@ const getAuthUser = (req) => {
     return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
 };
 
+// Helper to resolve current logged-in user or guest asynchronously with fresh Firestore state
+const getAuthUserAsync = async (req) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        const user = await serverEngine.resolveUserFromToken(authHeader);
+        if (user) return user;
+    }
+    return serverEngine.users.get('default_user') || serverEngine._ensureDefaultUser('default_user', 0.00);
+};
+
 // -------------------------------------------------------------
 // 0. AUTHENTICATION & USER MANAGEMENT (DIRECT FAST REGISTRATION + SECURE RECOVERY)
 // -------------------------------------------------------------
@@ -153,9 +163,9 @@ apiRouter.post('/auth/logout', (req, res) => {
 // -------------------------------------------------------------
 
 // GET /api/user/checkin/status -> Current streak, status & 7-day rewards
-apiRouter.get('/user/checkin/status', (req, res) => {
+apiRouter.get('/user/checkin/status', async (req, res) => {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUserAsync(req);
         const status = serverEngine.getDailyCheckInStatus(user.id);
         res.json(status);
     } catch (err) {
@@ -164,9 +174,9 @@ apiRouter.get('/user/checkin/status', (req, res) => {
 });
 
 // POST /api/user/checkin/claim -> Claim today's bonus (Requires min 1 Deposit)
-apiRouter.post('/user/checkin/claim', (req, res) => {
+apiRouter.post('/user/checkin/claim', async (req, res) => {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUserAsync(req);
         const result = serverEngine.claimDailyCheckIn(user.id);
         res.json(result);
     } catch (err) {
@@ -179,9 +189,9 @@ apiRouter.post('/user/checkin/claim', (req, res) => {
 });
 
 // GET /api/user/referral/stats -> User referral performance & invite history
-apiRouter.get('/user/referral/stats', (req, res) => {
+apiRouter.get('/user/referral/stats', async (req, res) => {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUserAsync(req);
         const summary = serverEngine.getReferralSummary(user.id);
         res.json(summary);
     } catch (err) {
@@ -291,9 +301,9 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
 // -------------------------------------------------------------
 
 // POST /api/bets/place -> Place bet order
-apiRouter.post('/bets/place', (req, res) => {
+apiRouter.post('/bets/place', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
         const result = serverEngine.placeBet({
             userId: authUser.id,
@@ -313,29 +323,33 @@ apiRouter.post('/bets/place', (req, res) => {
 });
 
 // GET /api/bets/my-history/:mode -> User's bet orders for a mode
-apiRouter.get('/bets/my-history/:mode', (req, res) => {
-    const authUser = getAuthUser(req);
-    const mode = req.params.mode;
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
+apiRouter.get('/bets/my-history/:mode', async (req, res) => {
+    try {
+        const authUser = await getAuthUserAsync(req);
+        const mode = req.params.mode;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 10;
 
-    const userBets = Array.from(serverEngine.bets.values())
-        .filter(b => b.userId === authUser.id && b.mode === mode)
-        .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
+        const userBets = Array.from(serverEngine.bets.values())
+            .filter(b => b.userId === authUser.id && b.mode === mode)
+            .sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
 
-    const start = (page - 1) * limit;
-    const items = userBets.slice(start, start + limit);
-    const totalPages = Math.max(1, Math.ceil(userBets.length / limit));
+        const start = (page - 1) * limit;
+        const items = userBets.slice(start, start + limit);
+        const totalPages = Math.max(1, Math.ceil(userBets.length / limit));
 
-    res.json({
-        success: true,
-        mode,
-        page,
-        limit,
-        totalPages,
-        totalItems: userBets.length,
-        items
-    });
+        res.json({
+            success: true,
+            mode,
+            page,
+            limit,
+            totalPages,
+            totalItems: userBets.length,
+            items
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // -------------------------------------------------------------
@@ -343,44 +357,56 @@ apiRouter.get('/bets/my-history/:mode', (req, res) => {
 // -------------------------------------------------------------
 
 // GET /api/wallet/summary -> Detailed VIP Wallet Overview with Bonus Balance
-apiRouter.get('/wallet/summary', (req, res) => {
-    const authUser = getAuthUser(req);
-    const summary = serverEngine.getWalletSummary(authUser.id);
-    res.json({
-        success: true,
-        summary
-    });
+apiRouter.get('/wallet/summary', async (req, res) => {
+    try {
+        const authUser = await getAuthUserAsync(req);
+        const summary = serverEngine.getWalletSummary(authUser.id);
+        res.json({
+            success: true,
+            summary
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // GET /api/wallet/balance -> Real-time balance
-apiRouter.get('/wallet/balance', (req, res) => {
-    const authUser = getAuthUser(req);
-    const user = serverEngine.users.get(authUser.id) || authUser;
-    res.json({
-        success: true,
-        balance: user ? user.balance : 0,
-        bonusBalance: user ? (user.bonusBalance || 0) : 0,
-        currency: '₹'
-    });
+apiRouter.get('/wallet/balance', async (req, res) => {
+    try {
+        const authUser = await getAuthUserAsync(req);
+        const user = serverEngine.users.get(authUser.id) || authUser;
+        res.json({
+            success: true,
+            balance: user ? user.balance : 0,
+            bonusBalance: user ? (user.bonusBalance || 0) : 0,
+            currency: '₹'
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // GET /api/wallet/ledger -> Transaction passbook
-apiRouter.get('/wallet/ledger', (req, res) => {
-    const authUser = getAuthUser(req);
-    const userLedger = serverEngine.ledger
-        .filter(l => l.userId === authUser.id)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+apiRouter.get('/wallet/ledger', async (req, res) => {
+    try {
+        const authUser = await getAuthUserAsync(req);
+        const userLedger = serverEngine.ledger
+            .filter(l => l.userId === authUser.id)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    res.json({
-        success: true,
-        items: userLedger.slice(0, 50)
-    });
+        res.json({
+            success: true,
+            items: userLedger.slice(0, 50)
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // POST /api/wallet/deposit-init -> Generate Dynamic Intent URI & QR Payload
-apiRouter.post('/wallet/deposit-init', (req, res) => {
+apiRouter.post('/wallet/deposit-init', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount = 200, channel = 'UPI_FAST' } = req.body;
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount < 200) {
@@ -474,7 +500,7 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
 // POST /api/wallet/deposit-usdt -> Automatic Tron Blockchain USDT TRC-20 Verification & Credit
 apiRouter.post('/wallet/deposit-usdt', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { txid, amountUsdt } = req.body;
         const result = await serverEngine.verifyAndProcessUsdtDeposit({
             userId: authUser.id,
@@ -488,9 +514,9 @@ apiRouter.post('/wallet/deposit-usdt', async (req, res) => {
 });
 
 // POST /api/wallet/deposit -> Submit user deposit request (UTR Verification)
-apiRouter.post('/wallet/deposit', (req, res) => {
+apiRouter.post('/wallet/deposit', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount, utrNumber, upiId, channel } = req.body;
         const result = serverEngine.createDepositRequest({
             userId: authUser.id,
@@ -506,9 +532,9 @@ apiRouter.post('/wallet/deposit', (req, res) => {
 });
 
 // POST /api/wallet/withdraw -> User bank or USDT withdrawal submission
-apiRouter.post('/wallet/withdraw', (req, res) => {
+apiRouter.post('/wallet/withdraw', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId, channel, usdtAddress } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -529,9 +555,9 @@ apiRouter.post('/wallet/withdraw', (req, res) => {
 });
 
 // POST /api/wallet/deposit-request -> Submit user deposit request (UTR Verification)
-apiRouter.post('/wallet/deposit-request', (req, res) => {
+apiRouter.post('/wallet/deposit-request', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount, utrNumber, upiId, channel } = req.body;
         const result = serverEngine.createDepositRequest({
             userId: authUser.id,
@@ -547,9 +573,9 @@ apiRouter.post('/wallet/deposit-request', (req, res) => {
 });
 
 // POST /api/wallet/withdraw-bank -> User bank withdrawal submission (24 Hours Processing)
-apiRouter.post('/wallet/withdraw-bank', (req, res) => {
+apiRouter.post('/wallet/withdraw-bank', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -568,9 +594,9 @@ apiRouter.post('/wallet/withdraw-bank', (req, res) => {
 });
 
 // POST /api/wallet/withdraw-request -> Alias for backwards compatibility
-apiRouter.post('/wallet/withdraw-request', (req, res) => {
+apiRouter.post('/wallet/withdraw-request', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -589,16 +615,20 @@ apiRouter.post('/wallet/withdraw-request', (req, res) => {
 });
 
 // GET /api/wallet/transactions -> User transactions status list
-apiRouter.get('/wallet/transactions', (req, res) => {
-    const authUser = getAuthUser(req);
-    const txs = serverEngine.getTransactions({ userId: authUser.id });
-    res.json({ success: true, items: txs });
+apiRouter.get('/wallet/transactions', async (req, res) => {
+    try {
+        const authUser = await getAuthUserAsync(req);
+        const txs = serverEngine.getTransactions({ userId: authUser.id });
+        res.json({ success: true, items: txs });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // POST /api/wallet/instamojo/create-order -> Plug-in Instamojo Gateway Bridge
 apiRouter.post('/wallet/instamojo/create-order', async (req, res) => {
     try {
-        const authUser = getAuthUser(req);
+        const authUser = await getAuthUserAsync(req);
         const { amount = 200 } = req.body;
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount < 200) {
