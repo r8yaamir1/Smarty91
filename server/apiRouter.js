@@ -336,8 +336,32 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
         const page = parseInt(req.query.page, 10) || 1;
         const limitAmount = parseInt(req.query.limit, 10) || 10;
 
-        // Fetch user bets from absolute database truth
-        const userBets = await firebaseSync.getUserBets(authUser.id, mode);
+        // Fetch user bets from Firestore and merge with any active in-memory bets
+        const firestoreBets = await firebaseSync.getUserBets(authUser.id, mode);
+        const betMap = new Map();
+
+        // 1. Add Firestore historical bets
+        if (Array.isArray(firestoreBets)) {
+            firestoreBets.forEach(b => {
+                if (b && b.id) betMap.set(b.id, b);
+            });
+        }
+
+        // 2. Overlay in-memory latest bets
+        if (serverEngine.bets && serverEngine.bets.size > 0) {
+            for (const [, b] of serverEngine.bets) {
+                if (b && b.userId === authUser.id && b.mode === mode) {
+                    betMap.set(b.id, b);
+                }
+            }
+        }
+
+        const userBets = Array.from(betMap.values());
+        userBets.sort((a, b) => {
+            const timeA = a.placedAt ? (typeof a.placedAt === 'string' ? new Date(a.placedAt).getTime() : a.placedAt) : 0;
+            const timeB = b.placedAt ? (typeof b.placedAt === 'string' ? new Date(b.placedAt).getTime() : b.placedAt) : 0;
+            return timeB - timeA;
+        });
 
         const start = (page - 1) * limitAmount;
         const items = userBets.slice(start, start + limitAmount);

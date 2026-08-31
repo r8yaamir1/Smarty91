@@ -18,13 +18,13 @@ import {
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
-    projectId: "gen-lang-client-0741491943",
-    appId: "1:609525333469:web:38d4a4133c9d733345ca34",
-    apiKey: "AIzaSyCHcQ5xllJMeM4MfcL_Iqm_kyTeZav0-Kw",
-    authDomain: "gen-lang-client-0741491943.firebaseapp.com",
-    firestoreDatabaseId: "ai-studio-smarty91-c085ecfd-c192-460f-a360-f400d1df3690",
-    storageBucket: "gen-lang-client-0741491943.firebasestorage.app",
-    messagingSenderId: "609525333469"
+    projectId: "smarty91-40e57",
+    appId: "1:575521043990:web:108625a45409f34bf76737",
+    apiKey: "AIzaSyA3aI18LmjJ0j-NIZvWx9zOiDk1AUV9Kz0",
+    authDomain: "smarty91-40e57.firebaseapp.com",
+    storageBucket: "smarty91-40e57.firebasestorage.app",
+    messagingSenderId: "575521043990",
+    measurementId: "G-2K63GFRWL2"
 };
 
 let app;
@@ -34,7 +34,7 @@ if (!getApps().length) {
     app = getApp();
 }
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+export const db = getFirestore(app);
 
 // Helper functions for Realtime Subscriptions
 export function subscribeToGamePeriod(mode, callback) {
