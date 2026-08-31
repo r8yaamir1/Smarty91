@@ -61,7 +61,7 @@ export function switchView(viewName) {
     });
 }
 
-// Smooth VIP Game Opening with Loader & Synchronization (Minimum 2+ seconds duration)
+// VIP Game Opening with Sync Loader
 export async function openGameWithLoader(targetView = 'game') {
     const overlay = document.getElementById('game-sync-overlay');
     const meterBar = document.getElementById('game-sync-meter-bar');
@@ -72,47 +72,32 @@ export async function openGameWithLoader(targetView = 'game') {
         return;
     }
 
-    // Reset progress and display sync overlay
-    if (meterBar) meterBar.style.width = '12%';
-    if (statusText) statusText.textContent = 'Connecting to VIP Game Server...';
+    overlay.style.display = 'flex';
+    if (meterBar) meterBar.style.width = '25%';
+    if (statusText) statusText.textContent = 'Connecting to VIP Arena...';
     overlay.classList.add('active');
 
     // Background sync of wallet balance
     try {
-        syncServerBalance(true).catch(() => {});
+        syncServerBalance(false).catch(() => {});
     } catch (e) {}
 
-    // Phase 1: 0 -> 500ms
-    await new Promise(r => setTimeout(r, 500));
-    if (meterBar) meterBar.style.width = '38%';
-    if (statusText) statusText.textContent = 'Verifying Player Session & Wallet Balance...';
+    // Smooth quick progression
+    await new Promise(r => setTimeout(r, 220));
+    if (meterBar) meterBar.style.width = '75%';
+    if (statusText) statusText.textContent = 'Synchronizing Live Rounds...';
 
-    // Phase 2: 500 -> 1100ms (600ms)
-    await new Promise(r => setTimeout(r, 600));
-    if (meterBar) meterBar.style.width = '68%';
-    if (statusText) statusText.textContent = 'Synchronizing Live Draw Periods & History...';
-
-    // Phase 3: 1100 -> 1700ms (600ms)
-    await new Promise(r => setTimeout(r, 600));
-    if (meterBar) meterBar.style.width = '90%';
-    if (statusText) statusText.textContent = 'Loading VIP Arena Engine...';
-
-    // Phase 4: 1700 -> 2150ms (450ms)
-    await new Promise(r => setTimeout(r, 450));
+    await new Promise(r => setTimeout(r, 250));
     if (meterBar) meterBar.style.width = '100%';
-    if (statusText) statusText.textContent = 'Ready! Entering Live Game...';
+    if (statusText) statusText.textContent = 'Entering Live Game...';
 
-    // Phase 5: Finalize and open (200ms) -> Total ~2.35s
-    await new Promise(r => setTimeout(r, 200));
-
-    // Switch view smoothly
+    await new Promise(r => setTimeout(r, 120));
     switchView(targetView);
 
-    // Hide loader overlay
     overlay.classList.remove('active');
     setTimeout(() => {
         if (meterBar) meterBar.style.width = '0%';
-    }, 300);
+    }, 200);
 }
 
 // Fetch Daily Sign-in status

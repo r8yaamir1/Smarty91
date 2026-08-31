@@ -3450,5 +3450,144 @@ body {
   font-weight: 600;
 }
 
+/* ==========================================================
+   GAME-SYNC-OVERLAY & ULTRA-SMOOTH HARDWARE ACCELERATED SPINNERS
+   ========================================================== */
+.game-sync-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 35%, #1F070E 0%, #0D0E15 65%, #05060A 100%);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.22s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.game-sync-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.game-sync-card {
+  width: 90%;
+  max-width: 320px;
+  background: rgba(18, 20, 30, 0.96);
+  border: 1.5px solid rgba(255, 215, 0, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(229, 24, 55, 0.3);
+  border-radius: 20px;
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.game-sync-overlay.active .game-sync-card {
+  transform: translateY(0) scale(1);
+}
+
+.game-sync-avatar-wrap {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-sync-avatar {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 2;
+}
+
+.game-sync-spinner-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 215, 0, 0.15);
+  border-top: 3px solid #FFD700;
+  border-right: 3px solid #FF2524;
+  animation: gameSyncSpin 0.75s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+}
+
+@keyframes gameSyncSpin {
+  0% { transform: rotate(0deg) translateZ(0); }
+  100% { transform: rotate(360deg) translateZ(0); }
+}
+
+.game-sync-title {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #FFD700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.game-sync-subtitle {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94A3B8;
+  margin-bottom: 16px;
+}
+
+.game-sync-meter-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.game-sync-meter-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #E51837 0%, #FFD700 100%);
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+.game-sync-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+.game-sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34D399;
+  box-shadow: 0 0 8px #34D399;
+  animation: smartyPulse 1.2s infinite ease-in-out;
+}
+
 
 

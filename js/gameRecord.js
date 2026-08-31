@@ -290,7 +290,6 @@ export async function switchGameMode(newGameType) {
         popupHeadTitle.textContent = state.displayName;
     }
 
-    // Show clean circular loader during mode switch sync
     if (window.SmartyLoader) {
         window.SmartyLoader.show(`Loading ${state.displayName}...`);
     }
@@ -309,7 +308,6 @@ export async function switchGameMode(newGameType) {
         renderChartTrend(targetMode);
         renderMyHistory(targetMode);
         fetchUserBetsFromServer(targetMode).catch(() => {});
-
         if (window.SmartyLoader) {
             window.SmartyLoader.hide();
         }
@@ -339,6 +337,17 @@ export async function initGameRecord() {
     renderGameHistory(initialMode);
     renderChartTrend(initialMode);
     renderMyHistory(initialMode);
+
+    // Eagerly fetch and render user's bet history for active mode & pre-fetch other modes
+    fetchUserBetsFromServer(initialMode).then(() => {
+        renderMyHistory(initialMode);
+    }).catch(() => {});
+
+    SUPPORTED_MODES.forEach(mode => {
+        if (mode !== initialMode) {
+            fetchUserBetsFromServer(mode).catch(() => {});
+        }
+    });
 
     // Setup Real-time Firebase Firestore Listeners for zero-latency sync
     try {

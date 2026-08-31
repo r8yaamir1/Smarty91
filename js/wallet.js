@@ -79,7 +79,6 @@ window.handleUserProfileClick = function() {
 };
 
 export async function syncServerBalance(showLoader = false) {
-    if (showLoader && window.SmartyLoader) window.SmartyLoader.show('Updating VIP Wallet...');
     try {
         const res = await walletService.getBalance();
         if (res && res.success && typeof res.balance === 'number') {
@@ -88,8 +87,6 @@ export async function syncServerBalance(showLoader = false) {
         }
     } catch (e) {
         // Fallback to memory balance
-    } finally {
-        if (showLoader && window.SmartyLoader) window.SmartyLoader.hide();
     }
     return currentBalance;
 }

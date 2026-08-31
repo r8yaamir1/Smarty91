@@ -199,6 +199,39 @@ apiRouter.get('/user/referral/stats', async (req, res) => {
     }
 });
 
+// GET /api/user/referral/payout-window -> Check if 1st of month payout window is open
+apiRouter.get('/user/referral/payout-window', async (req, res) => {
+    try {
+        const user = await getAuthUserAsync(req);
+        const status = serverEngine.canWithdrawReferralIncome(user.id);
+        res.json({ success: true, ...status });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/user/referral/withdraw -> Withdraw referral commissions (1st of month only)
+apiRouter.post('/user/referral/withdraw', async (req, res) => {
+    try {
+        const user = await getAuthUserAsync(req);
+        const { amount, accountHolderName, accountNumber, ifsc, bankName, channel, usdtAddress } = req.body;
+        const result = serverEngine.createWithdrawalRequest({
+            userId: user.id,
+            amount,
+            accountHolderName,
+            accountNumber,
+            ifsc,
+            bankName,
+            channel,
+            usdtAddress,
+            isReferralWithdrawal: true
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 // Helper for error handling
 const asyncWrap = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -347,7 +380,20 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
             });
         }
 
-        // 2. Overlay in-memory latest bets
+        // 2. Overlay disk/in-memory settled bets history
+        if (serverEngine.settledBetsHistory && serverEngine.settledBetsHistory.size > 0) {
+            const targetMode = String(mode).toLowerCase().replace('wingo', '').trim();
+            for (const [, b] of serverEngine.settledBetsHistory) {
+                if (b && b.userId === authUser.id) {
+                    const betMode = String(b.mode || '').toLowerCase().replace('wingo', '').trim();
+                    if (betMode === targetMode || b.mode === mode) {
+                        betMap.set(b.id, b);
+                    }
+                }
+            }
+        }
+
+        // 3. Overlay in-memory latest active bets
         if (serverEngine.bets && serverEngine.bets.size > 0) {
             const targetMode = String(mode).toLowerCase().replace('wingo', '').trim();
             for (const [, b] of serverEngine.bets) {

@@ -167,6 +167,92 @@
 
         .comm-sub-val.gold { color: #FFD700; }
 
+        /* Monthly 1st Payout Date Badge Box */
+        .payout-date-badge-box {
+            margin-top: 12px;
+            background: rgba(14, 17, 28, 0.95);
+            border: 1.5px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        .payout-date-badge-box.open {
+            border-color: rgba(52, 211, 153, 0.6);
+            background: rgba(6, 78, 59, 0.25);
+        }
+
+        .payout-date-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .payout-date-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #FFD700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .payout-date-badge-box.open .payout-date-title {
+            color: #34d399;
+        }
+
+        .payout-tag {
+            font-size: 9.5px;
+            font-weight: 800;
+            background: rgba(229, 24, 55, 0.2);
+            color: #ff4d6d;
+            padding: 2px 7px;
+            border-radius: 6px;
+            border: 1px solid rgba(229, 24, 55, 0.3);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .payout-date-badge-box.open .payout-tag {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .payout-date-desc {
+            font-size: 10.5px;
+            color: #A0A5B8;
+            line-height: 1.35;
+            margin-bottom: 8px;
+        }
+
+        .payout-date-desc strong {
+            color: #FFF;
+        }
+
+        .payout-withdraw-btn {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            background: linear-gradient(135deg, #374151 0%, #1F2937 100%);
+            color: #9CA3AF;
+        }
+
+        .payout-withdraw-btn.active-window {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: #FFFFFF;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
         /* 5-FRIEND PROGRESSION ROADMAP / STEPPER */
         .progression-section {
             margin: 16px 14px 0;
@@ -832,6 +918,23 @@
                     <span id="comm-milestones-val" class="comm-sub-val gold">₹0.00</span>
                 </div>
             </div>
+
+            <!-- Monthly 1st Date Payout Window Indicator & Action -->
+            <div class="payout-date-badge-box" id="payout-window-card">
+                <div class="payout-date-header">
+                    <div class="payout-date-title">
+                        <span id="payout-status-icon">🔒</span>
+                        <span id="payout-window-title">Monthly Payout Window (01st of Month)</span>
+                    </div>
+                    <span class="payout-tag" id="payout-badge-tag">1st of Month Only</span>
+                </div>
+                <div class="payout-date-desc" id="payout-window-desc">
+                    Referral commissions can be withdrawn strictly on the <strong>01st date</strong> of every calendar month.
+                </div>
+                <button class="payout-withdraw-btn" id="payout-withdraw-btn" onclick="window.handleReferralWithdrawalClick()">
+                    <span>💸 Claim Referral Payout</span>
+                </button>
+            </div>
         </div>
 
         <!-- 5-FRIEND MILESTONE PROGRESSION LINE -->
@@ -1224,6 +1327,33 @@
                 }
             });
 
+            // Render Payout Window Status
+            const payoutCard = document.getElementById('payout-window-card');
+            const payoutBtn = document.getElementById('payout-withdraw-btn');
+            const payoutIcon = document.getElementById('payout-status-icon');
+            const payoutTitle = document.getElementById('payout-window-title');
+            const payoutBadge = document.getElementById('payout-badge-tag');
+            const payoutDesc = document.getElementById('payout-window-desc');
+
+            const payout = refData.payoutWindow || { isFirstOfMonth: false, nextPayoutDate: '01 Next Month' };
+            if (payout.isFirstOfMonth) {
+                payoutCard.classList.add('open');
+                payoutIcon.textContent = '🎉';
+                payoutTitle.textContent = 'Monthly Referral Payout is OPEN Today!';
+                payoutBadge.textContent = 'OPEN TODAY (01st)';
+                payoutDesc.innerHTML = `✅ Today is the <strong>01st of the month</strong>! You can withdraw your accumulated referral earnings directly to your Bank / UPI!`;
+                payoutBtn.classList.add('active-window');
+                payoutBtn.innerHTML = `<span>💸 Withdraw Referral Commission (₹${(Number(refData.totalCommissionEarned) || 0).toFixed(2)})</span>`;
+            } else {
+                payoutCard.classList.remove('open');
+                payoutIcon.textContent = '🔒';
+                payoutTitle.textContent = 'Monthly Payout (01st of Month)';
+                payoutBadge.textContent = 'Opens 01st';
+                payoutDesc.innerHTML = `Referral earnings can be withdrawn strictly on the <strong>01st date of every month</strong>. Next payout window: <strong>01 ${payout.nextPayoutDate || ''}</strong>.`;
+                payoutBtn.classList.remove('active-window');
+                payoutBtn.innerHTML = `<span>🔒 Payout Opens on 01st (${payout.nextPayoutDate || 'Next Month'})</span>`;
+            }
+
             // Render Team list
             const teamListEl = document.getElementById('team-records-list');
             if (teamListEl) {
@@ -1293,12 +1423,32 @@
                 feedBtn.classList.remove('active');
                 teamContent.style.display = 'block';
                 feedContent.style.display = 'none';
+                if (window.applyTabAnimation) window.applyTabAnimation(teamContent);
             } else {
                 feedBtn.classList.add('active');
                 teamBtn.classList.remove('active');
                 feedContent.style.display = 'block';
                 teamContent.style.display = 'none';
+                if (window.applyTabAnimation) window.applyTabAnimation(feedContent);
             }
+        };
+
+        window.handleReferralWithdrawalClick = function() {
+            const payout = refData?.payoutWindow || { isFirstOfMonth: false, nextPayoutDate: '01 Next Month' };
+            const commAmount = Number(refData?.totalCommissionEarned) || 0;
+
+            if (!payout.isFirstOfMonth) {
+                showToast(`🔒 Referral payouts open exclusively on 01st of every month! Next window: 01 ${payout.nextPayoutDate || ''}`, 'error');
+                return;
+            }
+
+            if (commAmount < 500) {
+                showToast(`Minimum referral payout is ₹500. Current commission: ₹${commAmount.toFixed(2)}`, 'error');
+                return;
+            }
+
+            // Route to cashier withdrawal with referral flag
+            window.location.href = 'payment.html?tab=withdraw&mode=referral';
         };
 
         function copyToClipboard(text, msg) {

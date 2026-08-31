@@ -6,6 +6,7 @@ import { notifyNewDeposit, notifyNewWithdrawal } from './telegramAlert.js';
 
 const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users_store.json');
+const BETS_FILE = path.join(DATA_DIR, 'bets_store.json');
 const TOKEN_SECRET = process.env.SESSION_SECRET || 'smarty91_vip_secure_master_session_secret_2026';
 
 // Number Properties mapping (0-9)
@@ -117,6 +118,8 @@ class Smarty91ServerEngine {
 
         // All Bet Orders: Map<id, BetOrder>
         this.bets = new Map();
+        // Historical and settled bets cache: Map<id, BetOrder>
+        this.settledBetsHistory = new Map();
 
         // Admin Audit Logs: Array of { id, action, details, timestamp, adminIp }
         this.auditLogs = [];
@@ -154,15 +157,65 @@ class Smarty91ServerEngine {
     }
 
     _ensureDataDir() {
-        // Data directory initialization
+        try {
+            if (!fs.existsSync(DATA_DIR)) {
+                fs.mkdirSync(DATA_DIR, { recursive: true });
+            }
+        } catch (e) {
+            console.warn('[Engine] ensureDataDir note:', e.message);
+        }
     }
 
     _loadUsersFromDisk() {
-        // Users are continuously synced via Firestore
+        try {
+            if (fs.existsSync(USERS_FILE)) {
+                const data = fs.readFileSync(USERS_FILE, 'utf8');
+                const usersArr = JSON.parse(data);
+                if (Array.isArray(usersArr)) {
+                    usersArr.forEach(u => {
+                        if (u && u.id) {
+                            this.users.set(u.id, u);
+                            if (u.inviteCode) {
+                                this.referralCodes.set(u.inviteCode, u.id);
+                            }
+                        }
+                    });
+                }
+            }
+            if (fs.existsSync(BETS_FILE)) {
+                const bdata = fs.readFileSync(BETS_FILE, 'utf8');
+                const betsArr = JSON.parse(bdata);
+                if (Array.isArray(betsArr)) {
+                    betsArr.forEach(b => {
+                        if (b && b.id) {
+                            this.settledBetsHistory.set(b.id, b);
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[Engine] loadUsersFromDisk note:', e.message);
+        }
     }
 
     _saveUsersToDisk() {
-        // Persistence is directly and authoritatively managed by Firebase Firestore
+        try {
+            this._ensureDataDir();
+            const usersArr = Array.from(this.users.values());
+            fs.writeFileSync(USERS_FILE, JSON.stringify(usersArr, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('[Engine] saveUsersToDisk note:', e.message);
+        }
+    }
+
+    _saveBetsToDisk() {
+        try {
+            this._ensureDataDir();
+            const betsArr = Array.from(this.settledBetsHistory.values()).slice(0, 1000);
+            fs.writeFileSync(BETS_FILE, JSON.stringify(betsArr, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('[Engine] saveBetsToDisk note:', e.message);
+        }
     }
 
     _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {
@@ -828,6 +881,10 @@ class Smarty91ServerEngine {
                 await firebaseSync.updateBetSettlement(bet);
             }
 
+            // Archive into settled bets history and persist
+            this.settledBetsHistory.set(bet.id, { ...bet });
+            this._saveBetsToDisk();
+
             // Remove from active cache since the bet is fully settled
             this.bets.delete(bet.id);
         }
@@ -1003,10 +1060,12 @@ class Smarty91ServerEngine {
 
         // Cache active bet & ledger in memory immediately
         this.bets.set(betId, betOrder);
+        this.settledBetsHistory.set(betId, { ...betOrder });
         this.ledger.unshift(ledgerEntry);
 
         // Background non-blocking persistence to Firestore & Disk
         this._saveUsersToDisk();
+        this._saveBetsToDisk();
         firebaseSync.saveBet(betOrder).catch(e => console.warn('[Bet Firestore Save]', e.message));
         firebaseSync.updateUserBalance(userId, user.balance, `Bet on ${mode} round ${activePeriodId}`).catch(e => console.warn('[Bet Balance Sync]', e.message));
         firebaseSync.saveTransaction(ledgerEntry).catch(e => console.warn('[Ledger Save]', e.message));
@@ -1418,9 +1477,42 @@ class Smarty91ServerEngine {
         }
     }
 
-    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '', channel = 'BANK', usdtAddress = '' }) {
+    canWithdrawReferralIncome(userId = 'default_user') {
+        // Referral earnings can strictly be withdrawn only on the 1st day of any month
+        const now = new Date();
+        const istDay = Number(new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric' }).format(now));
+        const isFirstOfMonth = istDay === 1;
+
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const nextPayoutDateStr = new Intl.DateTimeFormat('en-IN', { 
+            timeZone: 'Asia/Kolkata', 
+            day: 'numeric', 
+            month: 'long', 
+            year: 'numeric' 
+        }).format(isFirstOfMonth ? now : nextMonth);
+
+        return {
+            isFirstOfMonth,
+            currentDay: istDay,
+            canWithdraw: isFirstOfMonth,
+            nextPayoutDate: nextPayoutDateStr,
+            message: isFirstOfMonth 
+                ? '✅ Monthly Referral Payout Window is OPEN today (01st of Month)!'
+                : `🔒 Referral commission payouts open exclusively on the 01st of every month. Next window: 01 ${nextPayoutDateStr}.`
+        };
+    }
+
+    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '', channel = 'BANK', usdtAddress = '', isReferralWithdrawal = false }) {
         const user = this.users.get(userId);
         if (!user) throw new Error('User account not found');
+
+        // If this is a specific referral income withdrawal, enforce 1st of month constraint
+        if (isReferralWithdrawal) {
+            const check = this.canWithdrawReferralIncome(userId);
+            if (!check.isFirstOfMonth) {
+                throw new Error(`Referral funds withdrawal is only allowed on the 1st of every month! Next payout: ${check.nextPayoutDate}.`);
+            }
+        }
 
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount < 500) {
@@ -2112,6 +2204,8 @@ class Smarty91ServerEngine {
                 description: l.description
             }));
 
+        const payoutWindow = this.canWithdrawReferralIncome(user.id);
+
         return {
             success: true,
             inviteCode,
@@ -2121,6 +2215,7 @@ class Smarty91ServerEngine {
             depositCommissionEarned: depComm,
             betCommissionEarned: betComm,
             milestoneBonusEarned: milestoneComm,
+            payoutWindow,
             progression: {
                 current: activeCount,
                 target: target5,

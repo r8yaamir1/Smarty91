@@ -1,4 +1,4 @@
-// js/loader.js - Minimal Transparent Circular Loader & Ultra-Smooth Page Transitions
+// js/loader.js - High Performance Circular Loader & Ultra-Smooth Page/Tab Transitions
 
 (function() {
     // Inject clean transparent spinner and ultra-smooth transition styles
@@ -12,7 +12,7 @@
                 left: 0;
                 width: 100vw;
                 height: 100vh;
-                background: rgba(10, 12, 18, 0.65);
+                background: rgba(8, 10, 15, 0.75);
                 backdrop-filter: blur(6px);
                 -webkit-backdrop-filter: blur(6px);
                 display: flex;
@@ -22,71 +22,83 @@
                 z-index: 99999;
                 opacity: 0;
                 pointer-events: none;
-                transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s ease;
+                transition: opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.16s ease;
                 visibility: hidden;
+                will-change: opacity, visibility;
             }
             .smarty-transparent-loader-overlay.active {
                 opacity: 1;
                 pointer-events: auto;
                 visibility: visible;
             }
+            .smarty-spinner-container {
+                position: relative;
+                width: 50px;
+                height: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
             .smarty-minimal-circle-spinner {
-                width: 48px;
-                height: 48px;
-                border: 3.5px solid rgba(255, 215, 0, 0.15);
-                border-top: 3.5px solid #FFD700;
-                border-right: 3.5px solid #FF2E4D;
+                width: 44px;
+                height: 44px;
+                border: 3px solid rgba(255, 215, 0, 0.15);
+                border-top: 3px solid #FFD700;
+                border-right: 3px solid #FF2524;
                 border-radius: 50%;
                 animation: smartyCircleSpin 0.7s linear infinite;
-                filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.5));
+                will-change: transform;
+                transform: translateZ(0);
+                filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
             }
             .smarty-loader-subtext {
-                margin-top: 14px;
+                margin-top: 12px;
                 color: #FFFFFF;
-                font-size: 13px;
+                font-size: 12.5px;
                 font-weight: 700;
-                letter-spacing: 0.5px;
-                text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+                letter-spacing: 0.4px;
+                text-shadow: 0 2px 6px rgba(0,0,0,0.85);
                 font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, sans-serif;
                 background: linear-gradient(135deg, #FFFFFF 0%, #FFD700 100%);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
+                text-align: center;
             }
             @keyframes smartyCircleSpin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
+                0% { transform: rotate(0deg) translateZ(0); }
+                100% { transform: rotate(360deg) translateZ(0); }
             }
 
             /* Smooth View Transitions */
             @keyframes smartyTabFadeIn {
                 0% {
                     opacity: 0;
-                    transform: translateY(6px);
+                    transform: translateY(4px) translateZ(0);
                 }
                 100% {
                     opacity: 1;
-                    transform: translateY(0);
+                    transform: translateY(0) translateZ(0);
                 }
             }
 
             @keyframes smartyPageFadeIn {
                 0% {
                     opacity: 0;
-                    transform: translateY(8px) scale(0.995);
+                    transform: translateY(6px) scale(0.998) translateZ(0);
                 }
                 100% {
                     opacity: 1;
-                    transform: translateY(0) scale(1);
+                    transform: translateY(0) scale(1) translateZ(0);
                 }
             }
 
             .tab-smooth-enter {
-                animation: smartyTabFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+                animation: smartyTabFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
                 will-change: opacity, transform;
             }
 
             .page-smooth-enter {
-                animation: smartyPageFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+                animation: smartyPageFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
                 will-change: opacity, transform;
             }
 
@@ -108,7 +120,7 @@
                 gap: 8px;
                 box-shadow: 0 8px 24px rgba(0,0,0,0.5);
                 z-index: 100000;
-                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+                transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
                 opacity: 0;
                 pointer-events: none;
             }
@@ -137,6 +149,7 @@
     let offlineBanner = null;
     let activeCounter = 0;
     let hideTimer = null;
+    let autoSafetyTimer = null;
 
     function ensureElements() {
         if (!overlay) {
@@ -144,7 +157,9 @@
             overlay.id = 'smarty-transparent-loader';
             overlay.className = 'smarty-transparent-loader-overlay';
             overlay.innerHTML = `
-                <div class="smarty-minimal-circle-spinner"></div>
+                <div class="smarty-spinner-container">
+                    <div class="smarty-minimal-circle-spinner"></div>
+                </div>
                 <div class="smarty-loader-subtext" id="smarty-loader-subtext"></div>
             `;
             document.body.appendChild(overlay);
@@ -183,6 +198,7 @@
         }
     });
 
+    // High performance circular loader helper
     window.SmartyLoader = {
         show: function(msg = '') {
             if (typeof document === 'undefined') return;
@@ -197,10 +213,22 @@
                 labelEl.style.display = msg ? 'block' : 'none';
             }
             overlay.classList.add('active');
+
+            // Automatic Safety Timeout (5 seconds max to prevent any stuck state)
+            if (autoSafetyTimer) clearTimeout(autoSafetyTimer);
+            autoSafetyTimer = setTimeout(() => {
+                if (overlay && overlay.classList.contains('active')) {
+                    window.SmartyLoader.hide(true);
+                }
+            }, 5000);
         },
 
         hide: function(force = false) {
             if (!overlay) return;
+            if (autoSafetyTimer) {
+                clearTimeout(autoSafetyTimer);
+                autoSafetyTimer = null;
+            }
             if (force) activeCounter = 0;
             else activeCounter = Math.max(0, activeCounter - 1);
 
@@ -210,7 +238,7 @@
                         overlay.classList.remove('active');
                         if (labelEl) labelEl.innerText = '';
                     }
-                }, 60);
+                }, 20);
             }
         },
 
@@ -231,7 +259,6 @@
     window.applyTabAnimation = function(targetEl) {
         if (!targetEl) return;
         targetEl.classList.remove('tab-smooth-enter');
-        // Trigger reflow to restart CSS animation
         void targetEl.offsetWidth;
         targetEl.classList.add('tab-smooth-enter');
     };
@@ -260,9 +287,8 @@
     window.navigateToPage = function(url, msg) {
         if (!url) return;
 
-        // Navigation Switch Throttle (1.2s gap between tab switches to avoid glitches)
         const now = Date.now();
-        if (now - lastNavClickTime < 1200) {
+        if (now - lastNavClickTime < 250) {
             return;
         }
 
@@ -281,22 +307,12 @@
 
         lastNavClickTime = now;
 
-        // Show single clean VIP loader with appropriate subtitle
+        // Show circular loader for smooth navigation feedback
         if (window.SmartyLoader) {
-            let label = msg || 'Loading VIP Arena...';
-            if (url.includes('checkin')) label = 'Loading Daily Sign In...';
-            else if (url.includes('referral')) label = 'Loading VIP Agent Hub...';
-            else if (url.includes('payment')) label = 'Loading Cashier & Wallet...';
-            else if (url.includes('profile')) label = 'Loading VIP Profile...';
-            else if (url.includes('index') || url === '/') label = 'Loading Smarty91...';
-
-            window.SmartyLoader.show(label);
+            window.SmartyLoader.show(msg || '');
         }
 
-        // Smooth immediate navigation
-        setTimeout(() => {
-            window.location.href = url;
-        }, 120);
+        window.location.href = url;
     };
 
     // Auto-reveal on load
