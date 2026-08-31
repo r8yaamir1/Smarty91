@@ -1,7 +1,7 @@
 import express from 'express';
 import { serverEngine, NUMBER_PROPERTIES, MODE_DISPLAY_NAMES } from './engine.js';
 import { firebaseSync } from './firebaseSync.js';
-import { sendTelegramMessage, TELEGRAM_CONFIG } from './telegramAlert.js';
+import { sendTelegramMessage, editTelegramMessage, answerCallbackQuery, TELEGRAM_CONFIG } from './telegramAlert.js';
 
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
@@ -783,6 +783,86 @@ apiRouter.post('/admin/telegram/config', checkAdminAuth, (req, res) => {
         });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/telegram/webhook -> Handle Inline Buttons (Approve/Reject) click from Telegram
+apiRouter.post('/telegram/webhook', async (req, res) => {
+    try {
+        const { callback_query } = req.body;
+        if (!callback_query) {
+            return res.sendStatus(200);
+        }
+
+        const senderChatId = callback_query.from.id.toString();
+        const callbackData = callback_query.data;
+        const messageId = callback_query.message.message_id;
+        const chatId = callback_query.message.chat.id;
+        const originalText = callback_query.message.text || '';
+
+        // Security check: Only allow the configured admin chat ID
+        if (senderChatId !== TELEGRAM_CONFIG.chatId) {
+            await answerCallbackQuery(callback_query.id, "❌ Unauthorized: You do not have permission to approve transactions!");
+            return res.sendStatus(200);
+        }
+
+        let txId = '';
+        let action = '';
+        let typeLabel = '';
+
+        if (callbackData.startsWith('approve_dep_')) {
+            txId = callbackData.replace('approve_dep_', '');
+            action = 'APPROVE';
+            typeLabel = 'DEPOSIT';
+        } else if (callbackData.startsWith('reject_dep_')) {
+            txId = callbackData.replace('reject_dep_', '');
+            action = 'REJECT';
+            typeLabel = 'DEPOSIT';
+        } else if (callbackData.startsWith('approve_wd_')) {
+            txId = callbackData.replace('approve_wd_', '');
+            action = 'APPROVE';
+            typeLabel = 'WITHDRAWAL';
+        } else if (callbackData.startsWith('reject_wd_')) {
+            txId = callbackData.replace('reject_wd_', '');
+            action = 'REJECT';
+            typeLabel = 'WITHDRAWAL';
+        } else {
+            await answerCallbackQuery(callback_query.id, "⚠️ Invalid or unknown callback action.");
+            return res.sendStatus(200);
+        }
+
+        // Process the transaction in the engine
+        const remarks = `Processed via Telegram Bot by Admin ${senderChatId}`;
+        const result = serverEngine.processTransaction(txId, action, remarks);
+
+        if (result.success) {
+            const statusLabel = action === 'APPROVE' ? 'APPROVED ✅' : 'REJECTED ❌';
+            const actionText = action === 'APPROVE' ? 'Approved' : 'Rejected';
+            
+            // Format updated message text keeping original details but updating status
+            const separator = '━━━━━━━━━━━━━━━━━━━━';
+            const parts = originalText.split(separator);
+            let updatedMessage = '';
+            
+            if (parts.length >= 2) {
+                updatedMessage = `<b>[TELEGRAM PROCESSED]</b>\n${parts[0].trim()}\n${separator}\n${parts[1].trim()}\n${separator}\n📢 <b>Status:</b> <b>${statusLabel}</b>\n👤 <b>Admin remarks:</b> <i>${remarks}</i>`;
+            } else {
+                updatedMessage = `🎰 <b>Smarty91 Transaction Action Updated</b>\n━━━━━━━━━━━━━━━━━━━━\n🆔 <b>Tx ID:</b> <code>${txId}</code>\n📝 <b>Type:</b> ${typeLabel}\n📢 <b>Status:</b> <b>${statusLabel}</b>\n━━━━━━━━━━━━━━━━━━━━\n👤 <i>Processed directly via Telegram Inline Buttons.</i>`;
+            }
+
+            // Dismiss the telegram button spinner & display toast
+            await answerCallbackQuery(callback_query.id, `🎉 Tx ${actionText} Successfully!`);
+            
+            // Edit message to remove inline keyboard so it can't be clicked again
+            await editTelegramMessage(chatId, messageId, updatedMessage, null);
+        } else {
+            await answerCallbackQuery(callback_query.id, `⚠️ Error: ${result.message || 'Could not process'}`);
+        }
+
+        res.sendStatus(200);
+    } catch (err) {
+        console.error('[Telegram Webhook Error]:', err.message);
+        res.sendStatus(200);
     }
 });
 

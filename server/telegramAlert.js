@@ -5,22 +5,27 @@ export const TELEGRAM_CONFIG = {
     adminUrl: 'https://smarty911.onrender.com/admin7117'
 };
 
-export async function sendTelegramMessage(text) {
+export async function sendTelegramMessage(text, replyMarkup = null) {
     try {
         const token = TELEGRAM_CONFIG.botToken;
         const chatId = TELEGRAM_CONFIG.chatId;
         if (!token || !chatId) return { success: false, message: 'Telegram credentials missing' };
 
         const url = `https://api.telegram.org/bot${token}/sendMessage`;
+        const body = {
+            chat_id: chatId,
+            text: text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: false
+        };
+        if (replyMarkup) {
+            body.reply_markup = replyMarkup;
+        }
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: text,
-                parse_mode: 'HTML',
-                disable_web_page_preview: false
-            })
+            body: JSON.stringify(body)
         });
 
         const resData = await response.json();
@@ -30,6 +35,55 @@ export async function sendTelegramMessage(text) {
         return resData;
     } catch (err) {
         console.warn('[Telegram Alert] Error sending alert:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+export async function editTelegramMessage(chatId, messageId, newText, replyMarkup = null) {
+    try {
+        const token = TELEGRAM_CONFIG.botToken;
+        if (!token) return { success: false, message: 'Bot token missing' };
+        
+        const url = `https://api.telegram.org/bot${token}/editMessageText`;
+        const body = {
+            chat_id: chatId,
+            message_id: messageId,
+            text: newText,
+            parse_mode: 'HTML'
+        };
+        if (replyMarkup) {
+            body.reply_markup = replyMarkup;
+        }
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        return await response.json();
+    } catch (err) {
+        console.warn('[Telegram Alert] Error editing message:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+export async function answerCallbackQuery(callbackQueryId, text) {
+    try {
+        const token = TELEGRAM_CONFIG.botToken;
+        if (!token) return { success: false, message: 'Bot token missing' };
+        
+        const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                callback_query_id: callbackQueryId,
+                text: text
+            })
+        });
+        return await response.json();
+    } catch (err) {
+        console.warn('[Telegram Alert] Error answering callback:', err.message);
         return { success: false, error: err.message };
     }
 }
@@ -50,7 +104,16 @@ export async function notifyNewDeposit({ userId, phone, amount, bonusAmount, utr
 ━━━━━━━━━━━━━━━━━━━━
 👉 <a href="${TELEGRAM_CONFIG.adminUrl}"><b>OPEN ADMIN PANEL TO APPROVE</b></a>`;
 
-    return sendTelegramMessage(message);
+    const inlineKeyboard = {
+        inline_keyboard: [
+            [
+                { text: '✅ Approve Deposit', callback_data: `approve_dep_${txId}` },
+                { text: '❌ Reject Deposit', callback_data: `reject_dep_${txId}` }
+            ]
+        ]
+    };
+
+    return sendTelegramMessage(message, inlineKeyboard);
 }
 
 export async function notifyNewWithdrawal({ userId, phone, amount, accountHolderName, bankName, accountNumber, ifsc, upiId, txId }) {
@@ -71,5 +134,14 @@ export async function notifyNewWithdrawal({ userId, phone, amount, accountHolder
 ━━━━━━━━━━━━━━━━━━━━
 👉 <a href="${TELEGRAM_CONFIG.adminUrl}"><b>OPEN ADMIN PANEL TO PROCESS</b></a>`;
 
-    return sendTelegramMessage(message);
+    const inlineKeyboard = {
+        inline_keyboard: [
+            [
+                { text: '✅ Approve Payout', callback_data: `approve_wd_${txId}` },
+                { text: '❌ Reject Payout', callback_data: `reject_wd_${txId}` }
+            ]
+        ]
+    };
+
+    return sendTelegramMessage(message, inlineKeyboard);
 }
