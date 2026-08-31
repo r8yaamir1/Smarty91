@@ -2,7 +2,7 @@
 export const TELEGRAM_CONFIG = {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '8847373950:AAFn0U8ODizcxzWmrV_5eV832w5kbl6jqPE',
     chatId: process.env.TELEGRAM_CHAT_ID || '8282793854',
-    adminUrl: 'https://smarty911.onrender.com/admin7117'
+    adminUrl: 'https://smarty911.onrender.com/admin.html'
 };
 
 export async function sendTelegramMessage(text, replyMarkup = null) {

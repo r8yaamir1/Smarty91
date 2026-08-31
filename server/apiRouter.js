@@ -802,7 +802,11 @@ apiRouter.post('/telegram/webhook', async (req, res) => {
 
         // Security check: Only allow the configured admin chat ID
         if (senderChatId !== TELEGRAM_CONFIG.chatId) {
-            await answerCallbackQuery(callback_query.id, "❌ Unauthorized: You do not have permission to approve transactions!");
+            console.warn(`[Telegram Webhook] Unauthorized click by ${senderChatId}. Configured Admin: ${TELEGRAM_CONFIG.chatId}`);
+            await answerCallbackQuery(
+                callback_query.id, 
+                `❌ Unauthorized! Your Chat ID (${senderChatId}) does not match configured Admin Chat ID (${TELEGRAM_CONFIG.chatId}). Please update it in the Admin Panel!`
+            );
             return res.sendStatus(200);
         }
 
@@ -831,11 +835,18 @@ apiRouter.post('/telegram/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // Process the transaction in the engine
+        // Process the transaction in the engine with robust try-catch
         const remarks = `Processed via Telegram Bot by Admin ${senderChatId}`;
-        const result = serverEngine.processTransaction(txId, action, remarks);
+        let result;
+        try {
+            result = serverEngine.processTransaction(txId, action, remarks);
+        } catch (txErr) {
+            console.error('[Telegram Webhook Tx Error]:', txErr.message);
+            await answerCallbackQuery(callback_query.id, `⚠️ Error: ${txErr.message}`);
+            return res.sendStatus(200);
+        }
 
-        if (result.success) {
+        if (result && result.success) {
             const statusLabel = action === 'APPROVE' ? 'APPROVED ✅' : 'REJECTED ❌';
             const actionText = action === 'APPROVE' ? 'Approved' : 'Rejected';
             
@@ -856,12 +867,20 @@ apiRouter.post('/telegram/webhook', async (req, res) => {
             // Edit message to remove inline keyboard so it can't be clicked again
             await editTelegramMessage(chatId, messageId, updatedMessage, null);
         } else {
-            await answerCallbackQuery(callback_query.id, `⚠️ Error: ${result.message || 'Could not process'}`);
+            const failMsg = result ? (result.message || 'Could not process') : 'Failed to process';
+            await answerCallbackQuery(callback_query.id, `⚠️ Error: ${failMsg}`);
         }
 
         res.sendStatus(200);
     } catch (err) {
         console.error('[Telegram Webhook Error]:', err.message);
+        if (req.body && req.body.callback_query && req.body.callback_query.id) {
+            try {
+                await answerCallbackQuery(req.body.callback_query.id, `⚠️ Webhook Error: ${err.message}`);
+            } catch (ansErr) {
+                // ignore double failure
+            }
+        }
         res.sendStatus(200);
     }
 });
