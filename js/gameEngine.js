@@ -216,7 +216,7 @@ export function evaluateModeBets(modeInput, result) {
 }
 
 // Place a bet in the specified (or active) mode (Server-Authoritative)
-export function placeBet(betData) {
+export async function placeBet(betData) {
     const targetMode = normalizeMode(betData.mode || betData.gameType || activeModeKey);
     const modeState = gameModes[targetMode];
 
@@ -228,49 +228,62 @@ export function placeBet(betData) {
         return { success: false, message: 'Insufficient balance' };
     }
 
-    const contractAmount = parseFloat((totalAmount * 0.98).toFixed(2));
-    const fee = parseFloat((totalAmount * 0.02).toFixed(2));
-    const newBal = Number((currentBalance - totalAmount).toFixed(2));
-    setBalanceLocally(newBal);
+    try {
+        if (window.SmartyLoader) window.SmartyLoader.show('Securing Bet on Blockchain...');
 
-    const betRecord = {
-        id: 'BET' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100),
-        mode: targetMode,
-        gameType: modeState.displayName,
-        periodId: modeState.currentIssueNumber,
-        type: betData.type,
-        selection: betData.selection,
-        selectionLabel: betData.selectionLabel,
-        betAmount: totalAmount,
-        contractAmount,
-        fee,
-        quantity: betData.quantity || 1,
-        balanceUnit: betData.balanceUnit || 1,
-        placedAt: Date.now(),
-        status: 'pending'
-    };
+        // Call server betting endpoint which performs direct Firebase check & atomic deduction
+        const res = await gameService.placeBet({
+            mode: targetMode,
+            periodId: modeState.currentIssueNumber,
+            type: betData.type,
+            selection: betData.selection,
+            unitAmount: betData.balanceUnit || 1,
+            multiplier: betData.quantity || 1,
+            quantity: 1
+        });
 
-    modeState.activeBets.push(betRecord);
-
-    // Call server betting endpoint asynchronously
-    gameService.placeBet({
-        mode: targetMode,
-        periodId: modeState.currentIssueNumber,
-        type: betData.type,
-        selection: betData.selection,
-        unitAmount: betData.balanceUnit || 1,
-        multiplier: betData.quantity || 1,
-        quantity: 1
-    }).then(res => {
-        if (res && res.success && res.newBalance !== undefined) {
-            setBalanceLocally(res.newBalance);
+        if (!res || !res.success) {
+            return { success: false, message: res ? res.message : 'Failed to place bet on server' };
         }
-    }).catch(err => {
-        console.warn('Server bet placement sync note:', err.message);
-        syncServerBalance();
-    });
 
-    return { success: true, bet: betRecord };
+        // Successfully placed and debited on Firestore! Now sync state
+        const contractAmount = parseFloat((totalAmount * 0.98).toFixed(2));
+        const fee = parseFloat((totalAmount * 0.02).toFixed(2));
+        
+        const betId = res.bet ? res.bet.id : ('BET' + Date.now().toString().slice(-8) + Math.floor(Math.random() * 100));
+
+        const betRecord = {
+            id: betId,
+            mode: targetMode,
+            gameType: modeState.displayName,
+            periodId: modeState.currentIssueNumber,
+            type: betData.type,
+            selection: betData.selection,
+            selectionLabel: betData.selectionLabel,
+            betAmount: totalAmount,
+            contractAmount,
+            fee,
+            quantity: betData.quantity || 1,
+            balanceUnit: betData.balanceUnit || 1,
+            placedAt: Date.now(),
+            status: 'pending'
+        };
+
+        modeState.activeBets.push(betRecord);
+
+        if (res.newBalance !== undefined) {
+            setBalanceLocally(res.newBalance);
+        } else {
+            await syncServerBalance();
+        }
+
+        return { success: true, bet: betRecord };
+    } catch (err) {
+        console.warn('Bet placement failed:', err);
+        return { success: false, message: err.message || 'Server error. Please try again.' };
+    } finally {
+        if (window.SmartyLoader) window.SmartyLoader.hide();
+    }
 }
 
 // ----------------- SUBTAB RENDERING (PER ACTIVE MODE) -----------------

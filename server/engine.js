@@ -708,7 +708,9 @@ class Smarty91ServerEngine {
                 const previousPeriod = state.currentPeriodId;
                 if (!state.settledRounds.has(previousPeriod)) {
                     state.settledRounds.add(previousPeriod);
-                    this._settleRound(mode, previousPeriod);
+                    this._settleRound(mode, previousPeriod).catch(err => {
+                        console.error(`[Tick] Settle round error for mode ${mode} period ${previousPeriod}:`, err);
+                    });
                 }
             }
 
@@ -720,12 +722,14 @@ class Smarty91ServerEngine {
             // Settle immediately if within last 150ms of the period
             if (times.timeLeftMs <= 150 && !state.settledRounds.has(currentPeriodId)) {
                 state.settledRounds.add(currentPeriodId);
-                this._settleRound(mode, currentPeriodId);
+                this._settleRound(mode, currentPeriodId).catch(err => {
+                    console.error(`[Tick] Settle round error for mode ${mode} period ${currentPeriodId}:`, err);
+                });
             }
         });
     }
 
-    _settleRound(mode, periodId) {
+    async _settleRound(mode, periodId) {
         const state = this.modes[mode];
         const modeConfig = this.config.modes[mode];
         
@@ -766,14 +770,14 @@ class Smarty91ServerEngine {
         if (state.history.length > 50) state.history.length = 50;
 
         // Persist settled round to Firestore
-        firebaseSync.saveSettledRound(mode, roundRecord);
+        await firebaseSync.saveSettledRound(mode, roundRecord);
 
         // 2. Settle all pending bets for this mode and periodId
         const pendingBetsForRound = Array.from(this.bets.values()).filter(
             b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
         );
 
-        pendingBetsForRound.forEach(bet => {
+        for (const bet of pendingBetsForRound) {
             const settlement = this._evaluateBet(bet, winningNumber);
             bet.status = settlement.isWin ? 'WON' : 'LOST';
             bet.resultNumber = winningNumber;
@@ -782,14 +786,27 @@ class Smarty91ServerEngine {
             bet.payoutAmount = settlement.payoutAmount;
             bet.settledAt = new Date().toISOString();
 
-            firebaseSync.updateBetSettlement(bet);
+            await firebaseSync.updateBetSettlement(bet);
 
             if (settlement.isWin && settlement.payoutAmount > 0) {
-                const user = this.users.get(bet.userId);
+                // Always fetch the freshest user document from Firestore to avoid race conditions
+                let user = null;
+                try {
+                    user = await firebaseSync.fetchUserFromFirestore(bet.userId);
+                } catch (err) {
+                    console.warn('[Server] Direct Firestore fetch failed during round payout:', err.message);
+                }
+
+                if (!user) {
+                    user = this.users.get(bet.userId) || this._ensureDefaultUser(bet.userId, 0.00);
+                }
+
                 if (user) {
                     const balanceBefore = user.balance;
-                    user.balance += settlement.payoutAmount;
+                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
                     const balanceAfter = user.balance;
+
+                    this.users.set(bet.userId, user);
 
                     this.ledger.unshift({
                         id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -803,10 +820,10 @@ class Smarty91ServerEngine {
                         description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
                     });
 
-                    firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
+                    await firebaseSync.updateUserBalance(user.id, user.balance, 'Round win payout');
                 }
             }
-        });
+        }
 
         // 3. Check if Pause was scheduled for after current round completes
         if (modeConfig && modeConfig.pausePending) {
@@ -881,7 +898,7 @@ class Smarty91ServerEngine {
     }
 
     // Place Bet (Server-Authoritative Validation)
-    placeBet({ userId = 'default_user', mode, periodId, type, selection, unitAmount, multiplier, quantity = 1 }) {
+    async placeBet({ userId = 'default_user', mode, periodId, type, selection, unitAmount, multiplier, quantity = 1 }) {
         const modeState = this.modes[mode];
         const modeConfig = this.config.modes[mode];
 
@@ -905,7 +922,18 @@ class Smarty91ServerEngine {
             throw new Error(`Maximum bet amount is ₹${this.config.maxBetAmount}`);
         }
 
-        const user = this._ensureDefaultUser(userId);
+        // Fetch fresh user data from Firestore to have absolute up-to-date balance check
+        let user = null;
+        try {
+            user = await firebaseSync.fetchUserFromFirestore(userId);
+        } catch (e) {
+            console.warn('[Server] Direct Firestore fetch failed during placeBet:', e.message);
+        }
+
+        if (!user) {
+            user = this._ensureDefaultUser(userId);
+        }
+
         if (user.isBlocked) {
             throw new Error('Account is restricted. Contact support');
         }
@@ -955,8 +983,8 @@ class Smarty91ServerEngine {
         this.bets.set(betId, betOrder);
 
         // Save bet order and update balance in Firestore
-        firebaseSync.saveBet(betOrder);
-        firebaseSync.updateUserBalance(user.id, user.balance, 'Bet placed');
+        await firebaseSync.saveBet(betOrder);
+        await firebaseSync.updateUserBalance(user.id, user.balance, 'Bet placed');
 
         // Record in Ledger
         this.ledger.unshift({

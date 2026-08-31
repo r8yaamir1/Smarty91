@@ -401,7 +401,7 @@ export function handleBettingOverlay_clicks() {
     });
 
     // Submit Bet Button
-    totalAmountDiv?.addEventListener("click", function () {
+    totalAmountDiv?.addEventListener("click", async function () {
         if (isBettingLocked()) {
             showToast('Betting is locked for the draw', 'error');
             return;
@@ -417,7 +417,7 @@ export function handleBettingOverlay_clicks() {
         const gameType = getCurrentGameType();
         const periodId = getCurrentIssueNumber();
 
-        const result = placeBet({
+        const result = await placeBet({
             periodId,
             gameType,
             type: currentBetContext.type,
