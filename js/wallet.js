@@ -143,6 +143,11 @@ window.openWithdrawalHub = openWithdrawalHub;
 export function initWalletModals() {
     syncServerBalance();
 
+    // Start continuous automatic balance synchronization every 4 seconds in the background
+    setInterval(() => {
+        syncServerBalance().catch(() => {});
+    }, 4000);
+
     const refreshBtn = document.querySelector('.Wallet__C-balance-l2 svg, .Wallet__C-balance-l2');
     if (refreshBtn) {
         refreshBtn.style.cursor = 'pointer';
