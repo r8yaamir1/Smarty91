@@ -276,6 +276,10 @@ export async function placeBet(betData) {
         };
 
         modeState.activeBets.push(betRecord);
+        if (!modeState.userBets) modeState.userBets = [];
+        modeState.userBets.unshift(betRecord);
+        renderMyHistory(targetMode);
+        fetchUserBetsFromServer(targetMode).catch(() => {});
 
         if (res.newBalance !== undefined) {
             setBalanceLocally(res.newBalance);
@@ -523,6 +527,61 @@ export function renderChartTrend(modeInput = activeModeKey) {
     }
 }
 
+// 3. Fetch My Bet History from Server/Firestore
+export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 1) {
+    const mode = normalizeMode(modeInput);
+    const state = gameModes[mode];
+    if (!state) return;
+
+    try {
+        const token = localStorage.getItem('smarty91_auth_token');
+        if (!token) {
+            state.userBets = [];
+            renderMyHistory(mode);
+            return;
+        }
+
+        const res = await gameService.getMyBetHistory(mode, page, 50);
+        if (res && res.success && Array.isArray(res.items)) {
+            state.userBets = res.items.map(b => {
+                const isWon = b.status === 'WON' || b.status === 'win' || (Number(b.payoutAmount || b.winAmount || 0) > 0);
+                const isPending = b.status === 'PENDING' || b.status === 'pending';
+                const isLost = b.status === 'LOST' || b.status === 'lost' || (!isWon && !isPending);
+                const betAmt = Number(b.totalAmount !== undefined ? b.totalAmount : (b.betAmount || 0));
+                const winAmt = Number(b.payoutAmount !== undefined ? b.payoutAmount : (b.winAmount || 0));
+                const contractAmt = Number(b.contractAmount !== undefined ? b.contractAmount : (betAmt * 0.98));
+                const feeAmt = Number(b.fee !== undefined ? b.fee : (b.serviceFee !== undefined ? b.serviceFee : (betAmt * 0.02)));
+
+                return {
+                    id: b.id,
+                    mode: b.mode || mode,
+                    periodId: b.periodId,
+                    type: b.type,
+                    selection: b.selection,
+                    selectionLabel: b.selectionLabel || b.selection,
+                    betAmount: betAmt,
+                    totalAmount: betAmt,
+                    contractAmount: contractAmt,
+                    fee: feeAmt,
+                    winAmount: winAmt,
+                    payoutAmount: winAmt,
+                    status: isWon ? 'win' : (isPending ? 'pending' : 'lose'),
+                    resultNumber: b.resultNumber,
+                    resultColor: b.resultColor,
+                    resultSize: b.resultSize,
+                    placedAt: b.placedAt || Date.now(),
+                    settledAt: b.settledAt
+                };
+            });
+            state.myHistoryPage = page;
+            renderMyHistory(mode);
+        }
+    } catch (e) {
+        console.warn('[GameEngine] fetchUserBetsFromServer note:', e.message);
+        renderMyHistory(mode);
+    }
+}
+
 // 3. Render My History (User Bets for Active Mode)
 export function renderMyHistory(modeInput = activeModeKey) {
     const mode = normalizeMode(modeInput);
@@ -552,8 +611,13 @@ export function renderMyHistory(modeInput = activeModeKey) {
 
     let cardsHtml = '';
     items.forEach((bet) => {
-        const isWin = bet.status === 'win';
+        const isWin = bet.status === 'win' || bet.status === 'WON' || (Number(bet.winAmount || bet.payoutAmount || 0) > 0);
+        const isPending = bet.status === 'pending' || bet.status === 'PENDING';
         const isNumber = bet.type === 'number' || (!isNaN(Number(bet.selection)) && bet.type !== 'color' && bet.type !== 'size');
+        const betAmt = Number(bet.betAmount !== undefined ? bet.betAmount : (bet.totalAmount || 0));
+        const winAmt = Number(bet.winAmount !== undefined ? bet.winAmount : (bet.payoutAmount || 0));
+        const contractAmt = Number(bet.contractAmount !== undefined ? bet.contractAmount : (betAmt * 0.98));
+        const feeAmt = Number(bet.fee !== undefined ? bet.fee : (betAmt * 0.02));
 
         let badgeClass = '';
         let badgeText = '';
@@ -586,9 +650,9 @@ export function renderMyHistory(modeInput = activeModeKey) {
                         <div class="MyGameRecordList__C-item-m-top" data-v-8bb41fd5="">${bet.periodId}</div>
                         <div class="MyGameRecordList__C-item-m-bottom" data-v-8bb41fd5="">${dateStr}</div>
                     </div>
-                    <div class="MyGameRecordList__C-item-r ${isWin ? 'success' : ''}" data-v-8bb41fd5="">
-                        <div data-v-8bb41fd5="">${isWin ? 'Succeed' : 'Failed'}</div>
-                        <span data-v-8bb41fd5="">${isWin ? '+₹' + Number(bet.winAmount || 0).toFixed(2) : '-₹' + Number(bet.betAmount || 0).toFixed(2)}</span>
+                    <div class="MyGameRecordList__C-item-r ${isWin ? 'success' : (isPending ? 'pending' : '')}" data-v-8bb41fd5="">
+                        <div data-v-8bb41fd5="">${isWin ? 'Succeed' : (isPending ? 'Pending' : 'Failed')}</div>
+                        <span data-v-8bb41fd5="">${isWin ? '+₹' + winAmt.toFixed(2) : (isPending ? '₹' + betAmt.toFixed(2) : '-₹' + betAmt.toFixed(2))}</span>
                     </div>
                 </div>
                 <div class="MyGameRecordList__C-detail" data-v-8bb41fd5="" style="display: none;">
@@ -603,15 +667,15 @@ export function renderMyHistory(modeInput = activeModeKey) {
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Purchase amount</span>
-                        <span data-v-8bb41fd5="">₹${Number(bet.betAmount || 0).toFixed(2)}</span>
+                        <span data-v-8bb41fd5="">₹${betAmt.toFixed(2)}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Amount after tax</span>
-                        <span data-v-8bb41fd5="">₹${Number(bet.contractAmount || 0).toFixed(2)}</span>
+                        <span data-v-8bb41fd5="">₹${contractAmt.toFixed(2)}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Tax</span>
-                        <span data-v-8bb41fd5="">₹${Number(bet.fee || 0).toFixed(2)}</span>
+                        <span data-v-8bb41fd5="">₹${feeAmt.toFixed(2)}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Result</span>
@@ -623,11 +687,11 @@ export function renderMyHistory(modeInput = activeModeKey) {
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Status</span>
-                        <span data-v-8bb41fd5="" class="${isWin ? 'green' : 'red'}" style="color: ${isWin ? 'var(--norm_green-color)' : 'var(--norm_red-color)'}; font-weight: bold;">${isWin ? 'Succeed' : 'Failed'}</span>
+                        <span data-v-8bb41fd5="" class="${isWin ? 'green' : (isPending ? 'pending' : 'red')}" style="color: ${isWin ? 'var(--norm_green-color)' : (isPending ? 'var(--text_color_L2)' : 'var(--norm_red-color)')}; font-weight: bold;">${isWin ? 'Succeed' : (isPending ? 'Pending' : 'Failed')}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Win/Loss</span>
-                        <span data-v-8bb41fd5="" class="${isWin ? 'green' : 'red'}" style="color: ${isWin ? 'var(--norm_green-color)' : 'var(--norm_red-color)'}; font-weight: bold;">${isWin ? '+₹' + Number(bet.winAmount || 0).toFixed(2) : '-₹' + Number(bet.betAmount || 0).toFixed(2)}</span>
+                        <span data-v-8bb41fd5="" class="${isWin ? 'green' : (isPending ? 'pending' : 'red')}" style="color: ${isWin ? 'var(--norm_green-color)' : (isPending ? 'var(--text_color_L2)' : 'var(--norm_red-color)')}; font-weight: bold;">${isWin ? '+₹' + winAmt.toFixed(2) : (isPending ? 'Pending' : '-₹' + betAmt.toFixed(2))}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Order time</span>
@@ -714,7 +778,10 @@ export function initSubtabs() {
 
             if (index === 0) renderGameHistory();
             else if (index === 1) renderChartTrend();
-            else if (index === 2) renderMyHistory();
+            else if (index === 2) {
+                renderMyHistory();
+                fetchUserBetsFromServer(getActiveModeKey());
+            }
         });
     });
 

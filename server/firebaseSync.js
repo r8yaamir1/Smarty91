@@ -592,12 +592,25 @@ class FirebaseSyncManager {
         if (!this._checkQuota()) return [];
         try {
             const betsCol = collection(db, 'bets');
-            // Query without orderBy to eliminate the requirement for composite index
-            const q = query(betsCol, where('userId', '==', userId), where('mode', '==', mode));
+            // Query by userId (simple single-field index always exists by default in Firestore)
+            const q = query(betsCol, where('userId', '==', userId));
             const querySnap = await getDocs(q);
             const userBets = [];
+            
+            const targetMode = mode ? String(mode).toLowerCase().replace('wingo', '').trim() : null;
+
             querySnap.forEach(docSnap => {
-                userBets.push(docSnap.data());
+                const data = docSnap.data();
+                if (data) {
+                    if (targetMode) {
+                        const betMode = String(data.mode || '').toLowerCase().replace('wingo', '').trim();
+                        if (betMode === targetMode || data.mode === mode) {
+                            userBets.push(data);
+                        }
+                    } else {
+                        userBets.push(data);
+                    }
+                }
             });
             
             // Sort in-memory descending by placedAt

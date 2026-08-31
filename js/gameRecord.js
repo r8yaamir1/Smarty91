@@ -13,6 +13,7 @@ import {
     renderGameHistory,
     renderChartTrend,
     renderMyHistory,
+    fetchUserBetsFromServer,
     updateModeHistoryFromServer
 } from "./gameEngine.js";
 import { showEvaluationDialog } from "./updateWin.js";
@@ -123,6 +124,7 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId) {
             if (latestResult) {
                 const evaluation = evaluateModeBets(mode, latestResult);
                 syncServerBalance();
+                fetchUserBetsFromServer(mode).catch(() => {});
 
                 if (mode === getActiveModeKey()) {
                     renderWinningTokensForActiveMode();
@@ -158,6 +160,7 @@ export async function initializeServerHistories() {
     renderGameHistory(activeMode);
     renderChartTrend(activeMode);
     renderMyHistory(activeMode);
+    fetchUserBetsFromServer(activeMode).catch(() => {});
 }
 
 // ----------------- LOCAL SMOOTH TICK LOOP -----------------
@@ -305,6 +308,7 @@ export async function switchGameMode(newGameType) {
         renderGameHistory(targetMode);
         renderChartTrend(targetMode);
         renderMyHistory(targetMode);
+        fetchUserBetsFromServer(targetMode).catch(() => {});
 
         if (window.SmartyLoader) {
             window.SmartyLoader.hide();
@@ -362,6 +366,7 @@ export async function initGameRecord() {
                         renderWinningTokensForActiveMode();
                         renderGameHistory(mode);
                         renderChartTrend(mode);
+                        fetchUserBetsFromServer(mode).catch(() => {});
                     }
                 }
             });

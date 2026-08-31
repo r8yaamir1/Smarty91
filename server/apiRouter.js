@@ -349,9 +349,13 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
 
         // 2. Overlay in-memory latest bets
         if (serverEngine.bets && serverEngine.bets.size > 0) {
+            const targetMode = String(mode).toLowerCase().replace('wingo', '').trim();
             for (const [, b] of serverEngine.bets) {
-                if (b && b.userId === authUser.id && b.mode === mode) {
-                    betMap.set(b.id, b);
+                if (b && b.userId === authUser.id) {
+                    const betMode = String(b.mode || '').toLowerCase().replace('wingo', '').trim();
+                    if (betMode === targetMode || b.mode === mode) {
+                        betMap.set(b.id, b);
+                    }
                 }
             }
         }
