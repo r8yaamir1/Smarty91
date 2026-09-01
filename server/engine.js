@@ -1818,7 +1818,7 @@ class Smarty91ServerEngine {
         };
     }
 
-    createWithdrawalRequest({ userId = 'default_user', amount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '', channel = 'BANK', usdtAddress = '', isReferralWithdrawal = false }) {
+    createWithdrawalRequest({ userId = 'default_user', amount, usdtAmount, accountHolderName = '', bankName = 'Bank Transfer', accountNumber = '', ifsc = '', securityPin = '', upiId = '', channel = 'BANK', usdtAddress = '', isReferralWithdrawal = false }) {
         const user = this.users.get(userId);
         if (!user) throw new Error('User account not found');
 
@@ -1838,10 +1838,6 @@ class Smarty91ServerEngine {
 
         const isUsdt = channel === 'USDT' || channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().length >= 10);
 
-        if (!isUsdt && !isReferralWithdrawal) {
-            throw new Error('Bank Transfer is currently under system upgrade (Coming Soon). Please use USDT Crypto Withdrawal for instant 0% fee payouts!');
-        }
-
         const rate = Number(this.config.usdtRate || 102);
         let numAmount = Number(amount);
         let usdtVal = Number(usdtAmount);
@@ -1858,8 +1854,8 @@ class Smarty91ServerEngine {
             numAmount = Number((usdtVal * rate).toFixed(2));
             usdtVal = Number(usdtVal.toFixed(2));
         } else {
-            if (isNaN(numAmount) || numAmount < 500) {
-                throw new Error('Minimum withdrawal amount is ₹500');
+            if (isNaN(numAmount) || numAmount < 200) {
+                throw new Error('Minimum withdrawal amount is ₹200');
             }
         }
 
