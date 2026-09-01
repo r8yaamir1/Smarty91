@@ -841,6 +841,31 @@ apiRouter.get('/admin/probabilities', checkAdminAuth, (req, res) => {
     });
 });
 
+// GET /api/admin/risk-engine/status -> Get Risk Engine status & config
+apiRouter.get('/admin/risk-engine/status', checkAdminAuth, (req, res) => {
+    res.json(serverEngine.getRiskEngineStatus());
+});
+
+// POST /api/admin/risk-engine/config -> Update House Win Rate % & Strategy Presets
+apiRouter.post('/admin/risk-engine/config', checkAdminAuth, (req, res) => {
+    try {
+        const result = serverEngine.updateRiskEngineConfig(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/risk-engine/targeted-users -> Add/Remove Targeted User Override (Always Win / Lose)
+apiRouter.post('/admin/risk-engine/targeted-users', checkAdminAuth, (req, res) => {
+    try {
+        const result = serverEngine.updateTargetedUser(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 // POST /api/admin/probabilities -> Update winning chance weights
 apiRouter.post('/admin/probabilities', checkAdminAuth, (req, res) => {
     try {

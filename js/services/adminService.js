@@ -74,6 +74,18 @@ class AdminService {
     async updateReferralStars(stars) {
         return await apiClient.post('/admin/referral-stars', stars);
     }
+
+    async getRiskEngineStatus() {
+        return await apiClient.get('/admin/risk-engine/status');
+    }
+
+    async updateRiskEngineConfig(payload) {
+        return await apiClient.post('/admin/risk-engine/config', payload);
+    }
+
+    async updateTargetedUser(userIdOrPhone, status) {
+        return await apiClient.post('/admin/risk-engine/targeted-users', { userIdOrPhone, status });
+    }
 }
 
 export const adminService = new AdminService();
