@@ -2277,6 +2277,7 @@ class Smarty91ServerEngine {
 
         firebaseSync.updateUserBalance(userId, user.balance, `Daily Sign-in bonus Day ${nextStreak} (₹${rewardAmount})`);
         firebaseSync.saveUser(user);
+        this._saveUsersToDisk();
 
         return {
             success: true,

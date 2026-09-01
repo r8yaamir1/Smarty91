@@ -182,6 +182,12 @@ class FirebaseSyncManager {
                         referredBy: u.referredBy || null,
                         hasDeposited: !!u.hasDeposited,
                         isBlocked: !!u.isBlocked,
+                        lastCheckInDate: u.lastCheckInDate || null,
+                        checkInStreak: Number(u.checkInStreak || 0),
+                        checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : [],
+                        totalReferralCommission: Number(u.totalReferralCommission || 0),
+                        betCommissionEarned: Number(u.betCommissionEarned || 0),
+                        awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
                         createdAt: u.createdAt || new Date().toISOString()
                     });
                     if (u.inviteCode) {
@@ -335,6 +341,12 @@ class FirebaseSyncManager {
                                 referredBy: u.referredBy || null,
                                 hasDeposited: !!u.hasDeposited,
                                 isBlocked: !!u.isBlocked,
+                                lastCheckInDate: u.lastCheckInDate || null,
+                                checkInStreak: Number(u.checkInStreak || 0),
+                                checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : [],
+                                totalReferralCommission: Number(u.totalReferralCommission || 0),
+                                betCommissionEarned: Number(u.betCommissionEarned || 0),
+                                awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
                                 createdAt: u.createdAt || new Date().toISOString()
                             });
                             if (u.inviteCode) {
@@ -374,6 +386,12 @@ class FirebaseSyncManager {
                     referredBy: u.referredBy || null,
                     hasDeposited: !!u.hasDeposited,
                     isBlocked: !!u.isBlocked,
+                    lastCheckInDate: u.lastCheckInDate || null,
+                    checkInStreak: Number(u.checkInStreak || 0),
+                    checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : [],
+                    totalReferralCommission: Number(u.totalReferralCommission || 0),
+                    betCommissionEarned: Number(u.betCommissionEarned || 0),
+                    awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
                     createdAt: u.createdAt || new Date().toISOString()
                 };
                 this.engine.users.set(userData.id, userData);
@@ -413,6 +431,12 @@ class FirebaseSyncManager {
                     referredBy: u.referredBy || null,
                     hasDeposited: !!u.hasDeposited,
                     isBlocked: !!u.isBlocked,
+                    lastCheckInDate: u.lastCheckInDate || null,
+                    checkInStreak: Number(u.checkInStreak || 0),
+                    checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : [],
+                    totalReferralCommission: Number(u.totalReferralCommission || 0),
+                    betCommissionEarned: Number(u.betCommissionEarned || 0),
+                    awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
                     createdAt: u.createdAt || new Date().toISOString()
                 };
                 this.engine.users.set(userData.id, userData);
@@ -759,6 +783,12 @@ class FirebaseSyncManager {
                 referredBy: user.referredBy || null,
                 hasDeposited: !!user.hasDeposited,
                 isBlocked: !!user.isBlocked,
+                lastCheckInDate: user.lastCheckInDate || null,
+                checkInStreak: Number(user.checkInStreak || 0),
+                checkInHistory: Array.isArray(user.checkInHistory) ? user.checkInHistory.slice(-30) : [],
+                totalReferralCommission: Number(user.totalReferralCommission || 0),
+                betCommissionEarned: Number(user.betCommissionEarned || 0),
+                awardedMilestones: Array.isArray(user.awardedMilestones) ? user.awardedMilestones : [],
                 createdAt: user.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             }, { merge: true });

@@ -10,7 +10,16 @@ import { placeBet, initSubtabs, renderMyHistory } from './gameEngine.js';
 import { getCurrentGameType, getCurrentIssueNumber, switchGameMode, isBettingLocked, getRemainingSeconds } from './gameRecord.js';
 import { initWinDialogEvents } from './updateWin.js';
 import { showToast } from './wallet.js';
-import { playClickSound, playSpinTick, playWinChime } from './audio.js';
+import {
+    playClickSound,
+    playStepperSound,
+    playChipSelectSound,
+    playBetPopupOpenSound,
+    playBetPlacedSound,
+    playModalCloseSound,
+    playSpinTick,
+    playWinChime
+} from './audio.js';
 
 // Pre-selected multiplier from outside quick buttons (default 1)
 let preSelectedMultiplier = 1;
@@ -106,6 +115,83 @@ function updateBettingPopupTheme(type, selection, selectionLabel) {
     }
 }
 
+// Update all betting popup values and chip states cleanly
+export function updateBetState({ balance, quantity }) {
+    if (balance !== undefined) {
+        currentBetContext.baseBalance = parseInt(balance, 10) || 1;
+    }
+    if (quantity !== undefined) {
+        let q = parseInt(quantity, 10);
+        if (isNaN(q) || q < 1) q = 1;
+        if (q > 100000) q = 100000;
+        currentBetContext.multiplier = q;
+        preSelectedMultiplier = q;
+    }
+
+    const currentBal = currentBetContext.baseBalance || 1;
+    const currentQty = currentBetContext.multiplier || 1;
+
+    // Update Input field
+    const inputField = document.querySelector("#van-field-5-input");
+    if (inputField) {
+        inputField.value = currentQty;
+    }
+
+    // Update Balance Chips (1, 10, 100, 1000)
+    const allItems = document.querySelectorAll('.Betting__Popup-body-line-item');
+    const balanceItems = Array.from(allItems).filter((item) => /^\d+$/.test(item.textContent.trim()));
+    balanceItems.forEach(chip => {
+        const val = parseInt(chip.textContent.trim(), 10);
+        const isActive = val === currentBal;
+        chip.classList.toggle('bgcolor', isActive);
+        chip.classList.toggle('active', isActive);
+    });
+
+    // Update Quantity Chips (X1, X5, X10, X20, X50, X100)
+    const quantityItems = Array.from(allItems).filter((item) => /^X\d+$/.test(item.textContent.trim()));
+    quantityItems.forEach(chip => {
+        const multVal = parseInt(chip.textContent.trim().replace('X', ''), 10);
+        chip.classList.toggle('bgcolor', multVal === currentQty);
+    });
+
+    // Update Outer Multiplier Chips
+    const outerMultipleChips = document.querySelectorAll('.Betting__C-multiple-r');
+    outerMultipleChips.forEach(outerChip => {
+        const outerVal = parseInt(outerChip.textContent.trim().replace('X', ''), 10);
+        outerChip.classList.toggle('active', outerVal === currentQty);
+    });
+
+    // Update Total Amount Text
+    const total = currentBal * currentQty;
+    if (totalAmountDiv) {
+        totalAmountDiv.textContent = `Total amount ₹${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+}
+
+// Global Stepper Adjust Quantity Helper for + / - buttons
+window.adjustBetQuantity = function(delta, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    playStepperSound(delta);
+
+    let currentQty = currentBetContext.multiplier || 1;
+    const inputField = document.querySelector("#van-field-5-input");
+    if (inputField && inputField.value !== '') {
+        const parsed = parseInt(inputField.value, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+            currentQty = parsed;
+        }
+    }
+
+    let newQty = currentQty + delta;
+    if (newQty < 1) newQty = 1;
+    if (newQty > 100000) newQty = 100000;
+
+    updateBetState({ quantity: newQty });
+};
+
 export function openBettingForSelection({ type, selection, selectionLabel, classSuffix }) {
     if (isBettingLocked()) {
         showToast('Betting is locked for the draw', 'error');
@@ -124,38 +210,9 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
     }
 
     updateBettingPopupTheme(type, selection, selectionLabel);
+    updateBetState({ balance: currentBetContext.baseBalance, quantity: currentBetContext.multiplier });
 
-    // Sync input field & multiplier chips inside popup
-    const inputField = document.querySelector("#van-field-5-input");
-    if (inputField) {
-        inputField.value = currentBetContext.multiplier;
-    }
-
-    const allItems = document.querySelectorAll('.Betting__Popup-body-line-item');
-    const balanceItems = Array.from(allItems).filter((item) => /^\d+$/.test(item.textContent.trim()));
-    const quantityItems = Array.from(allItems).filter((item) => /^X\d+$/.test(item.textContent.trim()));
-
-    balanceItems.forEach(chip => {
-        const val = parseInt(chip.textContent.trim(), 10);
-        const isActive = val === currentBetContext.baseBalance;
-        chip.classList.toggle('bgcolor', isActive);
-        chip.classList.toggle('active', isActive);
-    });
-
-    quantityItems.forEach(chip => {
-        if (/^X\d+$/.test(chip.textContent.trim())) {
-            const multVal = parseInt(chip.textContent.trim().replace('X', ''), 10);
-            chip.classList.toggle('bgcolor', multVal === currentBetContext.multiplier);
-        }
-    });
-
-    // Update total amount calculation
-    const total = currentBetContext.baseBalance * currentBetContext.multiplier;
-    if (totalAmountDiv) {
-        totalAmountDiv.textContent = `Total amount ₹${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-
-    playClickSound();
+    playBetPopupOpenSound();
     if (overlay) overlay.style.display = 'block';
     if (dialogDiv) dialogDiv.style.display = 'block';
     document.body.classList.add('van-overflow-hidden');
@@ -241,6 +298,7 @@ export function handleBettingOverlay() {
 }
 
 export function closeBettingPopup() {
+    playModalCloseSound();
     if (overlay) overlay.style.display = 'none';
     if (dialogDiv) dialogDiv.style.display = 'none';
     document.body.classList.remove('van-overflow-hidden');
@@ -262,76 +320,27 @@ export function handleBettingOverlay_clicks() {
     outerMultipleChips.forEach(chip => {
         chip.addEventListener('click', (e) => {
             e.stopPropagation();
-            playClickSound();
-            outerMultipleChips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-
+            playChipSelectSound();
             const val = parseInt(chip.textContent.trim().replace('X', ''), 10) || 1;
-            preSelectedMultiplier = val;
-            currentBetContext.multiplier = val;
-
-            if (inputField) inputField.value = val;
-            quantityItems.forEach(q => {
-                const qVal = parseInt(q.textContent.trim().replace('X', ''), 10);
-                q.classList.toggle('bgcolor', qVal === val);
-            });
-
-            updateTotalAmount();
+            updateBetState({ quantity: val });
         });
     });
-
-    // Agree toggle
-    isAgree?.addEventListener('click', () => {
-        isAgree.classList.toggle('active');
-    });
-
-    let selectedBalance = currentBetContext.baseBalance || 1;
-    let selectedQuantity = currentBetContext.multiplier || preSelectedMultiplier || 1;
-
-    if (inputField) inputField.value = selectedQuantity;
-
-    const updateTotalAmount = () => {
-        currentBetContext.baseBalance = selectedBalance;
-        currentBetContext.multiplier = selectedQuantity;
-        const total = selectedBalance * selectedQuantity;
-        if (totalAmountDiv) {
-            totalAmountDiv.textContent = `Total amount ₹${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        }
-    };
 
     // Balance select chips (1, 10, 100, 1000)
     balanceItems.forEach(item => {
         item.addEventListener("click", () => {
-            playClickSound();
-            balanceItems.forEach(b => {
-                b.classList.remove('bgcolor');
-                b.classList.remove('active');
-            });
-            item.classList.add('bgcolor');
-            item.classList.add('active');
-            selectedBalance = parseInt(item.textContent.trim(), 10) || 1;
-            updateTotalAmount();
+            playChipSelectSound();
+            const val = parseInt(item.textContent.trim(), 10) || 1;
+            updateBetState({ balance: val });
         });
     });
 
     // Popup Multiplier chips (X1, X5, X10, X20, X50, X100)
     quantityItems.forEach(item => {
         item.addEventListener("click", () => {
-            playClickSound();
-            quantityItems.forEach(q => q.classList.remove('bgcolor'));
-            item.classList.add('bgcolor');
+            playChipSelectSound();
             const val = parseInt(item.textContent.trim().replace('X', ''), 10) || 1;
-            selectedQuantity = val;
-            preSelectedMultiplier = val;
-            if (inputField) inputField.value = val;
-
-            // Sync outer multiple chips
-            outerMultipleChips.forEach(outerChip => {
-                const outerVal = parseInt(outerChip.textContent.trim().replace('X', ''), 10);
-                outerChip.classList.toggle('active', outerVal === val);
-            });
-
-            updateTotalAmount();
+            updateBetState({ quantity: val });
         });
     });
 
@@ -340,70 +349,32 @@ export function handleBettingOverlay_clicks() {
         inputField.addEventListener("input", function () {
             const raw = this.value.trim();
             if (raw === '') {
-                selectedQuantity = 1;
-                updateTotalAmount();
+                updateBetState({ quantity: 1 });
                 return;
             }
             let val = parseInt(raw.replace(/\D/g, ''), 10);
             if (isNaN(val) || val < 1) val = 1;
             if (val > 100000) val = 100000;
-
-            selectedQuantity = val;
-            preSelectedMultiplier = val;
-
-            quantityItems.forEach(item => {
-                const multiplierValue = parseInt(item.textContent.trim().replace('X', ''), 10);
-                item.classList.toggle('bgcolor', multiplierValue === val);
-            });
-
-            outerMultipleChips.forEach(outerChip => {
-                const outerVal = parseInt(outerChip.textContent.trim().replace('X', ''), 10);
-                outerChip.classList.toggle('active', outerVal === val);
-            });
-
-            updateTotalAmount();
+            updateBetState({ quantity: val });
         });
 
         inputField.addEventListener("blur", function () {
             if (!this.value || parseInt(this.value, 10) < 1) {
-                this.value = 1;
-                selectedQuantity = 1;
-                preSelectedMultiplier = 1;
-                updateTotalAmount();
+                updateBetState({ quantity: 1 });
             }
         });
     }
 
-    // Global Adjust Quantity Helper for + / - buttons
-    window.adjustBetQuantity = function(delta) {
-        playClickSound();
-        const inputField = document.querySelector("#van-field-5-input");
-        let currentVal = parseInt(inputField ? inputField.value : '1', 10);
-        if (isNaN(currentVal) || currentVal < 1) currentVal = 1;
-
-        let newVal = currentVal + delta;
-        if (newVal < 1) newVal = 1;
-        if (newVal > 100000) newVal = 100000;
-
-        if (inputField) {
-            inputField.value = newVal;
-            inputField.dispatchEvent(new Event('input', { bubbles: true }));
-        } else {
-            preSelectedMultiplier = newVal;
-            currentBetContext.multiplier = newVal;
-        }
-    };
-
     // Increment and Decrement Stepper Buttons
-    const decrementBtn = document.querySelector("#bet-pop-decrement") || document.querySelector(".Betting__Popup-btn:first-child");
-    const incrementBtn = document.querySelector("#bet-pop-increment") || document.querySelector(".Betting__Popup-btn:last-child");
+    const decrementBtn = document.querySelector("#bet-pop-decrement");
+    const incrementBtn = document.querySelector("#bet-pop-increment");
 
-    decrementBtn?.addEventListener("click", () => {
-        window.adjustBetQuantity(-1);
+    decrementBtn?.addEventListener("click", (e) => {
+        window.adjustBetQuantity(-1, e);
     });
 
-    incrementBtn?.addEventListener("click", () => {
-        window.adjustBetQuantity(1);
+    incrementBtn?.addEventListener("click", (e) => {
+        window.adjustBetQuantity(1, e);
     });
 
     // Agreement Checkbox Toggle
@@ -411,7 +382,6 @@ export function handleBettingOverlay_clicks() {
     const agreeCheckbox = document.querySelector('.Betting__Popup-agree-c');
 
     agreeContainer?.addEventListener('click', (e) => {
-        // If clicking on "Pre-sale rules" link, don't toggle (it opens rule modal)
         if (e.target.closest('.Betting__Popup-preSaleShow')) {
             return;
         }
@@ -434,7 +404,9 @@ export function handleBettingOverlay_clicks() {
             return;
         }
 
-        const total = selectedBalance * selectedQuantity;
+        const bal = currentBetContext.baseBalance || 1;
+        const qty = currentBetContext.multiplier || 1;
+        const total = bal * qty;
         const gameType = getCurrentGameType();
         const periodId = getCurrentIssueNumber();
 
@@ -445,8 +417,8 @@ export function handleBettingOverlay_clicks() {
             selection: currentBetContext.selection,
             selectionLabel: currentBetContext.selectionLabel,
             betAmount: total,
-            quantity: selectedQuantity,
-            balanceUnit: selectedBalance
+            quantity: qty,
+            balanceUnit: bal
         });
 
         if (!result.success) {
@@ -466,7 +438,8 @@ export function handleBettingOverlay_clicks() {
             return;
         }
 
-        // Success toast
+        // Success toast & audio
+        playBetPlacedSound();
         if (betTextToast) {
             betTextToast.style.display = "";
             setTimeout(() => {

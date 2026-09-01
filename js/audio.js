@@ -215,7 +215,193 @@ export function playWinChime() {
 
 export function playClickSound() {
     if (isMuted) return;
-    playSynthBeep(900, 0.04, 'sine');
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.025);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.025);
+    } catch (e) {
+        // Safe ignore
+    }
+}
+
+// Crisp pitch-modulated click for stepper (+ / -)
+export function playStepperSound(delta = 1) {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const baseFreq = delta > 0 ? 1400 : 900;
+        const endFreq = delta > 0 ? 900 : 450;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + 0.035);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.035);
+    } catch (e) {}
+}
+
+// Smooth casino-grade chip select sound
+export function playChipSelectSound() {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+
+        // Primary tap
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(1600, now);
+        osc1.frequency.exponentialRampToValueAtTime(800, now + 0.03);
+        gain1.gain.setValueAtTime(0.18, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.03);
+
+        // Secondary subtle bounce
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1100, now + 0.02);
+        osc2.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+        gain2.gain.setValueAtTime(0.12, now + 0.02);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.02);
+        osc2.stop(now + 0.05);
+    } catch (e) {}
+}
+
+// Ascending opening swoop for betting popup
+export function playBetPopupOpenSound() {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        const notes = [587.33, 880.00]; // D5, A5
+        notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + (idx * 0.04));
+            gain.gain.setValueAtTime(0.16, now + (idx * 0.04));
+            gain.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.04) + 0.12);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + (idx * 0.04));
+            osc.stop(now + (idx * 0.04) + 0.12);
+        });
+    } catch (e) {}
+}
+
+// Affirmative bet placed sound
+export function playBetPlacedSound() {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        const notes = [659.25, 987.77, 1318.51]; // E5, B5, E6
+        notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + (idx * 0.05));
+            gain.gain.setValueAtTime(0.2, now + (idx * 0.05));
+            gain.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.05) + 0.2);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + (idx * 0.05));
+            osc.stop(now + (idx * 0.05) + 0.2);
+        });
+    } catch (e) {}
+}
+
+// Soft modal cancel / close sound
+export function playModalCloseSound() {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(250, now + 0.05);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    } catch (e) {}
+}
+
+// Triumphant celebratory fanfare for Congratulations / Daily bonus claim
+export function playCongratulationSound() {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        if (!ctx || ctx.state === 'suspended') return;
+        const now = ctx.currentTime;
+        // Celebratory chord progression: C5 -> E5 -> G5 -> C6 -> E6
+        const fanfare = [
+            { f: 523.25, d: 0.12, t: 0.00 },
+            { f: 659.25, d: 0.12, t: 0.08 },
+            { f: 783.99, d: 0.14, t: 0.16 },
+            { f: 1046.50, d: 0.35, t: 0.24 },
+            { f: 1318.51, d: 0.45, t: 0.32 }
+        ];
+
+        fanfare.forEach(item => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(item.f, now + item.t);
+            gain.gain.setValueAtTime(0.24, now + item.t);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + item.t + item.d);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + item.t);
+            osc.stop(now + item.t + item.d);
+        });
+    } catch (e) {}
+}
+
+// Expose globally to window
+if (typeof window !== 'undefined') {
+    window.playClickSound = playClickSound;
+    window.playStepperSound = playStepperSound;
+    window.playChipSelectSound = playChipSelectSound;
+    window.playBetPopupOpenSound = playBetPopupOpenSound;
+    window.playBetPlacedSound = playBetPlacedSound;
+    window.playModalCloseSound = playModalCloseSound;
+    window.playCongratulationSound = playCongratulationSound;
+    window.playWinChime = playWinChime;
 }
 
 export function updateVoiceUI() {
@@ -279,4 +465,15 @@ export function initAudio() {
     };
     window.addEventListener('click', unlockAudio, { once: true });
     window.addEventListener('touchstart', unlockAudio, { once: true });
+
+    // Global listener for interactive buttons and nav items
+    document.addEventListener('click', (e) => {
+        const interactiveBtn = e.target.closest('button, .bottom-nav-item, .quick-action-card, .tab-item, .nav-btn, .action-btn');
+        if (interactiveBtn && !e.defaultPrevented) {
+            // Avoid double playing if already handled by custom popup/stepper sounds
+            if (!interactiveBtn.closest('.Betting__Popup') && !interactiveBtn.closest('.Betting__C-numC') && !interactiveBtn.closest('.Betting__C-foot')) {
+                playClickSound();
+            }
+        }
+    }, { capture: true, passive: true });
 }

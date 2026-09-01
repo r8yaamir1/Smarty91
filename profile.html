@@ -448,6 +448,8 @@
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid rgba(255,255,255,0.06);
+            gap: 10px;
+            min-width: 0;
         }
         .ledger-item:last-child {
             border-bottom: none;
@@ -457,6 +459,9 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .ledger-icon {
@@ -467,35 +472,56 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .ledger-details {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .ledger-title {
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 600;
             color: #E2E8F0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
         }
 
         .ledger-time {
             font-size: 10px;
+            font-weight: 500;
             color: #6B7280;
-            margin-top: 1px;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .ledger-right {
             text-align: right;
+            flex-shrink: 0;
+            min-width: fit-content;
+            margin-left: 8px;
         }
 
         .ledger-amount {
-            font-size: 13px;
-            font-weight: 800;
+            font-size: 12.5px;
+            font-weight: 700;
             font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap;
         }
 
         .ledger-bal {
             font-size: 10px;
+            font-weight: 500;
             color: #6B7280;
-            margin-top: 1px;
+            margin-top: 2px;
+            white-space: nowrap;
         }
 
         /* Account Settings Menu */

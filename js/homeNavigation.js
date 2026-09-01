@@ -1,6 +1,7 @@
 // js/homeNavigation.js - Smarty91 VIP Home Dashboard & Bottom Nav Controller
 import { syncServerBalance, showToast, formatCurrency } from './wallet.js';
 import { stopCountdownAudio } from './audio.js';
+import { showCongratulationsModal } from './congratulationsModal.js';
 
 let checkInState = {
     hasDeposited: false,
@@ -144,9 +145,13 @@ export async function claimCheckInBonus() {
 
         const data = await resp.json();
         if (data && data.success) {
-            showToast(`🎉 Claimed ₹${data.amount} Day ${data.streakDay} Bonus!`, 'success');
             await syncServerBalance(true);
             await loadCheckInStatus();
+            showCongratulationsModal({
+                amount: data.amount,
+                streakDay: data.streakDay,
+                newBalance: data.newBalance
+            });
         } else {
             if (data && data.code === 'DEPOSIT_REQUIRED') {
                 showToast('Recharge required! Daily bonus unlocks after your first deposit.', 'warn');

@@ -970,14 +970,14 @@ function renderFilteredTransactions(type) {
 
         html += `
             <div class="passbook-item-card">
-                <div>
+                <div style="flex: 1; min-width: 0; overflow: hidden;">
                     <div class="passbook-item-left">
-                        <span>${item.description || item.type}</span>
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${item.description || item.type}</span>
                     </div>
                     <div class="passbook-item-date">${dateStr} • Ref: ${item.referenceId || 'N/A'}</div>
                 </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.95rem; font-weight: 900; font-family: 'JetBrains Mono', monospace; color: ${isCredit ? '#10B981' : '#f87171'};">${amountFormatted}</div>
+                <div style="text-align: right; flex-shrink: 0; min-width: fit-content; margin-left: 8px;">
+                    <div style="font-size: 0.88rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: ${isCredit ? '#10B981' : '#f87171'}; white-space: nowrap;">${amountFormatted}</div>
                     <span class="status-badge ${statusClass}">${statusLabel}</span>
                 </div>
             </div>

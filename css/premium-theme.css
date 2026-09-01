@@ -3598,29 +3598,40 @@ body {
 }
 
 .Betting__Popup-btn {
-  width: 36px !important;
+  width: 38px !important;
   height: 36px !important;
-  min-width: 36px !important;
+  min-width: 38px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: #000000 !important;
+  background: #111111 !important;
   border-radius: 6px !important;
-  font-size: 20px !important;
+  font-size: 22px !important;
   font-weight: 900 !important;
   color: #ffffff !important;
   cursor: pointer !important;
   user-select: none !important;
+  -webkit-user-select: none !important;
   -webkit-tap-highlight-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
-  transition: all 0.15s ease !important;
+  transition: transform 0.1s ease, background-color 0.1s ease, border-color 0.1s ease !important;
+  outline: none !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
+.Betting__Popup-btn:hover {
+  background: #222222 !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .Betting__Popup-btn:active {
-  transform: scale(0.92) !important;
-  background: #222222 !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: scale(0.9) !important;
+  background: #333333 !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .Betting__Popup-input {
@@ -3660,6 +3671,170 @@ body {
   padding: 0 2px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
+}
+
+/* ============================================================
+   CONGRATULATIONS CELEBRATION POP-UP MODAL
+   ============================================================ */
+.congrats-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.congrats-modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.congrats-card {
+    width: 100%;
+    max-width: 380px;
+    background: linear-gradient(180deg, #1A1D2E 0%, #0F121E 100%);
+    border: 2px solid rgba(255, 215, 0, 0.6);
+    border-radius: 24px;
+    padding: 28px 20px 24px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(255, 215, 0, 0.25);
+    transform: scale(0.85) translateY(20px);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+.congrats-modal-overlay.active .congrats-card {
+    transform: scale(1) translateY(0);
+}
+.congrats-glow-rays {
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.25) 0%, rgba(229, 24, 55, 0.15) 50%, transparent 70%);
+    pointer-events: none;
+    animation: rotateRays 12s linear infinite;
+}
+@keyframes rotateRays {
+    0% { transform: translateX(-50%) rotate(0deg); }
+    100% { transform: translateX(-50%) rotate(360deg); }
+}
+.congrats-icon-box {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 14px;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
+    animation: bounceIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes bounceIn {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+.congrats-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 23px;
+    font-weight: 900;
+    color: #FFFFFF;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.congrats-subtitle {
+    font-size: 13px;
+    color: #A0A6BD;
+    margin-bottom: 16px;
+}
+.congrats-reward-badge {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(229, 24, 55, 0.15) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    border-radius: 16px;
+    padding: 14px 12px;
+    margin-bottom: 16px;
+}
+.congrats-reward-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #FFD700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+}
+.congrats-reward-amount {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 34px;
+    font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+.congrats-streak-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 20px;
+}
+.congrats-streak-info {
+    font-size: 12px;
+    color: #E2E8F0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.congrats-streak-badge {
+    font-size: 11px;
+    font-weight: 800;
+    color: #10B981;
+    background: rgba(16, 185, 129, 0.15);
+    padding: 3px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.congrats-btn {
+    width: 100%;
+    height: 48px;
+    background: linear-gradient(135deg, #FF2E4D 0%, #E51837 50%, #B80A22 100%);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    border-radius: 14px;
+    color: #FFFFFF;
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(229, 24, 55, 0.4);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.congrats-btn:active {
+    transform: scale(0.97);
+    filter: brightness(1.1);
 }
 
 

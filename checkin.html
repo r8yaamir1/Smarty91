@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="css/premium-theme.css">
     <script src="js/loader.js"></script>
     <script src="js/services/authGate.js"></script>
+    <script type="module" src="js/audio.js"></script>
+    <script type="module" src="js/congratulationsModal.js"></script>
     <style>
         :root {
             --red-primary: #E51837;
@@ -805,8 +807,16 @@
                 });
                 const data = await resp.json();
                 if (data.success) {
-                    showToast(`🎉 Claimed ₹${data.amount} Day ${data.streakDay} Bonus!`, 'success');
                     await fetchCheckInStatus();
+                    if (typeof window.showCongratulationsModal === 'function') {
+                        window.showCongratulationsModal({
+                            amount: data.amount,
+                            streakDay: data.streakDay,
+                            newBalance: data.newBalance
+                        });
+                    } else {
+                        showToast(`🎉 Claimed ₹${data.amount} Day ${data.streakDay} Bonus!`, 'success');
+                    }
                 } else {
                     if (data.code === 'DEPOSIT_REQUIRED') {
                         showToast('Recharge required to claim daily sign-in bonus!', 'warn');
