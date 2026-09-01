@@ -651,6 +651,7 @@ class Smarty91ServerEngine {
             if (!state.history) {
                 state.history = [];
             }
+            // Strictly empty initial history - real rounds populate exclusively via Firestore hydration & live settlements
         });
     }
 
@@ -929,6 +930,7 @@ class Smarty91ServerEngine {
         };
 
         // Prepend to mode history (strictly capped at max 50 rounds)
+        state.history = state.history.filter(h => String(h.period || h.periodId) !== String(periodId));
         state.history.unshift(roundRecord);
         if (state.history.length > 50) state.history.length = 50;
 

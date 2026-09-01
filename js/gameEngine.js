@@ -99,34 +99,12 @@ export function setActiveModeKey(modeInput) {
 
 // ----------------- RESULT GENERATION & SETTLEMENT PER MODE -----------------
 
+// Server-Authoritative Result Sync Handler
 export function drawNextResult(modeInput, periodId) {
+    // Official results are generated strictly by the server.
+    // Client receives official settled outcomes via Server APIs and Firestore real-time subscriptions.
     const mode = normalizeMode(modeInput);
-    const state = gameModes[mode];
-    const num = Math.floor(Math.random() * 10);
-    const prop = NUMBER_PROPERTIES[num];
-
-    const result = {
-        mode,
-        periodId,
-        number: num,
-        isBig: prop.isBig,
-        primaryColor: prop.primaryColor,
-        secondaryColor: prop.secondaryColor,
-        colorName: prop.colorName,
-        timestamp: Date.now()
-    };
-
-    // Prepend exclusively to this mode's history (capped at max 50)
-    state.history.unshift(result);
-    if (state.history.length > 50) state.history.length = 50;
-    state.latestResult = result;
-
-    // Update this mode's winning tokens
-    state.tokens.unshift(num);
-    if (state.tokens.length > 5) state.tokens.pop();
-
-    saveMultiModeState();
-    return result;
+    return gameModes[mode] ? gameModes[mode].latestResult : null;
 }
 
 export function evaluateModeBets(modeInput, result) {
@@ -297,6 +275,8 @@ export async function placeBet(betData) {
 // ----------------- SUBTAB RENDERING (PER ACTIVE MODE) -----------------
 
 // 1. Render Game History Table for Active Mode
+let lastRenderedTopPeriod = {};
+
 export function renderGameHistory(modeInput = activeModeKey) {
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
@@ -328,11 +308,17 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const startIndex = (state.historyPage - 1) * ITEMS_PER_PAGE;
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
+    const topItem = items[0];
+    const topPeriodId = topItem ? topItem.periodId : '';
+    const isNewTopPeriod = lastRenderedTopPeriod[mode] !== topPeriodId;
+    lastRenderedTopPeriod[mode] = topPeriodId;
+
     container.innerHTML = '';
 
     items.forEach((item, index) => {
         const row = document.createElement('div');
-        row.className = `van-row ${index === 0 && state.historyPage === 1 ? 'fifo-new-item' : ''}`;
+        const applyAnim = (index === 0 && state.historyPage === 1 && isNewTopPeriod);
+        row.className = `van-row ${applyAnim ? 'fifo-new-item' : ''}`;
         row.setAttribute('data-v-481307ec', '');
 
         let numClass = 'greenColor';
@@ -384,6 +370,17 @@ export function renderChartTrend(modeInput = activeModeKey) {
     const state = gameModes[mode];
     const chartView = document.getElementById('chart-view');
     if (!chartView) return;
+
+    if (!state.history || state.history.length === 0) {
+        chartView.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 0; color: var(--text_color_L2);">
+                <div style="font-size: 1.2rem; margin-bottom: 0.2rem;">📈</div>
+                <div style="font-size: 0.38rem; font-weight: bold;">No Trend Data Yet</div>
+                <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">${state.displayName} chart trends will appear after rounds complete</div>
+            </div>
+        `;
+        return;
+    }
 
     // Calculate statistics for digits 0-9 strictly for this mode
     const stats = Array.from({ length: 10 }, (_, i) => ({
@@ -816,7 +813,7 @@ export function initSubtabs() {
 export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
-    if (!state || !Array.isArray(serverHistoryItems)) return;
+    if (!state || !Array.isArray(serverHistoryItems)) return false;
 
     const parseTime = (val) => {
         if (!val) return 0;
@@ -825,33 +822,79 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
         return isNaN(t) ? 0 : t;
     };
 
-    const formatted = serverHistoryItems.map(item => {
-        const num = Number(item.number !== undefined ? item.number : 0);
-        const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
-        const rawTime = item.timestamp || item.settledAt;
-        return {
-            mode,
-            periodId: String(item.period || item.periodId || ''),
-            number: num,
-            isBig: item.size === 'big' || prop.isBig,
-            primaryColor: prop.primaryColor,
-            secondaryColor: prop.secondaryColor,
-            colorName: item.colorLabel || prop.colorName,
-            timestamp: parseTime(rawTime) || Date.now()
-        };
+    const formatted = serverHistoryItems
+        .map(item => {
+            const num = Number(item.number !== undefined ? item.number : 0);
+            const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+            const rawTime = item.timestamp || item.settledAt;
+            const periodIdStr = String(item.period || item.periodId || '');
+            return {
+                mode,
+                periodId: periodIdStr,
+                number: num,
+                isBig: item.size === 'big' || (item.size !== 'small' && prop.isBig),
+                primaryColor: prop.primaryColor,
+                secondaryColor: prop.secondaryColor,
+                colorName: item.colorLabel || prop.colorName,
+                timestamp: parseTime(rawTime)
+            };
+        })
+        .filter(item => item.periodId !== '');
+
+    // Deduplicate history items by unique periodId
+    const uniqueMap = new Map();
+    formatted.forEach(item => {
+        if (!uniqueMap.has(item.periodId)) {
+            uniqueMap.set(item.periodId, item);
+        } else {
+            const existing = uniqueMap.get(item.periodId);
+            if (!existing.timestamp && item.timestamp) {
+                uniqueMap.set(item.periodId, item);
+            }
+        }
     });
 
-    formatted.sort((a, b) => {
-        const tA = a.timestamp;
-        const tB = b.timestamp;
-        if (tA !== tB && tA > 0 && tB > 0) return tB - tA;
-        return String(b.periodId).localeCompare(String(a.periodId));
+    const deduplicated = Array.from(uniqueMap.values());
+
+    deduplicated.sort((a, b) => {
+        if (a.periodId !== b.periodId) {
+            return b.periodId.localeCompare(a.periodId, undefined, { numeric: true });
+        }
+        return b.timestamp - a.timestamp;
     });
 
-    if (formatted.length > 0) {
-        state.history = formatted.slice(0, 50);
-        state.latestResult = formatted[0];
-        state.tokens = formatted.slice(0, 5).map(h => h.number);
-        saveMultiModeState();
+    const newSlice = deduplicated.slice(0, 50);
+    if (newSlice.length === 0) {
+        if (state.history.length > 0) {
+            state.history = [];
+            state.tokens = [];
+            state.latestResult = null;
+            saveMultiModeState();
+            return true;
+        }
+        return false;
     }
+
+    // Compare new slice with current state.history to check if anything actually changed
+    let hasChanged = false;
+    if (state.history.length !== newSlice.length) {
+        hasChanged = true;
+    } else {
+        for (let i = 0; i < state.history.length; i++) {
+            if (state.history[i].periodId !== newSlice[i].periodId || state.history[i].number !== newSlice[i].number) {
+                hasChanged = true;
+                break;
+            }
+        }
+    }
+
+    if (hasChanged) {
+        state.history = newSlice;
+        state.latestResult = newSlice[0];
+        state.tokens = newSlice.slice(0, 5).map(h => h.number);
+        saveMultiModeState();
+        return true;
+    }
+
+    return false;
 }

@@ -97,7 +97,11 @@ export async function syncServerGameState() {
 
                 // Detect period transition from server
                 if (prevPeriod && prevPeriod !== serverMode.periodId) {
-                    await handlePeriodSettledFromServer(mode, prevPeriod);
+                    const settlementKey = `${mode}:${prevPeriod}`;
+                    if (!state.settledRounds.has(settlementKey)) {
+                        state.settledRounds.add(settlementKey);
+                        await handlePeriodSettledFromServer(mode, prevPeriod);
+                    }
                 }
             }
 
@@ -115,31 +119,57 @@ export async function syncServerGameState() {
 async function handlePeriodSettledFromServer(mode, settledPeriodId) {
     try {
         const historyRes = await gameService.getGameHistory(mode, 1, 50);
-        if (historyRes && historyRes.success && historyRes.items) {
-            updateModeHistoryFromServer(mode, historyRes.items);
+        if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
+            // Check if server history already contains the result for settledPeriodId
+            const hasSettledPeriod = historyRes.items.some(
+                item => String(item.period || item.periodId) === String(settledPeriodId)
+            );
 
-            const state = gameModes[mode];
-            const latestResult = state.history[0];
-
-            if (latestResult) {
-                const evaluation = evaluateModeBets(mode, latestResult);
-                syncServerBalance();
-                fetchUserBetsFromServer(mode).catch(() => {});
-
-                if (mode === getActiveModeKey()) {
-                    renderWinningTokensForActiveMode();
-                    renderGameHistory(mode);
-                    renderChartTrend(mode);
-                    renderMyHistory(mode);
-
-                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
-                        showEvaluationDialog(evaluation);
+            // If server tick hasn't finished writing the outcome, wait 350ms and retry once
+            if (!hasSettledPeriod) {
+                setTimeout(async () => {
+                    try {
+                        const retryRes = await gameService.getGameHistory(mode, 1, 50);
+                        if (retryRes && retryRes.success && Array.isArray(retryRes.items)) {
+                            processSettlement(mode, retryRes.items);
+                        }
+                    } catch (retryErr) {
+                        console.warn('History retry fetch error:', retryErr);
                     }
-                }
+                }, 350);
+                return;
             }
+
+            processSettlement(mode, historyRes.items);
         }
     } catch (e) {
         console.warn('History fetch error on settlement:', e);
+    }
+}
+
+function processSettlement(mode, items) {
+    const hasChanged = updateModeHistoryFromServer(mode, items);
+
+    const state = gameModes[mode];
+    const latestResult = state.history[0];
+
+    if (latestResult) {
+        const evaluation = evaluateModeBets(mode, latestResult);
+        syncServerBalance();
+        fetchUserBetsFromServer(mode).catch(() => {});
+
+        if (mode === getActiveModeKey()) {
+            if (hasChanged) {
+                renderWinningTokensForActiveMode();
+                renderGameHistory(mode);
+                renderChartTrend(mode);
+                renderMyHistory(mode);
+            }
+
+            if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
+                showEvaluationDialog(evaluation);
+            }
+        }
     }
 }
 
@@ -370,8 +400,8 @@ export async function initGameRecord() {
             // Real-time history & result settlement from Firestore
             subscribeToGameHistory(mode, (historyItems) => {
                 if (Array.isArray(historyItems) && historyItems.length > 0) {
-                    updateModeHistoryFromServer(mode, historyItems);
-                    if (mode === getActiveModeKey()) {
+                    const hasChanged = updateModeHistoryFromServer(mode, historyItems);
+                    if (hasChanged && mode === getActiveModeKey()) {
                         renderWinningTokensForActiveMode();
                         renderGameHistory(mode);
                         renderChartTrend(mode);

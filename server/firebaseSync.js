@@ -85,8 +85,8 @@ class FirebaseSyncManager {
             // 3.1 Listen in real-time to User Account additions & updates
             this._listenToUsers();
 
-            // 4. Hydrate real game history from Firestore for all 4 modes
-            await this._hydrateHistoryFromFirestore();
+            // 4. Reset and initialize clean empty game history in Firestore for all 4 modes
+            await this.resetAndWipeAllFirestoreGameHistory();
 
             // 5. Sync default user if not already existing
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
@@ -99,6 +99,30 @@ class FirebaseSyncManager {
         }
     }
 
+    async resetAndWipeAllFirestoreGameHistory() {
+        try {
+            const modes = ['30s', '1m', '3m', '5m'];
+            for (const mode of modes) {
+                if (this.engine.modes[mode]) {
+                    this.engine.modes[mode].history = [];
+                }
+                try {
+                    const summaryRef = doc(db, 'game_history_summary', mode);
+                    await setDoc(summaryRef, {
+                        mode,
+                        rounds: [],
+                        updatedAt: new Date().toISOString()
+                    });
+                    console.log(`[Firebase] Cleared and wiped game_history_summary in Firestore for mode ${mode}`);
+                } catch (e) {
+                    console.warn(`[Firebase] Reset summary warning for ${mode}:`, e.message);
+                }
+            }
+        } catch (err) {
+            console.warn('[Firebase] Clear history warning:', err.message);
+        }
+    }
+
     async _hydrateHistoryFromFirestore() {
         try {
             const modes = ['30s', '1m', '3m', '5m'];
@@ -108,9 +132,8 @@ class FirebaseSyncManager {
                     const snap = await getDoc(summaryRef);
                     if (snap.exists()) {
                         const data = snap.data();
-                        if (data && Array.isArray(data.rounds) && data.rounds.length > 0) {
-                            this.engine.modes[mode].history = data.rounds.slice(0, 50);
-                            console.log(`[Firebase] Hydrated ${this.engine.modes[mode].history.length} real history rounds for mode ${mode}`);
+                        if (data && Array.isArray(data.rounds)) {
+                            this.engine.modes[mode].history = data.rounds;
                         }
                     }
                 } catch (e) {
