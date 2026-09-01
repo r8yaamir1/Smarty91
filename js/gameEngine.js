@@ -108,6 +108,7 @@ export function drawNextResult(modeInput, periodId) {
 }
 
 export function evaluateModeBets(modeInput, result) {
+    if (!result) return null;
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
 
@@ -115,8 +116,11 @@ export function evaluateModeBets(modeInput, result) {
         return null;
     }
 
-    // Filter active bets matching mode and period
-    const betsToEvaluate = state.activeBets.filter(b => b.mode === mode && b.periodId === result.periodId);
+    const resultPeriod = String(result.periodId || result.period || '').trim();
+    if (!resultPeriod) return null;
+
+    // Filter active bets strictly matching mode and period
+    const betsToEvaluate = state.activeBets.filter(b => b.mode === mode && String(b.periodId).trim() === resultPeriod);
     if (betsToEvaluate.length === 0) {
         return null;
     }
@@ -126,41 +130,48 @@ export function evaluateModeBets(modeInput, result) {
     let lastBetDetails = null;
     const evaluatedList = [];
 
+    const rawNum = result.number !== undefined && result.number !== null ? result.number : (result.winningNumber !== undefined && result.winningNumber !== null ? result.winningNumber : 0);
+    const winNum = Number(rawNum);
+    const isBigRes = winNum >= 5;
+
     betsToEvaluate.forEach(bet => {
-        totalBet += bet.betAmount;
-        const contractAmount = bet.contractAmount; // betAmount * 0.98
+        totalBet += (Number(bet.betAmount) || 0);
+        const contractAmount = Number(bet.contractAmount || (bet.betAmount * 0.98));
         let multiplier = 0;
 
         const sel = String(bet.selection || '').toLowerCase().trim();
         const betType = String(bet.type || '').toLowerCase().trim();
-        const winNum = Number(result.number !== undefined ? result.number : (result.winningNumber !== undefined ? result.winningNumber : 0));
-        const isBigRes = winNum >= 5;
 
+        // 1. Number Bets (0-9) -> 9x
         if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
-            if (parseInt(sel, 10) === winNum) multiplier = 9;
-        } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
+            if (parseInt(sel, 10) === winNum) multiplier = 9.0;
+        } 
+        // 2. Color Bets (Green, Red, Violet)
+        else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
             if (sel === 'green') {
-                if ([1, 3, 7, 9].includes(winNum)) multiplier = 2;
-                else if (winNum === 5) multiplier = 1.5;
+                if ([1, 3, 7, 9].includes(winNum)) multiplier = 2.0; // Pure Green
+                else if (winNum === 5) multiplier = 1.5; // Half Green on 5
             } else if (sel === 'red') {
-                if ([2, 4, 6, 8].includes(winNum)) multiplier = 2;
-                else if (winNum === 0) multiplier = 1.5;
+                if ([2, 4, 6, 8].includes(winNum)) multiplier = 2.0; // Pure Red
+                else if (winNum === 0) multiplier = 1.5; // Half Red on 0
             } else if (sel === 'violet') {
-                if ([0, 5].includes(winNum)) multiplier = 4.5;
+                if (winNum === 0 || winNum === 5) multiplier = 4.5; // Violet
             }
-        } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
-            if ((sel === 'big' || sel === 'b') && isBigRes) multiplier = 2;
-            else if ((sel === 'small' || sel === 's') && !isBigRes) multiplier = 2;
+        } 
+        // 3. Size Bets (Big: 5-9, Small: 0-4) -> 2x
+        else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
+            if ((sel === 'big' || sel === 'b') && isBigRes) multiplier = 2.0;
+            else if ((sel === 'small' || sel === 's') && !isBigRes) multiplier = 2.0;
         }
 
-        const winAmount = multiplier > 0 ? (contractAmount * multiplier) : 0;
+        const winAmount = multiplier > 0 ? Number((contractAmount * multiplier).toFixed(2)) : 0;
         totalWon += winAmount;
 
         const evaluatedBet = {
             ...bet,
             mode,
             resultNumber: winNum,
-            resultColor: NUMBER_PROPERTIES[winNum]?.colorName || '',
+            resultColor: NUMBER_PROPERTIES[winNum]?.colorName || (winNum === 0 ? 'Red+Violet' : winNum === 5 ? 'Green+Violet' : [1,3,7,9].includes(winNum) ? 'Green' : 'Red'),
             resultBig: isBigRes,
             multiplier,
             winAmount,
@@ -174,11 +185,10 @@ export function evaluateModeBets(modeInput, result) {
     });
 
     // Remove evaluated bets from active bets
-    state.activeBets = state.activeBets.filter(b => !(b.mode === mode && b.periodId === result.periodId));
+    state.activeBets = state.activeBets.filter(b => !(b.mode === mode && String(b.periodId).trim() === resultPeriod));
     saveMultiModeState();
 
     if (totalWon > 0) {
-        addBalance(totalWon);
         playWinChime();
     }
 
@@ -187,8 +197,14 @@ export function evaluateModeBets(modeInput, result) {
         isWin: totalWon > 0,
         totalBet,
         totalWon,
-        netProfit: totalWon - totalBet,
-        result,
+        netProfit: Number((totalWon - totalBet).toFixed(2)),
+        result: {
+            ...result,
+            periodId: resultPeriod,
+            number: winNum,
+            isBig: isBigRes,
+            colorName: NUMBER_PROPERTIES[winNum]?.colorName || (winNum === 0 ? 'Red+Violet' : winNum === 5 ? 'Green+Violet' : [1,3,7,9].includes(winNum) ? 'Green' : 'Red')
+        },
         lastBet: lastBetDetails,
         evaluatedBets: evaluatedList
     };

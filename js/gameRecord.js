@@ -116,68 +116,90 @@ export async function syncServerGameState() {
     }
 }
 
-async function handlePeriodSettledFromServer(mode, settledPeriodId) {
+async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount = 0) {
     try {
         const state = gameModes[mode];
-        if (state && state.history && state.history.length > 0 && String(state.history[0].periodId) === String(settledPeriodId)) {
-            // Already settled and synced via real-time Firestore listener!
-            const latestResult = state.history[0];
-            const evaluation = evaluateModeBets(mode, latestResult);
-            syncServerBalance();
-            fetchUserBetsFromServer(mode).catch(() => {});
-            if (mode === getActiveModeKey() && evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
-                showEvaluationDialog(evaluation);
-            }
-            return;
-        }
+        const targetPeriod = String(settledPeriodId).trim();
 
-        const historyRes = await gameService.getGameHistory(mode, 1, 50);
-        if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
-            // Check if server history already contains the result for settledPeriodId
-            const hasSettledPeriod = historyRes.items.some(
-                item => String(item.period || item.periodId) === String(settledPeriodId)
+        // 1. Check if the outcome for targetPeriod is already in state.history
+        if (state && Array.isArray(state.history)) {
+            const existingOutcome = state.history.find(
+                item => String(item.period || item.periodId).trim() === targetPeriod
             );
+            if (existingOutcome) {
+                const evaluation = evaluateModeBets(mode, existingOutcome);
+                await syncServerBalance(true);
+                fetchUserBetsFromServer(mode).catch(() => {});
 
-            // If server tick hasn't finished writing the outcome, wait 350ms and retry once
-            if (!hasSettledPeriod) {
-                setTimeout(async () => {
-                    try {
-                        const retryRes = await gameService.getGameHistory(mode, 1, 50);
-                        if (retryRes && retryRes.success && Array.isArray(retryRes.items)) {
-                            processSettlement(mode, retryRes.items);
-                        }
-                    } catch (retryErr) {
-                        console.warn('History retry fetch error:', retryErr);
+                if (mode === getActiveModeKey()) {
+                    renderWinningTokensForActiveMode();
+                    renderGameHistory(mode);
+                    renderChartTrend(mode);
+                    renderMyHistory(mode);
+
+                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
+                        showEvaluationDialog(evaluation);
                     }
-                }, 350);
+                }
                 return;
             }
+        }
 
-            processSettlement(mode, historyRes.items);
+        // 2. Fetch fresh history from server API
+        const historyRes = await gameService.getGameHistory(mode, 1, 50);
+        if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
+            const hasTargetPeriod = historyRes.items.some(
+                item => String(item.period || item.periodId).trim() === targetPeriod
+            );
+
+            if (hasTargetPeriod) {
+                processSettlementForPeriod(mode, historyRes.items, targetPeriod);
+                return;
+            }
+        }
+
+        // 3. If server hasn't finished writing outcome yet, retry up to 4 times
+        if (retryCount < 4) {
+            setTimeout(() => {
+                handlePeriodSettledFromServer(mode, settledPeriodId, retryCount + 1);
+            }, 450);
+        } else if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
+            // Fallback to latest available history
+            processSettlementForPeriod(mode, historyRes.items, targetPeriod);
         }
     } catch (e) {
         console.warn('History fetch error on settlement:', e);
     }
 }
 
-function processSettlement(mode, items) {
+function processSettlementForPeriod(mode, items, targetPeriod) {
     const hasChanged = updateModeHistoryFromServer(mode, items);
-
     const state = gameModes[mode];
-    const latestResult = state.history[0];
+    if (!state) return;
 
-    if (latestResult) {
-        const evaluation = evaluateModeBets(mode, latestResult);
-        syncServerBalance();
+    // Find the specific outcome for targetPeriod, or fallback to history[0]
+    let resultForPeriod = null;
+    if (Array.isArray(state.history) && state.history.length > 0) {
+        if (targetPeriod) {
+            resultForPeriod = state.history.find(
+                h => String(h.period || h.periodId).trim() === String(targetPeriod).trim()
+            );
+        }
+        if (!resultForPeriod) {
+            resultForPeriod = state.history[0];
+        }
+    }
+
+    if (resultForPeriod) {
+        const evaluation = evaluateModeBets(mode, resultForPeriod);
+        syncServerBalance(true);
         fetchUserBetsFromServer(mode).catch(() => {});
 
         if (mode === getActiveModeKey()) {
-            if (hasChanged) {
-                renderWinningTokensForActiveMode();
-                renderGameHistory(mode);
-                renderChartTrend(mode);
-                renderMyHistory(mode);
-            }
+            renderWinningTokensForActiveMode();
+            renderGameHistory(mode);
+            renderChartTrend(mode);
+            renderMyHistory(mode);
 
             if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
                 showEvaluationDialog(evaluation);

@@ -457,15 +457,23 @@ apiRouter.get('/wallet/balance', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized. Please login again.' });
         }
         
-        let freshUser = null;
-        try {
-            freshUser = await firebaseSync.fetchUserFromFirestore(authUser.id);
-        } catch(e) {
-            console.warn('[API] Could not fetch fresh balance:', e.message);
-        }
+        // Priority 1: Live in-memory engine user (guaranteed instant reflection on bet settle/win)
+        const liveUser = serverEngine.users.get(authUser.id);
+        
+        let balance = liveUser ? liveUser.balance : authUser.balance;
+        let bonusBalance = liveUser ? (liveUser.bonusBalance || 0) : (authUser.bonusBalance || 0);
 
-        const balance = freshUser ? freshUser.balance : authUser.balance;
-        const bonusBalance = freshUser ? (freshUser.bonusBalance || 0) : (authUser.bonusBalance || 0);
+        if (!liveUser) {
+            try {
+                const freshUser = await firebaseSync.fetchUserFromFirestore(authUser.id);
+                if (freshUser) {
+                    balance = freshUser.balance;
+                    bonusBalance = freshUser.bonusBalance || 0;
+                }
+            } catch(e) {
+                console.warn('[API] Could not fetch fresh balance:', e.message);
+            }
+        }
 
         res.json({
             success: true,

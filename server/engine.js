@@ -1100,7 +1100,7 @@ class Smarty91ServerEngine {
         const winNum = Number(winningNumber);
         const props = NUMBER_PROPERTIES[winNum] || NUMBER_PROPERTIES[0];
         const multConfig = this.config.multipliers || {};
-        const contractAmount = bet.contractAmount; // Amount after 2% fee
+        const contractAmount = Number(bet.contractAmount || (bet.betAmount * 0.98));
 
         let isWin = false;
         let payoutMultiplier = 0;
@@ -1114,42 +1114,42 @@ class Smarty91ServerEngine {
             const betNum = parseInt(sel, 10);
             if (betNum === winNum) {
                 isWin = true;
-                payoutMultiplier = multConfig.number || 9;
+                payoutMultiplier = multConfig.number || 9.0;
             }
         }
         // 2. Color Bets (Green, Red, Violet)
-        else if (sel === 'green') {
+        else if (sel === 'green' || betType === 'color' && sel === 'green') {
             if ([1, 3, 7, 9].includes(winNum)) {
                 isWin = true;
-                payoutMultiplier = multConfig.pureColor || 2; // 2x
+                payoutMultiplier = multConfig.pureColor || 2.0; // 2x Pure Green
             } else if (winNum === 5) {
                 isWin = true;
-                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x
+                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x Half Green on 5
             }
-        } else if (sel === 'red') {
+        } else if (sel === 'red' || betType === 'color' && sel === 'red') {
             if ([2, 4, 6, 8].includes(winNum)) {
                 isWin = true;
-                payoutMultiplier = multConfig.pureColor || 2; // 2x
+                payoutMultiplier = multConfig.pureColor || 2.0; // 2x Pure Red
             } else if (winNum === 0) {
                 isWin = true;
-                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x
+                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x Half Red on 0
             }
-        } else if (sel === 'violet') {
+        } else if (sel === 'violet' || betType === 'color' && sel === 'violet') {
             if (winNum === 0 || winNum === 5) {
                 isWin = true;
-                payoutMultiplier = multConfig.violet || 4.5; // 4.5x
+                payoutMultiplier = multConfig.violet || 4.5; // 4.5x Violet
             }
         }
         // 3. Big / Small Bets (Big: 5-9, Small: 0-4) -> 2x
-        else if (sel === 'big' || sel === 'b') {
+        else if (sel === 'big' || sel === 'b' || betType === 'size' && (sel === 'big' || sel === 'b')) {
             if (isBigWin) {
                 isWin = true;
-                payoutMultiplier = multConfig.bigSmall || 2; // 2x
+                payoutMultiplier = multConfig.bigSmall || 2.0; // 2x
             }
-        } else if (sel === 'small' || sel === 's') {
+        } else if (sel === 'small' || sel === 's' || betType === 'size' && (sel === 'small' || sel === 's')) {
             if (!isBigWin) {
                 isWin = true;
-                payoutMultiplier = multConfig.bigSmall || 2; // 2x
+                payoutMultiplier = multConfig.bigSmall || 2.0; // 2x
             }
         }
 
