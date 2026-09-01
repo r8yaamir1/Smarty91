@@ -695,6 +695,11 @@ window.submitUtrDeposit = window.submitDepositUTR;
 
 // Withdrawal Method Switcher (USDT vs Bank)
 window.switchWithdrawMethod = function(method) {
+    if (method === 'BANK') {
+        showToast('🔒 Bank Withdrawal is Upcoming! Please use USDT Crypto Payouts for instant withdrawals.');
+        return;
+    }
+
     const usdtContainer = document.getElementById('withdraw-usdt-form-container');
     const bankContainer = document.getElementById('withdraw-bank-form-container');
     const usdtBtn = document.getElementById('wtab-usdt-btn');
@@ -768,6 +773,11 @@ window.submitUsdtWithdrawalRequest = async function() {
 
     if (isNaN(usdtAmount) || usdtAmount < 10) {
         showToast('Minimum withdrawal is 10 USDT ($10)');
+        return;
+    }
+    const reqTurnover = currentWalletSummary ? Number(currentWalletSummary.requiredTurnover || 0) : 0;
+    if (reqTurnover > 0) {
+        showToast(`🔒 Withdrawal Locked! You must complete your remaining required turnover of ₹${reqTurnover.toFixed(2)} first.`);
         return;
     }
     const requiredInr = usdtAmount * 102;

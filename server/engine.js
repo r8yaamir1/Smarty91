@@ -1266,6 +1266,7 @@ class Smarty91ServerEngine {
         this._saveUsersToDisk();
         this._saveBetsToDisk();
         firebaseSync.saveBet(betOrder).catch(e => console.warn('[Bet Firestore Save]', e.message));
+        firebaseSync.saveUser(user).catch(e => console.warn('[User Save Sync]', e.message));
         firebaseSync.updateUserBalance(userId, user.balance, `Bet on ${mode} round ${activePeriodId}`).catch(e => console.warn('[Bet Balance Sync]', e.message));
         firebaseSync.saveTransaction(ledgerEntry).catch(e => console.warn('[Ledger Save]', e.message));
 
@@ -1720,6 +1721,7 @@ class Smarty91ServerEngine {
 
             this.transactions.unshift(req);
             firebaseSync.saveTransaction(req);
+            firebaseSync.saveUser(userObj).catch(e => console.warn('[User Save Sync]', e.message));
             firebaseSync.updateUserBalance(userId, userObj.balance, `USDT Deposit Auto-Credit (${cleanTxid.slice(0, 8)}...)`, userObj.bonus);
 
             this.ledger.unshift({
@@ -2042,6 +2044,7 @@ class Smarty91ServerEngine {
                     });
                 }
 
+                firebaseSync.saveUser(user).catch(e => console.warn('[User Save Sync]', e.message));
                 firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin');
             } else if (tx.type === 'WITHDRAWAL') {
                 const ledgerEntry = {

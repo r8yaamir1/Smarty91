@@ -1258,77 +1258,77 @@ function renderCashierView(container) {
 
                     return `
                         <div style="background: var(--bg-input); border-left: 4px solid ${isDeposit ? 'var(--accent-green)' : 'var(--accent-violet)'}; border-radius: 10px; padding: 14px; border-top: 1px solid var(--border-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); ${isPending ? 'box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);' : ''}">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span style="font-weight: 900; font-size: 13px; color: #fff;">
-                                        ${isDeposit ? '📥 DEPOSIT REQUEST' : '📤 WITHDRAWAL REQUEST'}
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                    <span style="font-weight: 900; font-size: 13px; color: #fff; white-space: nowrap;">
+                                        ${isDeposit ? '📥 DEPOSIT' : '📤 WITHDRAWAL'}
                                     </span>
                                     <span style="font-size: 10px; font-family: monospace; color: var(--text-muted);">#${tx.id.slice(-8)}</span>
                                 </div>
-                                <span style="font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 12px; background: ${statusColor}22; color: ${statusColor}; border: 1px solid ${statusColor}44;">
+                                <span style="font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 12px; background: ${statusColor}22; color: ${statusColor}; border: 1px solid ${statusColor}44; white-space: nowrap;">
                                     ${tx.status}
                                 </span>
                             </div>
 
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <div>
-                                    <div style="font-size: 12px; color: var(--text-muted);">
-                                        Player: <b style="color: #fff;">${tx.userId}</b>
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                                <div style="min-width: 0; flex: 1;">
+                                    <div style="font-size: 12px; color: var(--text-muted); word-break: break-all;">
+                                        Player: <b style="color: #fff; word-break: break-all;">${tx.userId}</b>
                                     </div>
                                     <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${formattedDate}</div>
                                 </div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 20px; font-weight: 900; color: ${isDeposit ? 'var(--accent-green)' : 'var(--primary)'};">
+                                <div style="text-align: right; flex-shrink: 0;">
+                                    <div style="font-size: 18px; font-weight: 900; color: ${isDeposit ? 'var(--accent-green)' : 'var(--primary)'};">
                                         ₹${Number(tx.amount || 0).toLocaleString('en-IN')}
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Detailed Banking / Payment Reference Box -->
-                            <div style="background: var(--bg-card); padding: 10px 12px; border-radius: 8px; font-size: 11px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.06); line-height: 1.6;">
+                            <div style="background: var(--bg-card); padding: 10px 12px; border-radius: 8px; font-size: 11px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.06); line-height: 1.6; word-break: break-all;">
                                 ${isDeposit ? `
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         <span>UTR / Ref No:</span>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px;">${tx.utrNumber || 'N/A'}</b>
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; word-break: break-all;">
+                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px; word-break: break-all;">${tx.utrNumber || 'N/A'}</b>
                                             ${tx.utrNumber ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.utrNumber}">📋 Copy</button>` : ''}
                                         </div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
                                         <span>Gateway UPI:</span>
-                                        <span style="color: var(--text-muted);">${tx.upiId || 'VIP Merchant Gateway'}</span>
+                                        <span style="color: var(--text-muted); word-break: break-all;">${tx.upiId || 'VIP Merchant Gateway'}</span>
                                     </div>
                                 ` : `
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         <span>Bank & Name:</span>
-                                        <span style="color: #fff; font-weight: 700;">${tx.bankName || 'Bank Payout'} (${tx.accountHolderName || 'User'})</span>
+                                        <span style="color: #fff; font-weight: 700; text-align: right; word-break: break-all;">${tx.bankName || 'Bank Payout'} (${tx.accountHolderName || 'User'})</span>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
                                         <span>Account No:</span>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px;">${tx.accountNumber || tx.upiId || 'N/A'}</b>
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; word-break: break-all;">
+                                            <b style="color: #38bdf8; font-family: monospace; font-size: 12px; word-break: break-all;">${tx.accountNumber || tx.upiId || 'N/A'}</b>
                                             ${tx.accountNumber ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.accountNumber}">📋 Copy</button>` : ''}
                                         </div>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
                                         <span>IFSC Code:</span>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                             <b style="color: #facc15; font-family: monospace;">${tx.ifsc || 'N/A'}</b>
                                             ${tx.ifsc ? `<button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.ifsc}">📋 Copy</button>` : ''}
                                         </div>
                                     </div>
                                     ${tx.upiId ? `
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
                                             <span>UPI ID:</span>
-                                            <div style="display: flex; align-items: center; gap: 6px;">
-                                                <b style="color: #a78bfa;">${tx.upiId}</b>
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; word-break: break-all;">
+                                                <b style="color: #a78bfa; word-break: break-all;">${tx.upiId}</b>
                                                 <button type="button" class="btn-copy-chip copy-trigger" data-copy="${tx.upiId}">📋 Copy</button>
                                             </div>
                                         </div>
                                     ` : ''}
                                 `}
                                 ${tx.adminRemarks ? `
-                                    <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); color: var(--primary); font-weight: 700;">
+                                    <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1); color: var(--primary); font-weight: 700; word-break: break-all;">
                                         Admin Remarks: ${tx.adminRemarks}
                                     </div>
                                 ` : ''}
@@ -1336,12 +1336,12 @@ function renderCashierView(container) {
 
                             <!-- Action Buttons for Pending -->
                             ${isPending ? `
-                                <div style="display: flex; gap: 8px;">
-                                    <button class="btn-approve-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-weight: 900; padding: 10px; font-size: 12px; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
-                                        ✅ Approve ${isDeposit ? '& Credit Balance' : '& Mark Paid'}
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn-approve-tx btn-secondary" data-id="${tx.id}" style="flex: 1; min-width: 130px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-weight: 900; padding: 10px; font-size: 12px; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                        ✅ Approve ${isDeposit ? 'Deposit' : 'Withdrawal'}
                                     </button>
-                                    <button class="btn-reject-tx btn-secondary" data-id="${tx.id}" style="flex: 1; background: rgba(239,68,68,0.18); color: var(--accent-red); font-weight: 800; padding: 10px; font-size: 12px; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; cursor: pointer;">
-                                        ❌ Reject ${isDeposit ? 'Request' : '& Refund'}
+                                    <button class="btn-reject-tx btn-secondary" data-id="${tx.id}" style="flex: 1; min-width: 130px; background: rgba(239,68,68,0.18); color: var(--accent-red); font-weight: 800; padding: 10px; font-size: 12px; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; cursor: pointer;">
+                                        ❌ Reject
                                     </button>
                                 </div>
                             ` : ''}
