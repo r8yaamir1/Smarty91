@@ -72,27 +72,8 @@ export function subscribeToGameHistory(mode, callback) {
         if (snapshot.exists()) {
             const data = snapshot.data();
             if (data && Array.isArray(data.rounds)) {
-                // Return pre-compiled history sorted by period/timestamp descending
                 callback(sortHistoryItems(data.rounds));
-                return;
             }
-        }
-        
-        // Fallback: query game_history collection without orderBy to avoid index errors, then sort in-memory
-        try {
-            const historyCol = collection(db, 'game_history');
-            const q = query(historyCol, where('mode', '==', mode), limit(100));
-            onSnapshot(q, (snap) => {
-                const history = [];
-                snap.forEach(d => history.push(d.data()));
-                if (history.length > 0) {
-                    callback(sortHistoryItems(history).slice(0, 50));
-                }
-            }, (err) => {
-                console.warn(`Firestore history fallback sync warning [${mode}]:`, err);
-            });
-        } catch (e) {
-            console.warn(`Firestore history fallback setup error [${mode}]:`, e);
         }
     }, (err) => {
         console.warn(`Firestore history summary sync warning [${mode}]:`, err);

@@ -118,6 +118,19 @@ export async function syncServerGameState() {
 
 async function handlePeriodSettledFromServer(mode, settledPeriodId) {
     try {
+        const state = gameModes[mode];
+        if (state && state.history && state.history.length > 0 && String(state.history[0].periodId) === String(settledPeriodId)) {
+            // Already settled and synced via real-time Firestore listener!
+            const latestResult = state.history[0];
+            const evaluation = evaluateModeBets(mode, latestResult);
+            syncServerBalance();
+            fetchUserBetsFromServer(mode).catch(() => {});
+            if (mode === getActiveModeKey() && evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
+                showEvaluationDialog(evaluation);
+            }
+            return;
+        }
+
         const historyRes = await gameService.getGameHistory(mode, 1, 50);
         if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
             // Check if server history already contains the result for settledPeriodId
@@ -219,8 +232,8 @@ function processMasterTick() {
             const settlementKey = `${mode}:${finishedPeriod}`;
             if (!state.settledRounds.has(settlementKey)) {
                 state.settledRounds.add(settlementKey);
-                // Asynchronously fetch latest outcome & evaluate bets without blocking timer
-                setTimeout(() => handlePeriodSettledFromServer(mode, finishedPeriod), 400);
+                // Asynchronously fetch latest outcome & evaluate bets with exact 1000ms (1.0s) delay for smooth outcome registration
+                setTimeout(() => handlePeriodSettledFromServer(mode, finishedPeriod), 1000);
             }
         } else if (!state.currentIssueNumber) {
             state.currentIssueNumber = periodData.issueNumber;
@@ -319,6 +332,12 @@ export async function switchGameMode(newGameType) {
     if (popupHeadTitle) {
         popupHeadTitle.textContent = state.displayName;
     }
+
+    // Render target mode components IMMEDIATELY to prevent old mode history from flashing
+    renderWinningTokensForActiveMode();
+    renderGameHistory(targetMode);
+    renderChartTrend(targetMode);
+    renderMyHistory(targetMode);
 
     if (window.SmartyLoader) {
         window.SmartyLoader.show(`Loading ${state.displayName}...`);

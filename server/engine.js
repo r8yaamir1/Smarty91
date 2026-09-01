@@ -165,6 +165,7 @@ class Smarty91ServerEngine {
             isPaused: false,
             pausePending: false,
             settledRounds: new Set(),
+            preDecidedOutcomes: {}, // Store periodId -> outcome locked in last 5s
             history: [], // Array of settled round records
             activeBets: [] // Array of bet IDs in current round
         };
@@ -645,13 +646,64 @@ class Smarty91ServerEngine {
         }
     }
 
+    ensureFull50RoundsHistory(mode) {
+        const state = this.modes[mode];
+        if (!state) return;
+        if (!state.history) state.history = [];
+
+        const interval = MODE_INTERVALS[mode] || 30000;
+        const now = Date.now();
+        const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '')));
+
+        const newRounds = [];
+        for (let i = 1; i <= 60; i++) {
+            if (state.history.length + newRounds.length >= 50) break;
+            const pastTime = now - (i * interval);
+            const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
+
+            if (!existingPeriods.has(String(pastPeriodId))) {
+                existingPeriods.add(String(pastPeriodId));
+                const num = this._calculateDeterministicOutcome(mode, pastPeriodId);
+                const props = NUMBER_PROPERTIES[num];
+                const roundRecord = {
+                    period: pastPeriodId,
+                    number: num,
+                    color: props.color,
+                    size: props.size,
+                    colorLabel: props.label,
+                    settledAt: new Date(pastTime).toISOString(),
+                    isOverridden: false
+                };
+                newRounds.push(roundRecord);
+            }
+        }
+
+        if (newRounds.length > 0) {
+            state.history = state.history.concat(newRounds);
+        }
+
+        // Deduplicate and sort descending by period ID
+        const map = new Map();
+        state.history.forEach(item => {
+            const pId = String(item.period || item.periodId || '');
+            if (pId && !map.has(pId)) {
+                map.set(pId, item);
+            }
+        });
+
+        const deduped = Array.from(map.values());
+        deduped.sort((a, b) => {
+            const pA = String(a.period || a.periodId || '');
+            const pB = String(b.period || b.periodId || '');
+            return pB.localeCompare(pA, undefined, { numeric: true });
+        });
+
+        state.history = deduped.slice(0, 50);
+    }
+
     _seedInitialHistory() {
         ['30s', '1m', '3m', '5m'].forEach(mode => {
-            const state = this.modes[mode];
-            if (!state.history) {
-                state.history = [];
-            }
-            // Strictly empty initial history - real rounds populate exclusively via Firestore hydration & live settlements
+            this.ensureFull50RoundsHistory(mode);
         });
     }
 
@@ -704,6 +756,14 @@ class Smarty91ServerEngine {
         return totalPayout;
     }
 
+    // Secret 24/7 Cryptographic Seed Formula for Natural Outcomes
+    _calculateDeterministicOutcome(mode, periodId) {
+        const seedStr = `SMARTY91_SECRET_MASTER_SEED_2026_${mode}_${periodId}`;
+        const hex = crypto.createHash('sha256').update(seedStr).digest('hex');
+        const num = parseInt(hex.substring(0, 8), 16) % 10;
+        return num;
+    }
+
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
     selectSmartRiskOutcome(mode, periodId) {
         // Priority 1: Check Admin Force Override
@@ -728,10 +788,10 @@ class Smarty91ServerEngine {
             b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
         );
 
-        // If no bets placed in this round, generate crypto random 0-9
+        // If no bets placed in this round, generate 100% deterministic SHA-256 outcome
         if (pendingBets.length === 0) {
-            const num = crypto.randomInt(0, 10);
-            return { number: num, isOverridden: false, reason: 'AUTO_NO_BETS' };
+            const num = this._calculateDeterministicOutcome(mode, periodId);
+            return { number: num, isOverridden: false, reason: 'DETERMINISTIC_SHA256_NO_BETS' };
         }
 
         // Priority 2: Targeted User Rigging Check
@@ -899,6 +959,16 @@ class Smarty91ServerEngine {
             state.remainingSeconds = remainingSec;
             state.isLocked = remainingSec <= (modeConfig.lockoutSeconds || 5);
 
+            // Pre-decide and safely lock winning outcome in last 5 seconds (T-5s)
+            if (state.isLocked) {
+                if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
+                if (!state.preDecidedOutcomes[currentPeriodId]) {
+                    const outcomeResult = this.selectSmartRiskOutcome(mode, currentPeriodId);
+                    state.preDecidedOutcomes[currentPeriodId] = outcomeResult;
+                    console.log(`[Pre-Lock Engine] Mode ${mode} Period ${currentPeriodId} locked number in last 5s:`, outcomeResult.number);
+                }
+            }
+
             // Settle immediately if within last 150ms of the period
             if (times.timeLeftMs <= 150 && !state.settledRounds.has(currentPeriodId)) {
                 state.settledRounds.add(currentPeriodId);
@@ -913,8 +983,15 @@ class Smarty91ServerEngine {
         const state = this.modes[mode];
         const modeConfig = this.config.modes[mode];
         
-        // 1. Determine Winning Number via Smart Risk & House Profit Engine (Priority Hierarchy)
-        const outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
+        // 1. Determine Winning Number: use pre-decided locked outcome from last 5s if available
+        let outcomeResult;
+        if (state.preDecidedOutcomes && state.preDecidedOutcomes[periodId]) {
+            outcomeResult = state.preDecidedOutcomes[periodId];
+            delete state.preDecidedOutcomes[periodId];
+        } else {
+            outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
+        }
+
         const winningNumber = outcomeResult.number;
         const isOverridden = outcomeResult.isOverridden;
 
@@ -1341,6 +1418,19 @@ class Smarty91ServerEngine {
         }
         this.adminOverrides[mode] = num;
         firebaseSync.setAdminOverride(mode, num);
+
+        // Instantly reflect override in preDecidedOutcomes if current period is locked in last 5s
+        if (this.modes[mode]) {
+            const curP = this.modes[mode].currentPeriodId;
+            if (curP) {
+                if (!this.modes[mode].preDecidedOutcomes) this.modes[mode].preDecidedOutcomes = {};
+                this.modes[mode].preDecidedOutcomes[curP] = {
+                    number: num,
+                    isOverridden: true,
+                    reason: 'ADMIN_FORCE_OVERRIDE'
+                };
+            }
+        }
         
         const details = `Forced outcome for ${mode} next round set to ${num}`;
         this.auditLogs.unshift({

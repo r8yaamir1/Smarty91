@@ -85,8 +85,8 @@ class FirebaseSyncManager {
             // 3.1 Listen in real-time to User Account additions & updates
             this._listenToUsers();
 
-            // 4. Reset and initialize clean empty game history in Firestore for all 4 modes
-            await this.resetAndWipeAllFirestoreGameHistory();
+            // 4. Hydrate game history from Firestore and fill deterministic rounds up to 50 for all modes
+            await this._hydrateHistoryFromFirestore();
 
             // 5. Sync default user if not already existing
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
@@ -132,12 +132,29 @@ class FirebaseSyncManager {
                     const snap = await getDoc(summaryRef);
                     if (snap.exists()) {
                         const data = snap.data();
-                        if (data && Array.isArray(data.rounds)) {
+                        if (data && Array.isArray(data.rounds) && data.rounds.length > 0) {
                             this.engine.modes[mode].history = data.rounds;
                         }
                     }
                 } catch (e) {
-                    // Non-blocking fallback
+                    console.warn(`[Firebase] Hydrate summary warning for ${mode}:`, e.message);
+                }
+
+                // Ensure full 50 rounds in memory
+                if (this.engine.ensureFull50RoundsHistory) {
+                    this.engine.ensureFull50RoundsHistory(mode);
+                }
+
+                // Write full 50 rounds back to Firestore summary doc for instant 1-read client access
+                try {
+                    const summaryRef = doc(db, 'game_history_summary', mode);
+                    await setDoc(summaryRef, {
+                        mode,
+                        rounds: this.engine.modes[mode].history,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                } catch (e) {
+                    // Non-blocking
                 }
             }
         } catch (err) {

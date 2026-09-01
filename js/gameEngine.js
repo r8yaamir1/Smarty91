@@ -322,7 +322,7 @@ export function renderGameHistory(modeInput = activeModeKey) {
         row.setAttribute('data-v-481307ec', '');
 
         let numClass = 'greenColor';
-        if (item.number === 0) numClass = 'defaultColor';
+        if (item.number === 0) numClass = 'mixedColor0';
         else if (item.number === 5) numClass = 'mixedColor5';
         else if ([2, 4, 6, 8].includes(item.number)) numClass = 'defaultColor';
 
@@ -824,7 +824,7 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
 
     const formatted = serverHistoryItems
         .map(item => {
-            const num = Number(item.number !== undefined ? item.number : 0);
+            const num = Number(item.number !== undefined && item.number !== null ? item.number : 0);
             const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
             const rawTime = item.timestamp || item.settledAt;
             const periodIdStr = String(item.period || item.periodId || '');
@@ -832,10 +832,10 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
                 mode,
                 periodId: periodIdStr,
                 number: num,
-                isBig: item.size === 'big' || (item.size !== 'small' && prop.isBig),
+                isBig: prop.isBig,
                 primaryColor: prop.primaryColor,
                 secondaryColor: prop.secondaryColor,
-                colorName: item.colorLabel || prop.colorName,
+                colorName: prop.colorName,
                 timestamp: parseTime(rawTime)
             };
         })
@@ -848,7 +848,7 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
             uniqueMap.set(item.periodId, item);
         } else {
             const existing = uniqueMap.get(item.periodId);
-            if (!existing.timestamp && item.timestamp) {
+            if (item.timestamp && item.timestamp > (existing.timestamp || 0)) {
                 uniqueMap.set(item.periodId, item);
             }
         }
