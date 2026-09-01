@@ -382,27 +382,81 @@ async function fetchAndRefreshData() {
     }
 }
 
+function updateTopLiveBetsBox() {
+    const box = document.getElementById('top-live-bets-box');
+    if (!box || !liveData) return;
+
+    const exposure = (liveData.liveExposures && liveData.liveExposures[selectedMode]) || {
+        numbers: {}, colors: {}, sizes: {}, totalBetVolume: 0, totalBetsCount: 0,
+        periodId: '...', remainingSeconds: 0, isLocked: false
+    };
+
+    box.innerHTML = `
+        <div class="admin-card" style="padding: 9px 12px; margin-bottom: 0; border: 1px solid rgba(255,255,255,0.1); background: var(--bg-card); border-radius: 6px;">
+            <!-- Header Summary -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 4px;">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; color: #fff;">
+                    <span style="color: #f59e0b;">🔥 Live Bets (${selectedMode})</span>
+                    <span style="font-size: 10px; color: var(--text-muted); font-weight: 600;">#${exposure.periodId || '...'}</span>
+                    <span style="font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 4px; background: ${exposure.isLocked ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.15)'}; color: ${exposure.isLocked ? 'var(--accent-red)' : 'var(--accent-green)'}; border: 1px solid ${exposure.isLocked ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'};">
+                        ${exposure.remainingSeconds || 0}s ${exposure.isLocked ? '🔒' : ''}
+                    </span>
+                </div>
+                <div style="font-weight: 800; color: var(--accent-blue); font-size: 12px;">
+                    Total: ₹${(exposure.totalBetVolume || 0).toLocaleString('en-IN')} <span style="font-size: 10.5px; color: var(--text-muted); font-weight: 600;">(${exposure.totalBetsCount || 0} bets)</span>
+                </div>
+            </div>
+
+            <!-- Color Exposure (Compact 3 cols) -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px;">
+                <div style="background: var(--bg-input); border-left: 3px solid var(--accent-green); padding: 5px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: var(--accent-green);">GREEN</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #fff;">₹${(exposure.colors?.green || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div style="background: var(--bg-input); border-left: 3px solid var(--accent-violet); padding: 5px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: var(--accent-violet);">VIOLET</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #fff;">₹${(exposure.colors?.violet || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div style="background: var(--bg-input); border-left: 3px solid var(--accent-red); padding: 5px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: var(--accent-red);">RED</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #fff;">₹${(exposure.colors?.red || 0).toLocaleString('en-IN')}</span>
+                </div>
+            </div>
+
+            <!-- Size Exposure (Compact 2 cols) -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 6px;">
+                <div style="background: var(--bg-input); border-left: 3px solid var(--primary); padding: 5px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: var(--primary);">BIG (5-9)</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #fff;">₹${(exposure.sizes?.big || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div style="background: var(--bg-input); border-left: 3px solid var(--accent-blue); padding: 5px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: var(--accent-blue);">SMALL (0-4)</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #fff;">₹${(exposure.sizes?.small || 0).toLocaleString('en-IN')}</span>
+                </div>
+            </div>
+
+            <!-- Number Distribution Grid (Compact 10 items) -->
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px;">
+                ${[0,1,2,3,4,5,6,7,8,9].map(num => `
+                    <div style="background: var(--bg-input); padding: 4px 2px; border-radius: 4px; text-align: center; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; font-size: 10px; color: var(--primary);">#${num}</div>
+                        <div style="font-size: 9.5px; font-weight: 700; color: #fff; margin-top: 1px;">
+                            ₹${(exposure.numbers && exposure.numbers[num]) || 0}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
 function updateTopKpis(overview) {
-    if (!overview) return;
-    const usersEl = document.getElementById('kpi-users');
-    if (usersEl) usersEl.textContent = overview.activeUsersCount || 1;
-
-    const volumeEl = document.getElementById('kpi-volume');
-    if (volumeEl) volumeEl.textContent = `₹${(overview.totalBetVolume || 0).toLocaleString('en-IN')}`;
-
-    const payoutEl = document.getElementById('kpi-payout');
-    if (payoutEl) payoutEl.textContent = `₹${(overview.totalPayoutVolume || 0).toLocaleString('en-IN')}`;
-
-    const profitEl = document.getElementById('kpi-profit');
-    if (profitEl) {
-        const profit = overview.grossHouseProfit || 0;
-        profitEl.textContent = `₹${profit.toLocaleString('en-IN')}`;
-        profitEl.style.color = profit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-    }
+    updateTopLiveBetsBox();
 }
 
 function renderActiveTab(force = false) {
     if (!liveData) return;
+    updateTopLiveBetsBox();
     const container = document.getElementById('tab-view-container');
     if (!container) return;
 
@@ -2636,6 +2690,53 @@ function initDeveloperPortal() {
                 }
             });
         }
+    }
+
+    // Bulk Delete All Users Handler
+    const deleteAllUsersBtn = document.getElementById('dev-delete-all-users-btn');
+    if (deleteAllUsersBtn) {
+        deleteAllUsersBtn.addEventListener('click', async () => {
+            const firstConfirm = confirm('⚠️ CRITICAL WARNING: Are you ABSOLUTELY sure you want to WIPE and DELETE ALL USER ACCOUNTS from the entire platform?\n\nThis will completely purge all registered users, all wallet balances, all game bet histories, all ledger passbooks, and all deposits/withdrawals from server memory and Firestore database.\n\nTHIS ACTION CANNOT BE UNDONE!');
+            if (!firstConfirm) return;
+
+            const secondConfirm = prompt("To confirm permanent wipe of ALL accounts, type 'DELETE ALL' (without quotes):");
+            if (secondConfirm !== 'DELETE ALL') {
+                alert('Action cancelled. You did not type DELETE ALL.');
+                return;
+            }
+
+            deleteAllUsersBtn.disabled = true;
+            deleteAllUsersBtn.innerHTML = '<span>⏳</span><span>Wiping All Accounts & Databases...</span>';
+
+            try {
+                const res = await fetch('/api/developer/users/delete-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        secretKey: 'Smarty071'
+                    })
+                });
+                const d = await res.json();
+                if (d.success) {
+                    alert(`✓ SUCCESS: ${d.message}`);
+                    if (devUserCard) {
+                        devUserCard.innerHTML = `
+                            <div style="text-align:center; color:#10b981; font-weight:bold; font-size:12px; padding:30px 0;">
+                                ✓ All user accounts & data have been completely wiped.
+                            </div>
+                        `;
+                    }
+                    if (devSearchInput) devSearchInput.value = '';
+                } else {
+                    alert(`❌ Error: ${d.message}`);
+                }
+            } catch (err) {
+                alert(`❌ Error wiping all accounts: ${err.message}`);
+            } finally {
+                deleteAllUsersBtn.disabled = false;
+                deleteAllUsersBtn.innerHTML = '<span>🔥</span><span>DELETE ALL ACCOUNTS (WIPE ENTIRE DATABASE)</span>';
+            }
+        });
     }
     
     // Inputs

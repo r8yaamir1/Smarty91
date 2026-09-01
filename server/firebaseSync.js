@@ -433,11 +433,105 @@ class FirebaseSyncManager {
     async deleteUserFromFirestore(userId) {
         if (!this._checkQuota()) return;
         try {
+            // 1. Delete user profile document
             const userRef = doc(db, 'users', userId);
             await deleteDoc(userRef);
-            console.log(`[Firebase] Deleted user ${userId} from Firestore`);
+            console.log(`[Firebase] Deleted user ${userId} profile from Firestore`);
+
+            // 2. Delete all historical bets for this user
+            try {
+                const betsCol = collection(db, 'bets');
+                const betsQuery = query(betsCol, where('userId', '==', userId));
+                const betsSnap = await getDocs(betsQuery);
+                const deleteBetsPromises = [];
+                betsSnap.forEach(docSnap => {
+                    deleteBetsPromises.push(deleteDoc(docSnap.ref));
+                });
+                if (deleteBetsPromises.length > 0) {
+                    await Promise.all(deleteBetsPromises);
+                    console.log(`[Firebase] Deleted ${deleteBetsPromises.length} bets for user ${userId} from Firestore`);
+                }
+            } catch (err) {
+                console.warn(`[Firebase] Error deleting bets for user ${userId}:`, err.message);
+            }
+
+            // 3. Delete all transactions / ledger documents for this user
+            try {
+                const txCol = collection(db, 'transactions');
+                const txQuery = query(txCol, where('userId', '==', userId));
+                const txSnap = await getDocs(txQuery);
+                const deleteTxPromises = [];
+                txSnap.forEach(docSnap => {
+                    deleteTxPromises.push(deleteDoc(docSnap.ref));
+                });
+                if (deleteTxPromises.length > 0) {
+                    await Promise.all(deleteTxPromises);
+                    console.log(`[Firebase] Deleted ${deleteTxPromises.length} transactions for user ${userId} from Firestore`);
+                }
+            } catch (err) {
+                console.warn(`[Firebase] Error deleting transactions for user ${userId}:`, err.message);
+            }
         } catch (err) {
-            console.error(`[Firebase] Error deleting user ${userId}:`, err.message);
+            console.error(`[Firebase] Error deleting user ${userId} from Firestore:`, err.message);
+        }
+    }
+
+    async deleteAllUsersFromFirestore() {
+        if (!this._checkQuota()) return;
+        try {
+            console.log('[Firebase] Starting full wipe of all users, bets, and transactions from Firestore...');
+            
+            // 1. Delete all documents in 'users' collection
+            try {
+                const usersCol = collection(db, 'users');
+                const usersSnap = await getDocs(usersCol);
+                const deletePromises = [];
+                usersSnap.forEach(docSnap => {
+                    deletePromises.push(deleteDoc(docSnap.ref));
+                });
+                if (deletePromises.length > 0) {
+                    await Promise.all(deletePromises);
+                    console.log(`[Firebase] Deleted ${deletePromises.length} users from Firestore`);
+                }
+            } catch (e) {
+                console.warn('[Firebase] Error deleting all users:', e.message);
+            }
+
+            // 2. Delete all documents in 'bets' collection
+            try {
+                const betsCol = collection(db, 'bets');
+                const betsSnap = await getDocs(betsCol);
+                const deletePromises = [];
+                betsSnap.forEach(docSnap => {
+                    deletePromises.push(deleteDoc(docSnap.ref));
+                });
+                if (deletePromises.length > 0) {
+                    await Promise.all(deletePromises);
+                    console.log(`[Firebase] Deleted ${deletePromises.length} bets from Firestore`);
+                }
+            } catch (e) {
+                console.warn('[Firebase] Error deleting all bets:', e.message);
+            }
+
+            // 3. Delete all documents in 'transactions' collection
+            try {
+                const txCol = collection(db, 'transactions');
+                const txSnap = await getDocs(txCol);
+                const deletePromises = [];
+                txSnap.forEach(docSnap => {
+                    deletePromises.push(deleteDoc(docSnap.ref));
+                });
+                if (deletePromises.length > 0) {
+                    await Promise.all(deletePromises);
+                    console.log(`[Firebase] Deleted ${deletePromises.length} transactions from Firestore`);
+                }
+            } catch (e) {
+                console.warn('[Firebase] Error deleting all transactions:', e.message);
+            }
+
+            console.log('[Firebase] Full wipe of Firestore users & data completed.');
+        } catch (err) {
+            console.error('[Firebase] Error in deleteAllUsersFromFirestore:', err.message);
         }
     }
 

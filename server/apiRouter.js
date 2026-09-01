@@ -1493,28 +1493,122 @@ apiRouter.post('/developer/user/delete', async (req, res) => {
     const phone = user.phone;
     const inviteCode = user.inviteCode;
 
-    // Delete from memory Map
+    // 1. Delete user from memory Map
     serverEngine.users.delete(userId);
 
-    // Delete referral mapping
+    // 2. Delete referral mapping
     if (inviteCode) {
         serverEngine.referralCodes.delete(inviteCode);
     }
 
-    // Save to disk
+    // 3. Invalidate/remove all user session tokens
+    for (const [token, uid] of serverEngine.userTokens.entries()) {
+        if (uid === userId) {
+            serverEngine.userTokens.delete(token);
+        }
+    }
+
+    // 4. Remove all active bets from serverEngine.bets
+    if (serverEngine.bets && serverEngine.bets.size > 0) {
+        for (const [bId, b] of serverEngine.bets.entries()) {
+            if (b && b.userId === userId) {
+                serverEngine.bets.delete(bId);
+            }
+        }
+    }
+
+    // 5. Remove all historical settled bets from serverEngine.settledBetsHistory
+    if (serverEngine.settledBetsHistory && serverEngine.settledBetsHistory.size > 0) {
+        for (const [bId, b] of serverEngine.settledBetsHistory.entries()) {
+            if (b && b.userId === userId) {
+                serverEngine.settledBetsHistory.delete(bId);
+            }
+        }
+        serverEngine._saveBetsToDisk();
+    }
+
+    // 6. Remove all transactions from serverEngine.transactions
+    if (Array.isArray(serverEngine.transactions)) {
+        serverEngine.transactions = serverEngine.transactions.filter(t => t.userId !== userId);
+    }
+
+    // 7. Remove all ledger entries from serverEngine.ledger
+    if (Array.isArray(serverEngine.ledger)) {
+        serverEngine.ledger = serverEngine.ledger.filter(l => l.userId !== userId);
+    }
+
+    // 8. Save updated users list to disk
     serverEngine._saveUsersToDisk();
 
-    // Delete from Firestore Cloud permanently
+    // 9. Delete from Firestore Cloud permanently (user profile, all bets, all transactions)
     try {
         await firebaseSync.deleteUserFromFirestore(userId);
     } catch (err) {
         console.warn('[Dev API] Firestore delete user error:', err.message);
     }
 
-    firebaseSync.logAdminAction('DEVELOPER_DELETE_USER', `Permanently deleted user account ${phone}`);
+    firebaseSync.logAdminAction('DEVELOPER_DELETE_USER', `Permanently deleted user account ${phone} and all associated histories`);
 
     res.json({
         success: true,
-        message: `Permanently deleted user account ${phone} successfully. They can now re-register fresh.`
+        message: `Permanently deleted user account ${phone} and all bet/transaction histories successfully.`
     });
 });
+
+// 5. Permanent Delete ALL Users & Wipe Data
+apiRouter.post('/developer/users/delete-all', async (req, res) => {
+    const { secretKey } = req.body;
+    if (!validateDevKey(secretKey)) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+
+    try {
+        const totalUsersDeleted = serverEngine.users.size;
+
+        // 1. Wipe all users
+        serverEngine.users.clear();
+
+        // 2. Wipe user tokens & login sessions
+        serverEngine.userTokens.clear();
+
+        // 3. Wipe referral codes
+        serverEngine.referralCodes.clear();
+
+        // 4. Wipe active bets
+        serverEngine.bets.clear();
+
+        // 5. Wipe settled bets history
+        serverEngine.settledBetsHistory.clear();
+
+        // 6. Wipe transactions
+        serverEngine.transactions = [];
+
+        // 7. Wipe ledger
+        serverEngine.ledger = [];
+
+        // 8. Re-seed default demo user
+        serverEngine._ensureDefaultUser('default_user', 0.00);
+
+        // 9. Save empty states to disk files
+        serverEngine._saveUsersToDisk();
+        serverEngine._saveBetsToDisk();
+
+        // 10. Wipe all Firestore users, bets, and transactions collections
+        try {
+            await firebaseSync.deleteAllUsersFromFirestore();
+        } catch (err) {
+            console.warn('[Dev API] Firestore delete all users error:', err.message);
+        }
+
+        firebaseSync.logAdminAction('DEVELOPER_DELETE_ALL_USERS', `Permanently wiped all ${totalUsersDeleted} user accounts, bets, and transaction histories`);
+
+        res.json({
+            success: true,
+            message: `Successfully wiped and deleted ALL user accounts, bet histories, and transaction ledgers permanently. Total ${totalUsersDeleted} accounts wiped.`
+        });
+    } catch (error) {
+        console.error('[Dev API] Delete all users error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Internal server error while wiping all accounts' });
+    }
+});
+
