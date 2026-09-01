@@ -70,7 +70,7 @@ class Smarty91ServerEngine {
             usdtBep20Address: '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
             usdtBep20QrImage: 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
             usdtBep20Url: '',
-            usdtRate: 90,
+            usdtRate: 102,
             minDeposit: 200,
             maxDeposit: 100000,
             minWithdrawal: 200,

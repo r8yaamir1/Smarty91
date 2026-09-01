@@ -3,7 +3,7 @@
 
 let currentDepositAmount = 200;
 let currentBonusAmount = 200;
-let selectedChannel = 'USDT_TRC20';
+let selectedChannel = 'USDT_BEP20';
 let currentPlatform = 'USDT';
 let currentDepositAmountUsdt = 5;
 let countdownInterval = null;
@@ -15,7 +15,7 @@ let activeMerchantUsdtAddress = '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
 let activeMerchantUsdtQrImage = 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
 let activeMerchantUsdtBep20Address = '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
 let activeMerchantUsdtBep20QrImage = 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
-let activeUsdtRate = 90;
+let activeUsdtRate = 102;
 
 // Load live merchant config (UPI & USDT)
 async function fetchMerchantConfig() {
@@ -44,7 +44,7 @@ async function fetchMerchantConfig() {
                 activeMerchantUsdtBep20QrImage = data.usdtBep20QrImage;
             }
             if (data.usdtRate) {
-                activeUsdtRate = Number(data.usdtRate) || 90;
+                activeUsdtRate = Number(data.usdtRate) || 102;
             }
         }
     } catch (e) {
@@ -263,7 +263,7 @@ window.selectPaymentPlatform = function(platform) {
         platformUsdt.classList.add('selected');
         platformUsdt.style.borderColor = '#10b981';
     }
-    selectedChannel = 'USDT_TRC20'; // Default USDT channel
+    selectedChannel = 'USDT_BEP20'; // Default USDT channel
 };
 
 // Select Quick Amount Pill (INR)

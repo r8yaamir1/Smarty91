@@ -775,7 +775,7 @@ class FirebaseSyncManager {
                 usdtBep20Address: config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
                 usdtBep20QrImage: config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
                 usdtBep20Url: config.usdtBep20Url || '',
-                usdtRate: config.usdtRate || 90,
+                usdtRate: config.usdtRate || 102,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {

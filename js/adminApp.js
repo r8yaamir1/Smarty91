@@ -2095,7 +2095,7 @@ function initDeveloperPortal() {
             const activeBep20Qr = liveConfig.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
             const activeBep20Url = liveConfig.usdtBep20Url || '';
 
-            const activeRate = liveConfig.usdtRate || 90;
+            const activeRate = liveConfig.usdtRate || 102;
 
             if (newUsdtInput) newUsdtInput.value = activeUsdt;
             if (newUsdtUrlInput) newUsdtUrlInput.value = activeUsdtUrl;
@@ -2140,7 +2140,7 @@ function initDeveloperPortal() {
             const usdtBep20Url = newBep20UrlInput ? newBep20UrlInput.value.trim() : '';
             const usdtBep20QrImage = uploadedBep20Qr || (newBep20QrInput ? newBep20QrInput.value.trim() : '');
 
-            const usdtRate = newRateInput ? Number(newRateInput.value) : 90;
+            const usdtRate = newRateInput ? Number(newRateInput.value) : 102;
             const upiId = newUpiInput ? newUpiInput.value.trim() : '';
             const upiName = newNameInput ? newNameInput.value.trim() : 'Smarty91';
             const upiQrImage = uploadedUpiQr || (newUpiQrInput ? newUpiQrInput.value.trim() : '');
