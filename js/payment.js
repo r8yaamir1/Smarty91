@@ -887,11 +887,20 @@ window.handleWithdrawalSubmit = function(e) {
 
 // Filter Transactions
 let cachedLedgerItems = [];
+let currentActiveHistoryFilter = 'ALL';
+
 window.filterTransactions = function(type, btn) {
     const buttons = document.querySelectorAll('.filter-chip-btn');
     buttons.forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    if (btn) {
+        btn.classList.add('active');
+    } else {
+        // Find matching filter button to keep visually active
+        const matchingBtn = Array.from(buttons).find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${type}'`));
+        if (matchingBtn) matchingBtn.classList.add('active');
+    }
 
+    currentActiveHistoryFilter = type;
     renderFilteredTransactions(type);
 };
 
@@ -899,21 +908,42 @@ function renderFilteredTransactions(type) {
     const listContainer = document.getElementById('history-list-container') || document.getElementById('history-items-list');
     if (!listContainer) return;
 
-    let filtered = cachedLedgerItems;
-    if (type === 'DEPOSIT') {
-        filtered = cachedLedgerItems.filter(item => item.type && item.type.includes('DEPOSIT'));
+    let filtered = [];
+    if (type === 'ALL') {
+        filtered = cachedLedgerItems;
+    } else if (type === 'DEPOSIT') {
+        filtered = cachedLedgerItems.filter(item => {
+            const isDepositType = item.type === 'DEPOSIT_CREDIT' || item.type === 'DEPOSIT';
+            const isSuccess = !item.status || item.status === 'APPROVED' || item.status === 'COMPLETED' || item.status === 'SUCCESS';
+            return isDepositType && isSuccess;
+        });
     } else if (type === 'WITHDRAWAL') {
-        filtered = cachedLedgerItems.filter(item => item.type && item.type.includes('WITHDRAW'));
-    } else if (type === 'BONUS') {
-        filtered = cachedLedgerItems.filter(item => item.type && (item.type.includes('BONUS') || item.type.includes('PROMO')));
+        filtered = cachedLedgerItems.filter(item => {
+            const isWithdrawalType = item.type === 'WITHDRAWAL_PAID' || item.type === 'WITHDRAWAL';
+            const isSuccess = !item.status || item.status === 'APPROVED' || item.status === 'COMPLETED' || item.status === 'SUCCESS';
+            return isWithdrawalType && isSuccess;
+        });
+    } else if (type === 'PENDING') {
+        filtered = cachedLedgerItems.filter(item => {
+            return item.status === 'PENDING';
+        });
     }
 
     if (filtered.length === 0) {
+        let emptyMessage = "No records match the selected filter.";
+        if (type === 'DEPOSIT') {
+            emptyMessage = "No successful deposits found.";
+        } else if (type === 'WITHDRAWAL') {
+            emptyMessage = "No successful withdrawals found.";
+        } else if (type === 'PENDING') {
+            emptyMessage = "No pending deposits or withdrawals currently.";
+        }
+
         listContainer.innerHTML = `
             <div style="text-align: center; padding: 2.5rem 1rem; color: #94A3B8;">
                 <div style="font-size: 2rem; margin-bottom: 8px;">📑</div>
                 <div style="font-weight: 700; color: #64748b;">No Transactions Found</div>
-                <div style="font-size: 0.75rem; margin-top: 4px;">No records match the selected filter.</div>
+                <div style="font-size: 0.75rem; margin-top: 4px;">${emptyMessage}</div>
             </div>
         `;
         return;
@@ -983,7 +1013,7 @@ async function renderTransactionsHistory() {
         }
 
         cachedLedgerItems = data.items;
-        renderFilteredTransactions('ALL');
+        renderFilteredTransactions(currentActiveHistoryFilter);
 
     } catch (e) {
         listContainer.innerHTML = `
