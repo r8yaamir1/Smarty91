@@ -17,25 +17,7 @@ import { initAllEvents } from './events.js';
 import { initHomeNavigation } from './homeNavigation.js';
 
 function initViewportLock() {
-    // Prevent double-tap zoom
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (event) => {
-        const now = Date.now();
-        if (now - lastTouchEnd <= 300) {
-            event.preventDefault();
-        }
-        lastTouchEnd = now;
-    }, { passive: false });
-
-    // Prevent pinch-zoom gestures
-    document.addEventListener('gesturestart', (e) => e.preventDefault());
-    document.addEventListener('gesturechange', (e) => e.preventDefault());
-    document.addEventListener('gestureend', (e) => e.preventDefault());
-    document.addEventListener('touchmove', (e) => {
-        if (e.touches && e.touches.length > 1) {
-            e.preventDefault();
-        }
-    }, { passive: false });
+    // Clean, non-blocking viewport handling
 }
 
 async function bootstrap() {

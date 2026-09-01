@@ -876,17 +876,10 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
         })
         .filter(item => item.periodId !== '');
 
-    // Deduplicate history items by unique periodId
+    // Deduplicate history items by unique periodId (server outcomes are authoritative)
     const uniqueMap = new Map();
     formatted.forEach(item => {
-        if (!uniqueMap.has(item.periodId)) {
-            uniqueMap.set(item.periodId, item);
-        } else {
-            const existing = uniqueMap.get(item.periodId);
-            if (item.timestamp && item.timestamp > (existing.timestamp || 0)) {
-                uniqueMap.set(item.periodId, item);
-            }
-        }
+        uniqueMap.set(item.periodId, item);
     });
 
     const deduplicated = Array.from(uniqueMap.values());

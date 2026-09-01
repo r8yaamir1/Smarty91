@@ -68,37 +68,32 @@ export async function openGameWithLoader(targetView = 'game') {
     const meterBar = document.getElementById('game-sync-meter-bar');
     const statusText = document.getElementById('game-sync-status-text');
 
-    if (!overlay) {
-        switchView(targetView);
-        return;
-    }
-
-    overlay.style.display = 'flex';
-    if (meterBar) meterBar.style.width = '25%';
-    if (statusText) statusText.textContent = 'Connecting to VIP Arena...';
-    overlay.classList.add('active');
+    // Immediate switch without waiting
+    switchView(targetView);
 
     // Background sync of wallet balance
     try {
         syncServerBalance(false).catch(() => {});
     } catch (e) {}
 
-    // Smooth quick progression
-    await new Promise(r => setTimeout(r, 220));
-    if (meterBar) meterBar.style.width = '75%';
-    if (statusText) statusText.textContent = 'Synchronizing Live Rounds...';
+    if (!overlay) return;
 
-    await new Promise(r => setTimeout(r, 250));
-    if (meterBar) meterBar.style.width = '100%';
-    if (statusText) statusText.textContent = 'Entering Live Game...';
+    overlay.style.display = 'flex';
+    if (meterBar) meterBar.style.width = '35%';
+    if (statusText) statusText.textContent = 'Connecting to VIP Arena...';
+    overlay.classList.add('active');
 
-    await new Promise(r => setTimeout(r, 120));
-    switchView(targetView);
-
-    overlay.classList.remove('active');
+    // Quick subtle transition
     setTimeout(() => {
+        if (meterBar) meterBar.style.width = '100%';
+        if (statusText) statusText.textContent = 'Entering Live Game...';
+    }, 120);
+
+    setTimeout(() => {
+        overlay.classList.remove('active');
+        overlay.style.display = 'none';
         if (meterBar) meterBar.style.width = '0%';
-    }, 200);
+    }, 280);
 }
 
 // Fetch Daily Sign-in status
@@ -373,6 +368,19 @@ export function initHomeNavigation() {
         openDailyCheckInModal();
     } else if (tabParam === 'referral') {
         openReferralModal();
+    }
+
+    // Attach direct click and touch handlers for Colour Prediction game card
+    const cpCard = document.getElementById('game-card-colour-prediction');
+    if (cpCard) {
+        cpCard.onclick = (e) => {
+            if (e) e.preventDefault();
+            openGameWithLoader('game');
+        };
+        cpCard.addEventListener('click', (e) => {
+            if (e) e.preventDefault();
+            openGameWithLoader('game');
+        }, { passive: false });
     }
 
     // Attach global hooks

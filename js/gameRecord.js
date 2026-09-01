@@ -1,6 +1,5 @@
 // gameRecord.js - Server-Authoritative Live Game Loop & Multi-Mode Orchestrator
 
-import { period_time, period_number, tokenParent } from "./elements.js";
 import { normalizeMode, generateOfflinePeriodData } from "./offlineTimer.js";
 import {
     gameModes,
@@ -14,10 +13,11 @@ import {
     renderChartTrend,
     renderMyHistory,
     fetchUserBetsFromServer,
-    updateModeHistoryFromServer
+    updateModeHistoryFromServer,
+    NUMBER_PROPERTIES
 } from "./gameEngine.js";
 import { showEvaluationDialog } from "./updateWin.js";
-import { playTickSound, stopCountdownAudio, isGameViewActive } from "./audio.js";
+import { playTickSound, stopCountdownAudio, isGameViewActive, playWinChime } from "./audio.js";
 import { gameService } from "./services/gameService.js";
 import { syncServerBalance } from "./wallet.js";
 import { subscribeToGamePeriod, subscribeToGameHistory } from "./services/firebaseClient.js";
@@ -48,6 +48,7 @@ export function getRemainingSeconds() {
 
 // Render top-right winning number tokens for active mode
 export function renderWinningTokensForActiveMode() {
+    const tokenParent = document.querySelector('.TimeLeft__C-num');
     if (!tokenParent) return;
     const state = getActiveModeState();
     tokenParent.innerHTML = '';
@@ -62,6 +63,7 @@ export function renderWinningTokensForActiveMode() {
 
 // Format and update 5-box digital stopwatch display
 function updateTimeDisplay(minutes, seconds) {
+    const period_time = document.querySelector('.TimeLeft__C-time');
     if (!period_time) return;
     const timeDivs = period_time.querySelectorAll("div");
     if (timeDivs.length === 5) {
@@ -107,8 +109,9 @@ export async function syncServerGameState() {
 
             // Sync active view UI
             const activeState = gameModes[activeKey];
-            if (activeState && period_number) {
-                period_number.textContent = activeState.currentIssueNumber;
+            const periodEl = document.querySelector('.TimeLeft__C-id');
+            if (activeState && periodEl) {
+                periodEl.textContent = activeState.currentIssueNumber;
             }
         }
     } catch (err) {
@@ -121,90 +124,111 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
         const state = gameModes[mode];
         const targetPeriod = String(settledPeriodId).trim();
 
-        // 1. Check if the outcome for targetPeriod is already in state.history
-        if (state && Array.isArray(state.history)) {
-            const existingOutcome = state.history.find(
+        // 1. Fetch official settled game history from server API
+        const historyRes = await gameService.getGameHistory(mode, 1, 50);
+        let foundSettledOutcome = null;
+
+        if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
+            foundSettledOutcome = historyRes.items.find(
                 item => String(item.period || item.periodId).trim() === targetPeriod
             );
-            if (existingOutcome) {
-                const evaluation = evaluateModeBets(mode, existingOutcome);
-                await syncServerBalance(true);
-                fetchUserBetsFromServer(mode).catch(() => {});
+            if (foundSettledOutcome) {
+                updateModeHistoryFromServer(mode, historyRes.items);
+            }
+        }
 
-                if (mode === getActiveModeKey()) {
-                    renderWinningTokensForActiveMode();
-                    renderGameHistory(mode);
-                    renderChartTrend(mode);
-                    renderMyHistory(mode);
+        // 2. If outcome for targetPeriod was settled and confirmed by server:
+        if (foundSettledOutcome) {
+            // Fetch official settled bets for user from server
+            await fetchUserBetsFromServer(mode, 1);
+            await syncServerBalance(true);
 
-                    if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
-                        showEvaluationDialog(evaluation);
+            // Check if user had any bet on targetPeriod
+            const userSettledBets = (state.userBets || []).filter(
+                b => String(b.periodId).trim() === targetPeriod
+            );
+
+            if (userSettledBets.length > 0) {
+                const totalBet = userSettledBets.reduce((sum, b) => sum + (Number(b.totalAmount || b.betAmount || 0)), 0);
+                const totalWon = userSettledBets.reduce((sum, b) => sum + (Number(b.winAmount || b.payoutAmount || 0)), 0);
+                const isWin = totalWon > 0;
+
+                const rawNum = foundSettledOutcome.number !== undefined && foundSettledOutcome.number !== null 
+                    ? foundSettledOutcome.number 
+                    : (foundSettledOutcome.winningNumber !== undefined ? foundSettledOutcome.winningNumber : 0);
+                const winNum = Number(rawNum);
+                const isBig = winNum >= 5;
+
+                const summary = {
+                    mode,
+                    isWin,
+                    totalBet,
+                    totalWon,
+                    netProfit: Number((totalWon - totalBet).toFixed(2)),
+                    result: {
+                        periodId: targetPeriod,
+                        number: winNum,
+                        isBig,
+                        colorName: NUMBER_PROPERTIES[winNum]?.colorName || (winNum === 0 ? 'Red+Violet' : winNum === 5 ? 'Green+Violet' : [1,3,7,9].includes(winNum) ? 'Green' : 'Red')
+                    },
+                    lastBet: userSettledBets[0],
+                    evaluatedBets: userSettledBets
+                };
+
+                if (isWin) {
+                    playWinChime();
+                    if (mode === getActiveModeKey()) {
+                        showEvaluationDialog(summary);
                     }
                 }
-                return;
             }
+
+            // Remove any pending local activeBets matching this settled period
+            if (state.activeBets) {
+                state.activeBets = state.activeBets.filter(b => String(b.periodId).trim() !== targetPeriod);
+            }
+
+            if (mode === getActiveModeKey()) {
+                renderWinningTokensForActiveMode();
+                renderGameHistory(mode);
+                renderChartTrend(mode);
+                renderMyHistory(mode);
+            }
+            return;
         }
 
-        // 2. Fetch fresh history from server API
-        const historyRes = await gameService.getGameHistory(mode, 1, 50);
-        if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
-            const hasTargetPeriod = historyRes.items.some(
-                item => String(item.period || item.periodId).trim() === targetPeriod
-            );
-
-            if (hasTargetPeriod) {
-                processSettlementForPeriod(mode, historyRes.items, targetPeriod);
-                return;
-            }
-        }
-
-        // 3. If server hasn't finished writing outcome yet, retry up to 4 times
-        if (retryCount < 4) {
+        // 3. If server hasn't finished writing outcome yet, retry up to 5 times (total ~2.5s)
+        if (retryCount < 5) {
             setTimeout(() => {
                 handlePeriodSettledFromServer(mode, settledPeriodId, retryCount + 1);
-            }, 450);
-        } else if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
+            }, 500);
+        } else if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
             // Fallback to latest available history
-            processSettlementForPeriod(mode, historyRes.items, targetPeriod);
+            updateModeHistoryFromServer(mode, historyRes.items);
+            fetchUserBetsFromServer(mode, 1).catch(() => {});
+            syncServerBalance(true).catch(() => {});
+            if (mode === getActiveModeKey()) {
+                renderWinningTokensForActiveMode();
+                renderGameHistory(mode);
+                renderChartTrend(mode);
+                renderMyHistory(mode);
+            }
         }
     } catch (e) {
-        console.warn('History fetch error on settlement:', e);
+        console.warn('handlePeriodSettledFromServer error:', e);
     }
 }
 
 function processSettlementForPeriod(mode, items, targetPeriod) {
-    const hasChanged = updateModeHistoryFromServer(mode, items);
-    const state = gameModes[mode];
-    if (!state) return;
+    updateModeHistoryFromServer(mode, items);
+    fetchUserBetsFromServer(mode, 1).catch(() => {});
+    syncServerBalance(true).catch(() => {});
 
-    // Find the specific outcome for targetPeriod, or fallback to history[0]
-    let resultForPeriod = null;
-    if (Array.isArray(state.history) && state.history.length > 0) {
-        if (targetPeriod) {
-            resultForPeriod = state.history.find(
-                h => String(h.period || h.periodId).trim() === String(targetPeriod).trim()
-            );
-        }
-        if (!resultForPeriod) {
-            resultForPeriod = state.history[0];
-        }
-    }
-
-    if (resultForPeriod) {
-        const evaluation = evaluateModeBets(mode, resultForPeriod);
-        syncServerBalance(true);
-        fetchUserBetsFromServer(mode).catch(() => {});
-
-        if (mode === getActiveModeKey()) {
-            renderWinningTokensForActiveMode();
-            renderGameHistory(mode);
-            renderChartTrend(mode);
-            renderMyHistory(mode);
-
-            if (evaluation && evaluation.evaluatedBets && evaluation.evaluatedBets.length > 0) {
-                showEvaluationDialog(evaluation);
-            }
-        }
+    if (mode === getActiveModeKey()) {
+        renderWinningTokensForActiveMode();
+        renderGameHistory(mode);
+        renderChartTrend(mode);
+        renderMyHistory(mode);
     }
 }
 
@@ -298,6 +322,7 @@ function processMasterTick() {
             const seconds = totalSeconds % 60;
             updateTimeDisplay(minutes, seconds);
 
+            const period_number = document.querySelector('.TimeLeft__C-id');
             if (period_number && period_number.textContent !== state.currentIssueNumber) {
                 period_number.textContent = state.currentIssueNumber;
             }
@@ -323,6 +348,7 @@ export async function switchGameMode(newGameType) {
 
     const state = getActiveModeState();
     const bettingMark = document.querySelector(".Betting__C-mark");
+    const period_number = document.querySelector('.TimeLeft__C-id');
 
     if (period_number) {
         period_number.textContent = state.currentIssueNumber;
@@ -392,8 +418,9 @@ export async function initGameRecord() {
     const initialMode = getActiveModeKey();
     const state = getActiveModeState();
 
-    if (period_number) {
-        period_number.textContent = state.currentIssueNumber;
+    const periodEl = document.querySelector('.TimeLeft__C-id');
+    if (periodEl) {
+        periodEl.textContent = state.currentIssueNumber;
     }
     const timeLeftName = document.querySelector('.TimeLeft__C .TimeLeft__C-name');
     if (timeLeftName) {
@@ -433,8 +460,9 @@ export async function initGameRecord() {
                 if (periodData.isLocked !== undefined) state.isLockoutActive = periodData.isLocked;
                 if (periodData.currentEndTimeMs) state.currentEndTimeMs = periodData.currentEndTimeMs;
                 
-                if (mode === getActiveModeKey() && period_number && state.currentIssueNumber) {
-                    period_number.textContent = state.currentIssueNumber;
+                if (mode === getActiveModeKey() && state.currentIssueNumber) {
+                    const pNumEl = document.querySelector('.TimeLeft__C-id');
+                    if (pNumEl) pNumEl.textContent = state.currentIssueNumber;
                 }
             });
 

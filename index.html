@@ -34,8 +34,19 @@
         })();
     </script>
     <script>
-        document.addEventListener("gesturestart", function(e) { e.preventDefault(); });
-        document.addEventListener("dblclick", function(e) { e.preventDefault(); }, { passive: false });
+        // Immediate early fallback for game view switching
+        window.openGameWithLoader = function(targetView) {
+            if (window.switchAppView) {
+                window.switchAppView(targetView || 'game');
+            } else {
+                const homeView = document.getElementById('home-dashboard-view');
+                const wingoView = document.getElementById('wingo-game-view');
+                const bottomNav = document.querySelector('.app-bottom-nav');
+                if (homeView) homeView.style.display = 'none';
+                if (wingoView) wingoView.style.display = 'block';
+                if (bottomNav) bottomNav.classList.add('nav-hidden');
+            }
+        };
     </script>
     <script src="js/loader.js"></script>
     <script src="js/services/authGate.js"></script>
@@ -913,7 +924,7 @@
     </div>
 
     <!-- VIP GAME SYNCING & LAUNCH LOADER OVERLAY -->
-    <div id="game-sync-overlay" class="game-sync-overlay">
+    <div id="game-sync-overlay" class="game-sync-overlay" style="display: none;">
         <div class="game-sync-card">
             <div class="game-sync-avatar-wrap">
                 <img src="https://plain-apac-prod-public.komododecks.com/202608/31/mG2VbthxURYBWjfn0UDF/image.png" class="game-sync-avatar" alt="Colour Prediction" />

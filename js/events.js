@@ -1,11 +1,5 @@
 // events.js - Primary Event Handler & Betting Interaction Orchestrator
 
-import {
-    overlay, dialogDiv, bettingPopup, totalAmountDiv, isAgree,
-    howtoBtn, ruleDialog, ruleCloseBtn, vanOverlay, betTextToast,
-    InsufficientBalance, selectedNum,
-    bettingOn_red, bettingOn_violet, bettingOn_green
-} from './elements.js';
 import { placeBet, initSubtabs, renderMyHistory } from './gameEngine.js';
 import { getCurrentGameType, getCurrentIssueNumber, switchGameMode, isBettingLocked, getRemainingSeconds } from './gameRecord.js';
 import { initWinDialogEvents } from './updateWin.js';
@@ -70,6 +64,7 @@ export function initGameListEvents() {
 
 // Update the visual theme, title, and badge inside the betting popup
 function updateBettingPopupTheme(type, selection, selectionLabel) {
+    const bettingPopup = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
     if (!bettingPopup) return;
 
     const popupHead = bettingPopup.querySelector('.Betting__Popup-head');
@@ -163,6 +158,7 @@ export function updateBetState({ balance, quantity }) {
 
     // Update Total Amount Text
     const total = currentBal * currentQty;
+    const totalAmountDiv = document.querySelector(".Betting__Popup-foot-s");
     if (totalAmountDiv) {
         totalAmountDiv.textContent = `Total amount ₹${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
@@ -204,9 +200,13 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
     currentBetContext.baseBalance = currentBetContext.baseBalance || 1;
     currentBetContext.multiplier = preSelectedMultiplier || 1;
 
+    const bettingPopup = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
+    const overlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
+
     if (bettingPopup) {
         bettingPopup.className = bettingPopup.className.replace(/Betting__Popup-\d+/, '');
         bettingPopup.classList.add(`Betting__Popup-${classSuffix}`);
+        bettingPopup.style.display = 'block';
     }
 
     updateBettingPopupTheme(type, selection, selectionLabel);
@@ -214,7 +214,6 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
 
     playBetPopupOpenSound();
     if (overlay) overlay.style.display = 'block';
-    if (dialogDiv) dialogDiv.style.display = 'block';
     document.body.classList.add('van-overflow-hidden');
 }
 
@@ -223,6 +222,10 @@ export function handleBettingOverlay() {
     const numCItems = document.querySelectorAll('.Betting__C-numC > div, .Betting__C-numC-item');
     const bigButton = document.querySelector('.Betting__C-foot-b');
     const smallButton = document.querySelector('.Betting__C-foot-s');
+    const greenBtn = document.querySelector('.Betting__C-head-g');
+    const redBtn = document.querySelector('.Betting__C-head-r');
+    const violetBtn = document.querySelector('.Betting__C-head-p');
+    const overlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
 
     // Big Button (13)
     bigButton?.addEventListener('click', () => {
@@ -259,7 +262,7 @@ export function handleBettingOverlay() {
     });
 
     // Color Buttons
-    bettingOn_green?.addEventListener('click', () => {
+    greenBtn?.addEventListener('click', () => {
         openBettingForSelection({
             type: 'color',
             selection: 'green',
@@ -268,7 +271,7 @@ export function handleBettingOverlay() {
         });
     });
 
-    bettingOn_red?.addEventListener('click', () => {
+    redBtn?.addEventListener('click', () => {
         openBettingForSelection({
             type: 'color',
             selection: 'red',
@@ -277,7 +280,7 @@ export function handleBettingOverlay() {
         });
     });
 
-    bettingOn_violet?.addEventListener('click', () => {
+    violetBtn?.addEventListener('click', () => {
         openBettingForSelection({
             type: 'color',
             selection: 'violet',
@@ -299,6 +302,8 @@ export function handleBettingOverlay() {
 
 export function closeBettingPopup() {
     playModalCloseSound();
+    const overlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
+    const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
     if (overlay) overlay.style.display = 'none';
     if (dialogDiv) dialogDiv.style.display = 'none';
     document.body.classList.remove('van-overflow-hidden');
@@ -392,6 +397,7 @@ export function handleBettingOverlay_clicks() {
     });
 
     // Submit Bet Button
+    const totalAmountDiv = document.querySelector(".Betting__Popup-foot-s");
     totalAmountDiv?.addEventListener("click", async function () {
         if (isBettingLocked()) {
             showToast('Betting is locked for the draw', 'error');
@@ -423,6 +429,7 @@ export function handleBettingOverlay_clicks() {
 
         if (!result.success) {
             const errorMsg = result.message || 'Failed to place bet. Please try again.';
+            const InsufficientBalance = document.querySelector(".van-toast--fail");
             if (InsufficientBalance) {
                 const toastText = InsufficientBalance.querySelector('.van-toast__text');
                 if (toastText) toastText.textContent = errorMsg;
@@ -440,6 +447,7 @@ export function handleBettingOverlay_clicks() {
 
         // Success toast & audio
         playBetPlacedSound();
+        const betTextToast = document.querySelector(".van-toast--text");
         if (betTextToast) {
             betTextToast.style.display = "";
             setTimeout(() => {
@@ -452,12 +460,14 @@ export function handleBettingOverlay_clicks() {
         renderMyHistory();
         closeBettingPopup();
     });
-
-    updateTotalAmount();
 }
 
 // "How to play" Rule Dialog
 export function initRuleModal() {
+    const ruleDialog = document.querySelector("div[role='dialog'][data-v-0bba67ea]");
+    const vanOverlay = document.querySelector(".van-overlay[data-v-7f36fe93]");
+    const ruleCloseBtn = document.querySelector(".TimeLeft__C-PreSale-foot-btn");
+
     // Force hidden on initial load
     if (ruleDialog) ruleDialog.style.display = 'none';
 
@@ -467,8 +477,10 @@ export function initRuleModal() {
         btn.addEventListener("click", (e) => {
             e.stopPropagation();
             playClickSound();
-            if (ruleDialog) ruleDialog.style.display = 'flex';
-            if (vanOverlay) vanOverlay.style.display = 'block';
+            const rDialog = document.querySelector("div[role='dialog'][data-v-0bba67ea]");
+            const vOverlay = document.querySelector(".van-overlay[data-v-7f36fe93]");
+            if (rDialog) rDialog.style.display = 'flex';
+            if (vOverlay) vOverlay.style.display = 'block';
             document.body.classList.add('van-overflow-hidden');
         });
     });
@@ -476,12 +488,15 @@ export function initRuleModal() {
     const closeRule = (e) => {
         if (e) e.stopPropagation();
         playClickSound();
-        if (ruleDialog) ruleDialog.style.display = 'none';
+        const rDialog = document.querySelector("div[role='dialog'][data-v-0bba67ea]");
+        const vOverlay = document.querySelector(".van-overlay[data-v-7f36fe93]");
+        const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
+        if (rDialog) rDialog.style.display = 'none';
         
         // Only hide overlay if betting popup is not currently open
         const isBettingOpen = dialogDiv && dialogDiv.style.display !== 'none';
         if (!isBettingOpen) {
-            if (vanOverlay) vanOverlay.style.display = 'none';
+            if (vOverlay) vOverlay.style.display = 'none';
             document.body.classList.remove('van-overflow-hidden');
         }
     };
@@ -591,3 +606,4 @@ export function initAllEvents() {
     initWinDialogEvents();
     initSubtabs();
 }
+

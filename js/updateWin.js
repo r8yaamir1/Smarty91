@@ -1,23 +1,29 @@
 // updateWin.js - Win / Loss Result Dialog Manager
 
-import { winDialog, winBonus, winDetail, winningNum, winSmallBig, winColor, colorType, closeBtn, sec3Btn } from "./elements.js";
 import { formatCurrency } from "./wallet.js";
 
 let autoCloseTimer = null;
 let isAutoCloseEnabled = true;
 
 export function showEvaluationDialog(summary) {
+    const winDialog = document.querySelector(".WinningTip__C");
     if (!summary || !winDialog) return;
 
     const { isWin, totalWon, totalBet, result, lastBet, mode } = summary;
 
-    // Reset styles
+    // Display overlay
     winDialog.style.display = 'flex';
     document.body.classList.add('van-overflow-hidden');
 
     const bodyEl = winDialog.querySelector('.WinningTip__C-body');
     const titleEl = winDialog.querySelector('.WinningTip__C-body-l1');
     const headLabel = winDialog.querySelector('.WinningTip__C-body-l3 .head');
+    const winDetail = winDialog.querySelector(".gameDetail, .WinningTip__C-body-l3 .gameDetail");
+    const winningNum = winDialog.querySelector(".tip-num-val, .WinningNum");
+    const winSmallBig = winDialog.querySelector(".tip-size-val");
+    const winColor = winDialog.querySelector(".tip-color-val");
+    const winBonus = winDialog.querySelector(".bonus, .WinningTip__C-body-l3 .bonus");
+    const colorType = winDialog.querySelector(".WinningTip__C-body-l2");
 
     if (bodyEl) {
         bodyEl.classList.toggle('isL', !isWin);
@@ -30,7 +36,7 @@ export function showEvaluationDialog(summary) {
         headLabel.textContent = isWin ? 'Bonus' : 'Lose';
     }
 
-    const modeName = mode ? (mode.toUpperCase().includes('MIN') ? mode : `${mode.toUpperCase()}`) : (lastBet?.gameType || 'Smarty91');
+    const modeName = mode ? (mode.toUpperCase().includes('MIN') || mode.toUpperCase().includes('SEC') || mode.toUpperCase().includes('30S') ? mode : `${mode.toUpperCase()}`) : (lastBet?.gameType || 'Smarty91');
     if (winDetail) {
         winDetail.textContent = `Period: ${modeName} ${result.periodId}`;
     }
@@ -41,7 +47,7 @@ export function showEvaluationDialog(summary) {
         winningNum.textContent = result.number;
     }
     if (winColor) {
-        winColor.textContent = result.colorName;
+        winColor.textContent = result.colorName || (result.color ? result.color.toUpperCase() : 'Green');
     }
     if (winBonus) {
         if (isWin) {
@@ -71,6 +77,7 @@ export function showEvaluationDialog(summary) {
 }
 
 export function closeWinDialog() {
+    const winDialog = document.querySelector(".WinningTip__C");
     if (winDialog) {
         winDialog.style.display = 'none';
         document.body.classList.remove('van-overflow-hidden');
@@ -82,19 +89,27 @@ export function closeWinDialog() {
 }
 
 export function initWinDialogEvents() {
-    if (closeBtn) {
-        closeBtn.onclick = (e) => {
+    const winDialog = document.querySelector(".WinningTip__C");
+    const closeBtns = document.querySelectorAll(".WinningTip__C-icon, .closeBtn, .WinningTip__C .closeBtn");
+    const autoCloseBtn = document.querySelector(".acitveBtn, .WinningTip__C-body-l4 .acitveBtn, .WinningTip__C-body-l4");
+
+    closeBtns.forEach(btn => {
+        btn.onclick = (e) => {
             e.stopPropagation();
             closeWinDialog();
         };
-    }
+    });
 
-    if (sec3Btn) {
-        sec3Btn.classList.add('active'); // active by default
-        sec3Btn.onclick = (e) => {
+    if (autoCloseBtn) {
+        const toggleIcon = autoCloseBtn.classList.contains('acitveBtn') ? autoCloseBtn : autoCloseBtn.querySelector('.acitveBtn');
+        if (toggleIcon) toggleIcon.classList.add('active'); // active by default
+        
+        autoCloseBtn.onclick = (e) => {
             e.stopPropagation();
-            sec3Btn.classList.toggle('active');
-            isAutoCloseEnabled = sec3Btn.classList.contains('active');
+            if (toggleIcon) {
+                toggleIcon.classList.toggle('active');
+                isAutoCloseEnabled = toggleIcon.classList.contains('active');
+            }
         };
     }
 
@@ -105,3 +120,5 @@ export function initWinDialogEvents() {
         };
     }
 }
+
+

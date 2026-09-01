@@ -57,12 +57,14 @@ function parseRecordTime(val) {
 
 function sortHistoryItems(items) {
     return [...items].sort((a, b) => {
-        const tA = parseRecordTime(a.timestamp || a.settledAt);
-        const tB = parseRecordTime(b.timestamp || b.settledAt);
-        if (tA !== tB && tA > 0 && tB > 0) return tB - tA;
         const pA = String(a.period || a.periodId || '');
         const pB = String(b.period || b.periodId || '');
-        return pB.localeCompare(pA);
+        if (pA && pB && pA !== pB) {
+            return pB.localeCompare(pA, undefined, { numeric: true });
+        }
+        const tA = parseRecordTime(a.timestamp || a.settledAt);
+        const tB = parseRecordTime(b.timestamp || b.settledAt);
+        return tB - tA;
     });
 }
 

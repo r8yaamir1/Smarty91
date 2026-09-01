@@ -356,7 +356,7 @@ class Smarty91ServerEngine {
             phone: cleanPhone,
             passwordHash: this._hashPassword(password),
             securityPin: cleanPin,
-            balance: 0.00, // Starts with exact 0 balance
+            balance: 100.00, // Starts with ₹100 VIP Welcome Bonus
             requiredTurnover: 0.00,
             inviteCode: userInviteCode,
             referredBy: referrerId,
@@ -367,6 +367,20 @@ class Smarty91ServerEngine {
 
         this.users.set(userId, newUser);
         this.referralCodes.set(userInviteCode, userId);
+
+        // Record Welcome Gift Ledger Entry
+        const welcomeLedger = {
+            id: 'LEDGER_WELCOME_' + Date.now(),
+            userId,
+            type: 'WELCOME_BONUS',
+            amount: 100.00,
+            balanceBefore: 0.00,
+            balanceAfter: 100.00,
+            referenceId: 'WELCOME_GIFT',
+            timestamp: new Date().toISOString(),
+            description: 'VIP New User Welcome Bonus ₹100.00'
+        };
+        this.ledger.unshift(welcomeLedger);
 
         // Permanently persist to local disk and Firestore Cloud
         this._saveUsersToDisk();
@@ -655,7 +669,10 @@ class Smarty91ServerEngine {
 
         const interval = MODE_INTERVALS[mode] || 30000;
         const now = Date.now();
+        const currentActivePeriod = this._calculatePeriodId(now, interval, mode);
         const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '')));
+        // Also ensure current active round is not treated as a past settled round
+        existingPeriods.add(String(currentActivePeriod));
 
         const newRounds = [];
         for (let i = 1; i <= 60; i++) {
@@ -663,7 +680,7 @@ class Smarty91ServerEngine {
             const pastTime = now - (i * interval);
             const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
 
-            if (!existingPeriods.has(String(pastPeriodId))) {
+            if (pastPeriodId !== currentActivePeriod && !existingPeriods.has(String(pastPeriodId))) {
                 existingPeriods.add(String(pastPeriodId));
                 const num = this._calculateDeterministicOutcome(mode, pastPeriodId);
                 const props = NUMBER_PROPERTIES[num];
@@ -840,26 +857,37 @@ class Smarty91ServerEngine {
         eligibleMatrix.sort((a, b) => b.netProfit - a.netProfit);
 
         let houseWinRate = Number(riskConfig.houseWinRatePercent);
-        if (isNaN(houseWinRate)) houseWinRate = 80;
+        if (isNaN(houseWinRate)) houseWinRate = 50;
 
-        if (riskConfig.strategyMode === 'SAFE_HOUSE') houseWinRate = 95;
-        else if (riskConfig.strategyMode === 'BALANCED') houseWinRate = 80;
-        else if (riskConfig.strategyMode === 'HOOKING') houseWinRate = 40;
+        if (riskConfig.strategyMode === 'SAFE_HOUSE') houseWinRate = 90;
+        else if (riskConfig.strategyMode === 'BALANCED') houseWinRate = 50;
+        else if (riskConfig.strategyMode === 'HOOKING') houseWinRate = 35;
         else if (riskConfig.strategyMode === 'FAIR') houseWinRate = 50;
+
+        if (riskConfig.strategyMode === 'FAIR' || !riskConfig.enabled) {
+            // Natural cryptographically random weighted outcome
+            const num = this.generateWeightedNumber(mode);
+            return { number: num, isOverridden: false, reason: 'SMART_RISK_FAIR_RNG' };
+        }
 
         const roll = Math.floor(Math.random() * 100) + 1; // 1..100
 
         let chosenNumber;
         if (roll <= houseWinRate) {
-            // High House Profit: Pick from top profit outcomes
+            // House Favored: Pick from top net profit outcomes
             const topProfits = eligibleMatrix.filter(m => m.netProfit >= eligibleMatrix[0].netProfit - 10);
             const selected = topProfits[crypto.randomInt(0, topProfits.length)];
             chosenNumber = selected.number;
         } else {
-            // Player Win / Natural Variance
-            const otherOptions = eligibleMatrix.length > 2 ? eligibleMatrix.slice(1) : eligibleMatrix;
-            const selected = otherOptions[crypto.randomInt(0, otherOptions.length)];
-            chosenNumber = selected.number;
+            // Player Win Branch: Specifically choose from outcomes where players win (payout > 0)
+            const playerWinOptions = eligibleMatrix.filter(m => m.payout > 0);
+            if (playerWinOptions.length > 0) {
+                const selected = playerWinOptions[crypto.randomInt(0, playerWinOptions.length)];
+                chosenNumber = selected.number;
+            } else {
+                // If no player winning candidates exist (e.g. conflicting multi-bets), pick natural random
+                chosenNumber = crypto.randomInt(0, 10);
+            }
         }
 
         return { number: chosenNumber, isOverridden: false, reason: `SMART_RISK_${riskConfig.strategyMode}_${houseWinRate}PCT` };
