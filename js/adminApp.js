@@ -38,7 +38,48 @@ document.addEventListener('DOMContentLoaded', () => {
     initModeChips();
     initDeveloperPortal();
     initSoundToggle();
+    initHelpModalListeners();
 });
+
+function initHelpModalListeners() {
+    const modal = document.getElementById('help-explanation-modal');
+    const closeBtn = document.getElementById('help-modal-close');
+    const okBtn = document.getElementById('help-modal-ok-btn');
+
+    if (!modal) return;
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+    };
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal();
+        });
+    }
+
+    if (okBtn) {
+        okBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal();
+        });
+    }
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+}
 
 function getAudioContext() {
     try {

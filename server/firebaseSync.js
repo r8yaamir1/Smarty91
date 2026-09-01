@@ -178,12 +178,14 @@ class FirebaseSyncManager {
                 if (data.usdtBep20QrImage !== undefined) this.engine.config.usdtBep20QrImage = data.usdtBep20QrImage;
                 if (data.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = data.usdtBep20Url;
                 if (data.usdtRate !== undefined) this.engine.config.usdtRate = data.usdtRate;
+                if (data.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...data.riskEngine };
             } else {
                 await setDoc(configRef, {
                     multipliers: this.engine.config.multipliers,
                     serviceFeePercent: this.engine.config.serviceFeePercent,
                     minBetAmount: this.engine.config.minBetAmount,
                     maxBetAmount: this.engine.config.maxBetAmount,
+                    riskEngine: this.engine.config.riskEngine,
                     upiId: this.engine.config.upiId || '6289140468@axl',
                     upiName: this.engine.config.upiName || 'Smarty91',
                     upiQrImage: this.engine.config.upiQrImage || '',
@@ -212,6 +214,7 @@ class FirebaseSyncManager {
                     if (d.usdtBep20QrImage !== undefined) this.engine.config.usdtBep20QrImage = d.usdtBep20QrImage;
                     if (d.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = d.usdtBep20Url;
                     if (d.usdtRate !== undefined) this.engine.config.usdtRate = d.usdtRate;
+                    if (d.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...d.riskEngine };
                 }
             });
         } catch (e) {
@@ -764,6 +767,7 @@ class FirebaseSyncManager {
                 serviceFeePercent: config.serviceFeePercent,
                 minBetAmount: config.minBetAmount,
                 maxBetAmount: config.maxBetAmount,
+                riskEngine: config.riskEngine,
                 probabilities: config.probabilities,
                 modes: config.modes,
                 upiId: config.upiId || '6289140468@axl',

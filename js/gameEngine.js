@@ -818,19 +818,34 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
     const state = gameModes[mode];
     if (!state || !Array.isArray(serverHistoryItems)) return;
 
+    const parseTime = (val) => {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        const t = new Date(val).getTime();
+        return isNaN(t) ? 0 : t;
+    };
+
     const formatted = serverHistoryItems.map(item => {
         const num = Number(item.number !== undefined ? item.number : 0);
         const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+        const rawTime = item.timestamp || item.settledAt;
         return {
             mode,
-            periodId: item.period || item.periodId,
+            periodId: String(item.period || item.periodId || ''),
             number: num,
             isBig: item.size === 'big' || prop.isBig,
             primaryColor: prop.primaryColor,
             secondaryColor: prop.secondaryColor,
             colorName: item.colorLabel || prop.colorName,
-            timestamp: item.timestamp || (item.settledAt ? new Date(item.settledAt).getTime() : Date.now())
+            timestamp: parseTime(rawTime) || Date.now()
         };
+    });
+
+    formatted.sort((a, b) => {
+        const tA = a.timestamp;
+        const tB = b.timestamp;
+        if (tA !== tB && tA > 0 && tB > 0) return tB - tA;
+        return String(b.periodId).localeCompare(String(a.periodId));
     });
 
     if (formatted.length > 0) {

@@ -48,19 +48,32 @@ export function subscribeToGamePeriod(mode, callback) {
     });
 }
 
+function parseRecordTime(val) {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    const t = new Date(val).getTime();
+    return isNaN(t) ? 0 : t;
+}
+
+function sortHistoryItems(items) {
+    return [...items].sort((a, b) => {
+        const tA = parseRecordTime(a.timestamp || a.settledAt);
+        const tB = parseRecordTime(b.timestamp || b.settledAt);
+        if (tA !== tB && tA > 0 && tB > 0) return tB - tA;
+        const pA = String(a.period || a.periodId || '');
+        const pB = String(b.period || b.periodId || '');
+        return pB.localeCompare(pA);
+    });
+}
+
 export function subscribeToGameHistory(mode, callback) {
     const summaryDoc = doc(db, 'game_history_summary', mode);
     return onSnapshot(summaryDoc, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.data();
             if (data && Array.isArray(data.rounds)) {
-                // Return pre-compiled history sorted by timestamp/settledAt descending
-                const sorted = [...data.rounds].sort((a, b) => {
-                    const tA = Number(a.timestamp || a.settledAt || 0);
-                    const tB = Number(b.timestamp || b.settledAt || 0);
-                    return tB - tA;
-                });
-                callback(sorted);
+                // Return pre-compiled history sorted by period/timestamp descending
+                callback(sortHistoryItems(data.rounds));
                 return;
             }
         }
@@ -72,13 +85,8 @@ export function subscribeToGameHistory(mode, callback) {
             onSnapshot(q, (snap) => {
                 const history = [];
                 snap.forEach(d => history.push(d.data()));
-                history.sort((a, b) => {
-                    const tA = Number(a.timestamp || a.settledAt || 0);
-                    const tB = Number(b.timestamp || b.settledAt || 0);
-                    return tB - tA;
-                });
                 if (history.length > 0) {
-                    callback(history.slice(0, 50));
+                    callback(sortHistoryItems(history).slice(0, 50));
                 }
             }, (err) => {
                 console.warn(`Firestore history fallback sync warning [${mode}]:`, err);

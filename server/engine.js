@@ -1278,6 +1278,7 @@ class Smarty91ServerEngine {
             timestamp: new Date().toISOString()
         });
         firebaseSync.logAdminAction('RISK_ENGINE_CONFIG_UPDATED', logMsg);
+        firebaseSync.saveSystemConfig(this.config);
 
         return {
             success: true,
@@ -1316,6 +1317,7 @@ class Smarty91ServerEngine {
             timestamp: new Date().toISOString()
         });
         firebaseSync.logAdminAction('TARGETED_USER_OVERRIDE_SET', logMsg);
+        firebaseSync.saveSystemConfig(this.config);
 
         return {
             success: true,
