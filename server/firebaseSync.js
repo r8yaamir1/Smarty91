@@ -219,6 +219,7 @@ class FirebaseSyncManager {
                 if (data.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = data.usdtBep20Url;
                 if (data.usdtRate !== undefined) this.engine.config.usdtRate = data.usdtRate;
                 if (data.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...data.riskEngine };
+                if (data.referralStars) this.engine.config.referralStars = data.referralStars;
             } else {
                 await setDoc(configRef, {
                     multipliers: this.engine.config.multipliers,
@@ -255,6 +256,7 @@ class FirebaseSyncManager {
                     if (d.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = d.usdtBep20Url;
                     if (d.usdtRate !== undefined) this.engine.config.usdtRate = d.usdtRate;
                     if (d.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...d.riskEngine };
+                    if (d.referralStars) this.engine.config.referralStars = d.referralStars;
                 }
             });
         } catch (e) {
@@ -824,6 +826,7 @@ class FirebaseSyncManager {
                 usdtBep20QrImage: config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
                 usdtBep20Url: config.usdtBep20Url || '',
                 usdtRate: config.usdtRate || 102,
+                referralStars: config.referralStars || null,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {

@@ -2688,7 +2688,7 @@ class Smarty91ServerEngine {
             }
         };
 
-        firebaseSync.syncConfigToFirestore();
+        firebaseSync.saveSystemConfig(this.config);
 
         return {
             success: true,

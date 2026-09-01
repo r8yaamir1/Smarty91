@@ -39,7 +39,55 @@ document.addEventListener('DOMContentLoaded', () => {
     initDeveloperPortal();
     initSoundToggle();
     initHelpModalListeners();
+    initSidebarToggle();
 });
+
+function initSidebarToggle() {
+    const toggleBtn = document.getElementById('sidebar-toggle-btn');
+    const layoutWrapper = document.getElementById('admin-layout-wrapper');
+    const adminNav = document.getElementById('admin-nav');
+    const overlay = document.getElementById('drawer-overlay');
+
+    if (!toggleBtn || !layoutWrapper || !adminNav) return;
+
+    // Load persisted state for desktop sidebar
+    const isCollapsed = localStorage.getItem('smarty91_admin_sidebar_collapsed') === 'true';
+    if (isCollapsed && window.innerWidth > 768) {
+        layoutWrapper.classList.add('sidebar-collapsed');
+    }
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.innerWidth <= 768) {
+            // Mobile: slide drawer open/close
+            adminNav.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('active');
+        } else {
+            // Desktop: collapse sidebar
+            layoutWrapper.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('smarty91_admin_sidebar_collapsed', layoutWrapper.classList.contains('sidebar-collapsed'));
+        }
+    });
+
+    // Close mobile drawer when clicking overlay
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            adminNav.classList.remove('open');
+            overlay.classList.remove('active');
+        });
+    }
+
+    // Close mobile drawer when clicking any nav item
+    const navItems = adminNav.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                adminNav.classList.remove('open');
+                if (overlay) overlay.classList.remove('active');
+            }
+        });
+    });
+}
 
 function initHelpModalListeners() {
     const modal = document.getElementById('help-explanation-modal');
@@ -1222,6 +1270,18 @@ function renderCashierView(container) {
                     </a>
                 </div>
                 <div id="telegram-test-feedback" style="display: none; font-size: 11px; margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-weight: 700;"></div>
+
+                <!-- Single-Click Setup Banner for Webhook Registration -->
+                <div style="margin-top: 10px; padding: 10px; background: rgba(56, 189, 248, 0.08); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <div style="font-size: 11px; color: #cbd5e1; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                        <span>⚡</span>
+                        <span>Bot Webhook (For Approve/Cancel Buttons):</span>
+                    </div>
+                    <button type="button" id="btn-telegram-webhook" style="font-size: 11px; padding: 6px 12px; background: #0ea5e9; color: #fff; font-weight: 800; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                        <span>Register Webhook 🔗</span>
+                    </button>
+                </div>
+                <div id="telegram-webhook-feedback" style="display: none; font-size: 11px; margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-weight: 700;"></div>
             </div>
 
             <!-- Search and Filter Bar -->
@@ -1431,6 +1491,39 @@ function renderCashierView(container) {
             } finally {
                 tgBtn.disabled = false;
                 tgBtn.textContent = '📲 SEND TELEGRAM TEST MSG';
+            }
+        });
+    }
+
+    // Telegram Bot Webhook Registration Button
+    const tgWebhookBtn = container.querySelector('#btn-telegram-webhook');
+    const tgWebhookFeedback = container.querySelector('#telegram-webhook-feedback');
+    if (tgWebhookBtn) {
+        tgWebhookBtn.addEventListener('click', async () => {
+            tgWebhookBtn.disabled = true;
+            tgWebhookBtn.innerHTML = 'Registering Webhook... ⏳';
+            if (tgWebhookFeedback) tgWebhookFeedback.style.display = 'none';
+
+            try {
+                const res = await adminService.registerTelegramWebhook();
+                if (tgWebhookFeedback) {
+                    tgWebhookFeedback.style.display = 'block';
+                    tgWebhookFeedback.style.background = 'rgba(16, 185, 129, 0.15)';
+                    tgWebhookFeedback.style.color = '#10b981';
+                    tgWebhookFeedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                    tgWebhookFeedback.innerHTML = '✅ <strong>Webhook Registered Successfully!</strong> Live Telegram callbacks configured. Bot buttons will now trigger instantly! 🟢';
+                }
+            } catch (err) {
+                if (tgWebhookFeedback) {
+                    tgWebhookFeedback.style.display = 'block';
+                    tgWebhookFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+                    tgWebhookFeedback.style.color = '#ef4444';
+                    tgWebhookFeedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    tgWebhookFeedback.textContent = `❌ Failed: ${err.message || 'Make sure Bot Token is filled in settings and saved first!'}`;
+                }
+            } finally {
+                tgWebhookBtn.disabled = false;
+                tgWebhookBtn.innerHTML = 'Register Webhook 🔗';
             }
         });
     }

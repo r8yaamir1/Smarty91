@@ -934,13 +934,37 @@ apiRouter.post('/admin/telegram/test', checkAdminAuth, async (req, res) => {
 ━━━━━━━━━━━━━━━━━━━━
 👉 <a href="${TELEGRAM_CONFIG.adminUrl}">Open Admin Cashier</a>`;
 
+        // Attempt webhook registration during test to auto-fix missing setup
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const host = req.get('host');
+        const webhookUrl = `${protocol}://${host}/api/telegram/webhook`;
+        
+        let webhookResult = '';
+        if (TELEGRAM_CONFIG.botToken) {
+            try {
+                const registerUrl = `https://api.telegram.org/bot${TELEGRAM_CONFIG.botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
+                const regRes = await fetch(registerUrl);
+                const regData = await regRes.json();
+                if (regData.ok) {
+                    webhookResult = ' (Auto-registered Telegram Webhook!)';
+                    console.log(`[Telegram Webhook] Webhook auto-set to ${webhookUrl}`);
+                } else {
+                    webhookResult = ` (Webhook registration warning: ${regData.description})`;
+                    console.warn(`[Telegram Webhook] Failed auto-set:`, regData.description);
+                }
+            } catch (webhookErr) {
+                webhookResult = ` (Webhook error: ${webhookErr.message})`;
+                console.warn(`[Telegram Webhook] Error during setWebhook:`, webhookErr.message);
+            }
+        }
+
         const result = await sendTelegramMessage(testMsg);
         if (result && result.ok) {
-            return res.json({ success: true, message: 'Test message sent successfully to your Telegram!' });
+            return res.json({ success: true, message: `Test message sent successfully to your Telegram!${webhookResult}` });
         } else {
             return res.status(400).json({
                 success: false,
-                message: result?.description || 'Could not send message. Please make sure you have started the bot by clicking Start on @smarty91_alert_bot in Telegram.'
+                message: (result?.description || 'Could not send message. Please make sure you have started the bot by clicking Start on @smarty91_alert_bot in Telegram.') + webhookResult
             });
         }
     } catch (err) {
@@ -949,19 +973,76 @@ apiRouter.post('/admin/telegram/test', checkAdminAuth, async (req, res) => {
 });
 
 // POST /api/admin/telegram/config -> Update Bot Token or Chat ID
-apiRouter.post('/admin/telegram/config', checkAdminAuth, (req, res) => {
+apiRouter.post('/admin/telegram/config', checkAdminAuth, async (req, res) => {
     try {
         const { botToken, chatId } = req.body;
         if (botToken) TELEGRAM_CONFIG.botToken = botToken.trim();
         if (chatId) TELEGRAM_CONFIG.chatId = chatId.trim();
+        
+        // Auto register/set webhook on Telegram so inline buttons work!
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const host = req.get('host');
+        const webhookUrl = `${protocol}://${host}/api/telegram/webhook`;
+        
+        let webhookStatus = '';
+        if (TELEGRAM_CONFIG.botToken) {
+            try {
+                const registerUrl = `https://api.telegram.org/bot${TELEGRAM_CONFIG.botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
+                const regRes = await fetch(registerUrl);
+                const regData = await regRes.json();
+                if (regData.ok) {
+                    webhookStatus = ' and Inline Button Webhook registered successfully!';
+                    console.log(`[Telegram Webhook] Webhook set to ${webhookUrl}`);
+                } else {
+                    webhookStatus = ` but Inline Webhook registration failed: ${regData.description}`;
+                    console.warn(`[Telegram Webhook] Failed to set webhook:`, regData.description);
+                }
+            } catch (webhookErr) {
+                webhookStatus = ` but Inline Webhook setup errored: ${webhookErr.message}`;
+                console.warn(`[Telegram Webhook] Error during setWebhook:`, webhookErr.message);
+            }
+        }
+
         res.json({
             success: true,
-            message: 'Telegram settings updated',
+            message: `Telegram settings updated${webhookStatus}`,
             chatId: TELEGRAM_CONFIG.chatId,
             botTokenMasked: TELEGRAM_CONFIG.botToken ? `${TELEGRAM_CONFIG.botToken.slice(0, 8)}...` : ''
         });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/telegram/register-webhook -> Explicit Webhook Registration
+apiRouter.post('/admin/telegram/register-webhook', checkAdminAuth, async (req, res) => {
+    try {
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const host = req.get('host');
+        const webhookUrl = `${protocol}://${host}/api/telegram/webhook`;
+        
+        if (!TELEGRAM_CONFIG.botToken) {
+            return res.status(400).json({ success: false, message: 'Bot Token is not configured! Please configure Telegram Bot first.' });
+        }
+        
+        const registerUrl = `https://api.telegram.org/bot${TELEGRAM_CONFIG.botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
+        const regRes = await fetch(registerUrl);
+        const regData = await regRes.json();
+        
+        if (regData.ok) {
+            return res.json({ 
+                success: true, 
+                message: 'Telegram Webhook registered successfully! Live integration active.', 
+                url: webhookUrl 
+            });
+        } else {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Telegram rejected webhook: ${regData.description}` 
+            });
+        }
+    } catch (err) {
+        return res.status(500).json({ success: false, message: `Webhook registration error: ${err.message}` });
     }
 });
 

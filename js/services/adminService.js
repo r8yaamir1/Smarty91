@@ -55,6 +55,10 @@ class AdminService {
         return await apiClient.post('/admin/telegram/test', {});
     }
 
+    async registerTelegramWebhook() {
+        return await apiClient.post('/admin/telegram/register-webhook', {});
+    }
+
     async updateTelegramConfig(botToken, chatId) {
         return await apiClient.post('/admin/telegram/config', { botToken, chatId });
     }
