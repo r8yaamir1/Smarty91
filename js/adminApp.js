@@ -2370,13 +2370,13 @@ function handleAuditLogTap() {
 
 // Global subtab switcher for Developer Portal
 window.switchDevPortalTab = function(tabId) {
-    const tabs = ['usdt', 'bep20', 'upi', 'preview'];
+    const tabs = ['usdt', 'bep20', 'upi', 'preview', 'users'];
     tabs.forEach(t => {
         const btn = document.getElementById(`dev-tab-${t}`);
         const panel = document.getElementById(`dev-panel-${t}`);
         if (btn) {
             if (t === tabId) {
-                btn.style.background = t === 'usdt' ? '#10b981' : t === 'bep20' ? '#f59e0b' : t === 'upi' ? '#38bdf8' : '#8b5cf6';
+                btn.style.background = t === 'usdt' ? '#10b981' : t === 'bep20' ? '#f59e0b' : t === 'upi' ? '#38bdf8' : t === 'users' ? '#8b5cf6' : '#8b5cf6';
                 btn.style.color = '#fff';
             } else {
                 btn.style.background = 'transparent';
@@ -2428,6 +2428,215 @@ function initDeveloperPortal() {
     const authError = document.getElementById('dev-portal-auth-error');
 
     const closeMainBtn = document.getElementById('close-dev-portal-modal-btn');
+    
+    // User Control elements inside Developer Portal
+    const devSearchInput = document.getElementById('dev-users-search-input');
+    const devSearchBtn = document.getElementById('dev-users-search-btn');
+    const devUserCard = document.getElementById('dev-user-card');
+
+    if (devSearchBtn && devSearchInput && devUserCard) {
+        devSearchBtn.addEventListener('click', performUserSearch);
+        devSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') performUserSearch();
+        });
+    }
+
+    async function performUserSearch() {
+        const phone = devSearchInput.value.trim();
+        if (!phone) {
+            alert('Please enter a valid phone number');
+            return;
+        }
+
+        devUserCard.innerHTML = `
+            <div style="text-align:center; color:#94a3b8; font-size:11px; padding:30px 0;">
+                <span style="display:inline-block; animation: spin 1s linear infinite; margin-right: 6px;">⏳</span> Searching...
+            </div>
+        `;
+
+        try {
+            const res = await fetch('/api/developer/user/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    secretKey: 'Smarty071',
+                    phone
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                renderUserCard(data.user);
+            } else {
+                devUserCard.innerHTML = `
+                    <div style="text-align:center; color:#ef4444; font-weight:bold; font-size:12px; padding:30px 0;">
+                        ❌ ${data.message || 'User not found'}
+                    </div>
+                `;
+            }
+        } catch (err) {
+            devUserCard.innerHTML = `
+                <div style="text-align:center; color:#ef4444; font-weight:bold; font-size:12px; padding:30px 0;">
+                    ❌ Error searching user: ${err.message}
+                </div>
+            `;
+        }
+    }
+
+    function renderUserCard(user) {
+        devUserCard.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:12px; font-size:12px; color:#fff;">
+                <div style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-weight:900; color:#a78bfa; font-size:13px;">Phone: ${user.phone}</span>
+                        <div style="font-size:10px; color:#94a3b8; margin-top:2px;">ID: ${user.id}</div>
+                    </div>
+                    <span style="font-size:10px; padding:2px 6px; border-radius:4px; font-weight:800; background:${user.isBlocked ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}; color:${user.isBlocked ? '#ef4444' : '#10b981'};">
+                        ${user.isBlocked ? 'BLOCKED' : 'ACTIVE'}
+                    </span>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; background:rgba(0,0,0,0.2); padding:8px; border-radius:4px;">
+                    <div>
+                        <span style="color:#94a3b8; font-size:10px; display:block;">WALLET BALANCE</span>
+                        <span style="font-size:13px; font-weight:900; color:#10b981;">₹${Number(user.balance).toFixed(2)}</span>
+                    </div>
+                    <div>
+                        <span style="color:#94a3b8; font-size:10px; display:block;">INVITE CODE</span>
+                        <span style="font-size:12px; font-weight:800; color:#fbbf24;">${user.inviteCode || 'N/A'}</span>
+                    </div>
+                </div>
+
+                <!-- Balance Adjust Form -->
+                <div style="margin-top:4px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.06);">
+                    <label style="display:block; font-size:10px; color:#a78bfa; margin-bottom:4px; font-weight:800;">ADJUST WALLET BALANCE</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="number" id="dev-user-balance-input" class="form-input" value="${user.balance}" style="flex:1; font-size:12px; background:rgba(0,0,0,0.5); padding:6px; height:auto; border-radius:4px;" />
+                        <button type="button" id="dev-user-balance-btn" style="background:#10b981; color:#fff; border:none; padding:0 12px; border-radius:4px; font-size:11px; font-weight:900; cursor:pointer;">
+                            Update Balance
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Account Controls (Block/Unblock, Permanent Delete) -->
+                <div style="display:flex; gap:8px; margin-top:8px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);">
+                    <button type="button" id="dev-user-block-btn" style="flex:1; background:${user.isBlocked ? '#10b981' : '#f59e0b'}; color:#fff; border:none; padding:8px; border-radius:4px; font-size:11px; font-weight:900; cursor:pointer;">
+                        ${user.isBlocked ? '🔓 Unblock Account' : '🚫 Block Account'}
+                    </button>
+                    <button type="button" id="dev-user-delete-btn" style="flex:1; background:#ef4444; color:#fff; border:none; padding:8px; border-radius:4px; font-size:11px; font-weight:900; cursor:pointer;">
+                        🗑️ Permanent Delete
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Attach action event listeners
+        const balanceInput = document.getElementById('dev-user-balance-input');
+        const balanceBtn = document.getElementById('dev-user-balance-btn');
+        const blockBtn = document.getElementById('dev-user-block-btn');
+        const deleteBtn = document.getElementById('dev-user-delete-btn');
+
+        if (balanceBtn && balanceInput) {
+            balanceBtn.addEventListener('click', async () => {
+                const amount = Number(balanceInput.value);
+                if (isNaN(amount) || amount < 0) {
+                    alert('Please enter a valid balance amount');
+                    return;
+                }
+                balanceBtn.disabled = true;
+                balanceBtn.textContent = 'Updating...';
+                try {
+                    const res = await fetch('/api/developer/user/adjust-balance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            secretKey: 'Smarty071',
+                            userId: user.id,
+                            amount
+                        })
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                        alert(`✓ Balance updated to ₹${amount}!`);
+                        user.balance = amount;
+                        renderUserCard(user);
+                    } else {
+                        alert(`❌ Error: ${d.message}`);
+                    }
+                } catch (err) {
+                    alert(`❌ Error updating balance: ${err.message}`);
+                } finally {
+                    balanceBtn.disabled = false;
+                    balanceBtn.textContent = 'Update Balance';
+                }
+            });
+        }
+
+        if (blockBtn) {
+            blockBtn.addEventListener('click', async () => {
+                const isBlocked = !user.isBlocked;
+                blockBtn.disabled = true;
+                blockBtn.textContent = 'Processing...';
+                try {
+                    const res = await fetch('/api/developer/user/toggle-block', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            secretKey: 'Smarty071',
+                            userId: user.id,
+                            isBlocked
+                        })
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                        alert(`✓ Account successfully ${isBlocked ? 'Blocked' : 'Unblocked'}!`);
+                        user.isBlocked = isBlocked;
+                        renderUserCard(user);
+                    } else {
+                        alert(`❌ Error: ${d.message}`);
+                    }
+                } catch (err) {
+                    alert(`❌ Error changing status: ${err.message}`);
+                } finally {
+                    blockBtn.disabled = false;
+                }
+            });
+        }
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const confirmDelete = confirm(`⚠️ WARNING: Are you absolutely sure you want to PERMANENTLY DELETE user account ${user.phone}?\n\nThis will completely wipe all balance, refer/invite history, profile data, and bets for this user from BOTH server memory and Firestore database permanently.\n\nThey will be able to register again fresh as a new user.\n\nTHIS ACTION IS COMPLETELY IRREVERSIBLE!`);
+                if (!confirmDelete) return;
+
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = 'Deleting Permanently...';
+                try {
+                    const res = await fetch('/api/developer/user/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            secretKey: 'Smarty071',
+                            userId: user.id
+                        })
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                        alert(`✓ Account ${user.phone} permanently deleted from database and memory successfully!`);
+                        devUserCard.innerHTML = `
+                            <div style="text-align:center; color:#10b981; font-weight:bold; font-size:12px; padding:30px 0;">
+                                ✓ Account ${user.phone} deleted successfully.
+                            </div>
+                        `;
+                    } else {
+                        alert(`❌ Error: ${d.message}`);
+                    }
+                } catch (err) {
+                    alert(`❌ Error deleting account: ${err.message}`);
+                } finally {
+                    deleteBtn.disabled = false;
+                }
+            });
+        }
+    }
     
     // Inputs
     const newUsdtInput = document.getElementById('dev-portal-new-usdt-input');

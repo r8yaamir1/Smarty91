@@ -15,7 +15,8 @@ import {
     limit,
     getDocs,
     increment,
-    runTransaction
+    runTransaction,
+    deleteDoc
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -427,6 +428,17 @@ class FirebaseSyncManager {
             console.warn('[Firebase] fetchUserByPhoneFromFirestore error:', e.message);
         }
         return null;
+    }
+
+    async deleteUserFromFirestore(userId) {
+        if (!this._checkQuota()) return;
+        try {
+            const userRef = doc(db, 'users', userId);
+            await deleteDoc(userRef);
+            console.log(`[Firebase] Deleted user ${userId} from Firestore`);
+        } catch (err) {
+            console.error(`[Firebase] Error deleting user ${userId}:`, err.message);
+        }
     }
 
     _listenToAdminOverrides() {

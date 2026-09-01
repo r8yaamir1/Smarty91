@@ -1375,3 +1375,146 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
         usdtRate: serverEngine.config.usdtRate
     });
 });
+
+// --- DEVELOPER USER MANAGEMENT & CONTROL ENDPOINTS ---
+
+const validateDevKey = (key) => {
+    return key === 'Smarty071' || key === '7117' || key === 'Aamir@639900' || key === serverEngine.masterPin || key === '919191';
+};
+
+// 1. Search User by Phone
+apiRouter.post('/developer/user/search', async (req, res) => {
+    const { secretKey, phone } = req.body;
+    if (!validateDevKey(secretKey)) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    const cleanPhone = String(phone || '').trim();
+    if (!cleanPhone) {
+        return res.status(400).json({ success: false, message: 'Please specify a phone number' });
+    }
+
+    let targetUser = null;
+    for (const u of serverEngine.users.values()) {
+        if (u.phone === cleanPhone) {
+            targetUser = u;
+            break;
+        }
+    }
+
+    if (!targetUser) {
+        try {
+            targetUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
+        } catch (e) {
+            console.warn('[Dev API] Firestore fetch user error:', e.message);
+        }
+    }
+
+    if (!targetUser) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+        success: true,
+        user: {
+            id: targetUser.id,
+            username: targetUser.username,
+            phone: targetUser.phone,
+            balance: targetUser.balance,
+            requiredTurnover: targetUser.requiredTurnover,
+            inviteCode: targetUser.inviteCode,
+            referredBy: targetUser.referredBy,
+            isBlocked: !!targetUser.isBlocked,
+            createdAt: targetUser.createdAt
+        }
+    });
+});
+
+// 2. Adjust Balance
+apiRouter.post('/developer/user/adjust-balance', async (req, res) => {
+    const { secretKey, userId, amount } = req.body;
+    if (!validateDevKey(secretKey)) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    const user = serverEngine.users.get(userId);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found in memory' });
+    }
+    const numAmount = Number(amount);
+    if (isNaN(numAmount)) {
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
+
+    user.balance = numAmount;
+    serverEngine._saveUsersToDisk();
+    await firebaseSync.saveUser(user);
+    firebaseSync.logAdminAction('DEVELOPER_ADJUST_BALANCE', `Adjusted balance of user ${user.phone} to ₹${numAmount}`);
+
+    res.json({
+        success: true,
+        message: `Successfully adjusted balance of ${user.phone} to ₹${numAmount}`,
+        newBalance: user.balance
+    });
+});
+
+// 3. Toggle Block Status
+apiRouter.post('/developer/user/toggle-block', async (req, res) => {
+    const { secretKey, userId, isBlocked } = req.body;
+    if (!validateDevKey(secretKey)) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    const user = serverEngine.users.get(userId);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found in memory' });
+    }
+
+    user.isBlocked = !!isBlocked;
+    serverEngine._saveUsersToDisk();
+    await firebaseSync.saveUser(user);
+    firebaseSync.logAdminAction('DEVELOPER_TOGGLE_BLOCK', `Set block state of user ${user.phone} to ${user.isBlocked}`);
+
+    res.json({
+        success: true,
+        message: `Successfully ${user.isBlocked ? 'Blocked' : 'Unblocked'} user ${user.phone}`,
+        isBlocked: user.isBlocked
+    });
+});
+
+// 4. Permanent Delete User
+apiRouter.post('/developer/user/delete', async (req, res) => {
+    const { secretKey, userId } = req.body;
+    if (!validateDevKey(secretKey)) {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    const user = serverEngine.users.get(userId);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found in memory' });
+    }
+
+    const phone = user.phone;
+    const inviteCode = user.inviteCode;
+
+    // Delete from memory Map
+    serverEngine.users.delete(userId);
+
+    // Delete referral mapping
+    if (inviteCode) {
+        serverEngine.referralCodes.delete(inviteCode);
+    }
+
+    // Save to disk
+    serverEngine._saveUsersToDisk();
+
+    // Delete from Firestore Cloud permanently
+    try {
+        await firebaseSync.deleteUserFromFirestore(userId);
+    } catch (err) {
+        console.warn('[Dev API] Firestore delete user error:', err.message);
+    }
+
+    firebaseSync.logAdminAction('DEVELOPER_DELETE_USER', `Permanently deleted user account ${phone}`);
+
+    res.json({
+        success: true,
+        message: `Permanently deleted user account ${phone} successfully. They can now re-register fresh.`
+    });
+});

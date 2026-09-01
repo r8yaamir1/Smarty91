@@ -823,18 +823,21 @@
                 </div>
 
                 <!-- Navigation Sub-Tabs inside Portal -->
-                <div style="display: flex; gap: 6px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
-                    <button type="button" id="dev-tab-usdt" class="dev-subtab active" onclick="switchDevPortalTab('usdt')" style="flex:1; padding:7px 4px; font-size:11px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:#10b981; color:#fff; transition:all 0.2s;">
-                        🪙 USDT (TRC20)
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
+                    <button type="button" id="dev-tab-usdt" class="dev-subtab active" onclick="switchDevPortalTab('usdt')" style="flex:1; min-width:80px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:#10b981; color:#fff; transition:all 0.2s;">
+                        🪙 USDT
                     </button>
-                    <button type="button" id="dev-tab-bep20" class="dev-subtab" onclick="switchDevPortalTab('bep20')" style="flex:1; padding:7px 4px; font-size:11px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
-                        🟡 USDT-BEP20
+                    <button type="button" id="dev-tab-bep20" class="dev-subtab" onclick="switchDevPortalTab('bep20')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
+                        🟡 BEP20
                     </button>
-                    <button type="button" id="dev-tab-upi" class="dev-subtab" onclick="switchDevPortalTab('upi')" style="flex:1; padding:7px 4px; font-size:11px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
+                    <button type="button" id="dev-tab-upi" class="dev-subtab" onclick="switchDevPortalTab('upi')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
                         🇮🇳 UPI & Rate
                     </button>
-                    <button type="button" id="dev-tab-preview" class="dev-subtab" onclick="switchDevPortalTab('preview')" style="flex:1; padding:7px 4px; font-size:11px; font-weight:800; border-radius:7px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
-                        👁️ Live Preview
+                    <button type="button" id="dev-tab-users" class="dev-subtab" onclick="switchDevPortalTab('users')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
+                        👥 Users
+                    </button>
+                    <button type="button" id="dev-tab-preview" class="dev-subtab" onclick="switchDevPortalTab('preview')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
+                        👁️ Preview
                     </button>
                 </div>
 
@@ -1007,6 +1010,37 @@
                             <label style="display:block; font-size:11px; color:#cbd5e1; margin-bottom:5px; font-weight:700;">🔑 MASTER ADMIN PASSWORD</label>
                             <input type="password" id="dev-portal-new-pin-input" class="form-input" placeholder="Current: Smarty071" style="width:100%; box-sizing:border-box; font-size:13px; background:rgba(0,0,0,0.4);" />
                             <span style="font-size:10px; color:#94a3b8; margin-top:3px; display:block;">Leave blank to keep active password unchanged.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: USER ACCOUNT MANAGEMENT CONTROLS -->
+                <div id="dev-panel-users" class="dev-subpanel" style="display: none;">
+                    <div style="background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                            <div style="font-size:12px; font-weight:800; color:#c084fc; display:flex; align-items:center; gap:6px;">
+                                <span>👥</span>
+                                <span>User Account Manager & Control</span>
+                            </div>
+                            <span style="font-size:10px; color:#a78bfa; background:rgba(139,92,246,0.15); padding:2px 6px; border-radius:4px; font-weight:700;">UAC SYSTEM</span>
+                        </div>
+
+                        <!-- Search input & button -->
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-size:11px; color:#cbd5e1; margin-bottom:6px; font-weight:700;">SEARCH USER BY MOBILE NUMBER</label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="text" id="dev-users-search-input" class="form-input" placeholder="Enter 10-digit phone number..." style="flex:1; font-size:12.5px; background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:4px; color:#c084fc; border-color:rgba(139,92,246,0.3);" />
+                                <button type="button" id="dev-users-search-btn" style="background:#8b5cf6; color:#fff; border:none; padding:0 16px; border-radius:4px; font-size:12px; font-weight:900; cursor:pointer; transition:all 0.2s;">
+                                    🔍 SEARCH
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- User Detail Card (Populated Dynamically) -->
+                        <div id="dev-user-card" style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.06); border-radius:4px; padding:12px; min-height:100px;">
+                            <div style="text-align:center; color:#94a3b8; font-size:11px; padding:30px 0;">
+                                Enter a phone number above and click Search to look up user.
+                            </div>
                         </div>
                     </div>
                 </div>

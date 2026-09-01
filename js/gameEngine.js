@@ -831,8 +831,12 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
         .filter(item => {
             if (!item) return false;
             // Exclude pending/unsettled items with no valid outcome number to prevent millisecond "0" flicker
-            const numVal = item.number !== undefined && item.number !== null ? item.number : (item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : null);
-            if (numVal === null || numVal === undefined) return false;
+            const rawNum = item.number !== undefined && item.number !== null ? item.number : (item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : null);
+            if (rawNum === null || rawNum === undefined || rawNum === '' || rawNum === 'null' || rawNum === 'undefined') return false;
+            
+            const num = Number(rawNum);
+            if (isNaN(num) || !isFinite(num) || num < 0 || num > 9) return false;
+            
             if (item.status && (item.status === 'PENDING' || item.status === 'pending')) return false;
             return true;
         })
