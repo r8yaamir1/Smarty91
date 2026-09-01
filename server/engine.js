@@ -1932,6 +1932,8 @@ class Smarty91ServerEngine {
             txId
         }).catch(e => console.warn('[Telegram Withdrawal Alert]', e.message));
 
+        const usdtEquivalent = usdtVal;
+
         this.ledger.unshift({
             id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
             userId,

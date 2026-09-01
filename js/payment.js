@@ -824,7 +824,8 @@ window.submitUsdtWithdrawalRequest = async function() {
             return;
         }
 
-        showToast(data.message || 'USDT Withdrawal request submitted successfully!');
+        // Show Gorgeous Congratulations Popup!
+        window.showCongratsModal(requiredInr, usdtAmount);
 
         // Clear inputs
         if (amountInput) amountInput.value = '';
@@ -833,10 +834,6 @@ window.submitUsdtWithdrawalRequest = async function() {
 
         // Refresh wallet
         loadWalletData();
-
-        setTimeout(() => {
-            switchCashierTab('history');
-        }, 1200);
 
     } catch (err) {
         showToast('Network error during withdrawal submission');
@@ -847,6 +844,25 @@ window.submitUsdtWithdrawalRequest = async function() {
     } finally {
         if (window.SmartyLoader) window.SmartyLoader.hide();
     }
+};
+
+// Congratulations Popup Display & Control
+window.showCongratsModal = function(amountInr, amountUsdt) {
+    const amtEl = document.getElementById('congrats-detail-amount');
+    const usdtEl = document.getElementById('congrats-detail-usdt');
+    if (amtEl) amtEl.innerText = `₹${Number(amountInr).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (usdtEl) usdtEl.innerText = `$${Number(amountUsdt).toFixed(2)} USDT`;
+    
+    const modal = document.getElementById('congrats-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.closeCongratsModal = function() {
+    const modal = document.getElementById('congrats-modal');
+    if (modal) modal.style.display = 'none';
+    
+    // Switch to history tab to track transaction
+    window.switchCashierTab('history');
 };
 
 // Withdraw All helper
