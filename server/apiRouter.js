@@ -482,13 +482,39 @@ apiRouter.get('/wallet/balance', async (req, res) => {
 apiRouter.get('/wallet/ledger', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
-        const userLedger = serverEngine.ledger
-            .filter(l => l.userId === authUser.id)
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const ledgerItems = serverEngine.ledger.filter(l => l.userId === authUser.id);
+        const txItems = serverEngine.transactions.filter(t => t.userId === authUser.id).map(t => ({
+            id: t.id,
+            userId: t.userId,
+            type: t.type,
+            amount: t.type === 'WITHDRAWAL' ? -Math.abs(t.amount) : Math.abs(t.amount),
+            status: t.status,
+            referenceId: t.utrNumber || t.id,
+            timestamp: t.createdAt || t.timestamp || new Date().toISOString(),
+            description: `${t.type} (${t.channel || 'System'}) - Status: ${t.status}`
+        }));
+
+        const combinedMap = new Map();
+        ledgerItems.forEach(item => combinedMap.set(item.id, item));
+        txItems.forEach(item => {
+            if (!combinedMap.has(item.id)) {
+                combinedMap.set(item.id, item);
+            }
+        });
+
+        const sorted = Array.from(combinedMap.values()).sort((a, b) => {
+            const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+            const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+            return timeB - timeA;
+        });
 
         res.json({
             success: true,
-            items: userLedger.slice(0, 50)
+            items: sorted.slice(0, 100)
         });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });

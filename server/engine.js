@@ -258,6 +258,7 @@ class Smarty91ServerEngine {
                 phone: '9876543210',
                 passwordHash: this._hashPassword('123456'),
                 balance: initialBalance,
+                requiredTurnover: 0.00,
                 inviteCode: 'SM9101',
                 referredBy: null,
                 hasDeposited: false,
@@ -356,6 +357,7 @@ class Smarty91ServerEngine {
             passwordHash: this._hashPassword(password),
             securityPin: cleanPin,
             balance: 0.00, // Starts with exact 0 balance
+            requiredTurnover: 0.00,
             inviteCode: userInviteCode,
             referredBy: referrerId,
             hasDeposited: false,
@@ -1095,53 +1097,60 @@ class Smarty91ServerEngine {
     }
 
     _evaluateBet(bet, winningNumber) {
-        const props = NUMBER_PROPERTIES[winningNumber];
-        const multConfig = this.config.multipliers;
+        const winNum = Number(winningNumber);
+        const props = NUMBER_PROPERTIES[winNum] || NUMBER_PROPERTIES[0];
+        const multConfig = this.config.multipliers || {};
         const contractAmount = bet.contractAmount; // Amount after 2% fee
 
         let isWin = false;
         let payoutMultiplier = 0;
 
-        const sel = String(bet.selection).toLowerCase().trim();
+        const sel = String(bet.selection || '').toLowerCase().trim();
+        const betType = String(bet.type || '').toLowerCase().trim();
+        const isBigWin = winNum >= 5;
 
         // 1. Number Bets (0-9) -> 9x
-        if (!isNaN(parseInt(sel, 10))) {
+        if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
             const betNum = parseInt(sel, 10);
-            if (betNum === winningNumber) {
+            if (betNum === winNum) {
                 isWin = true;
-                payoutMultiplier = multConfig.number;
+                payoutMultiplier = multConfig.number || 9;
             }
         }
         // 2. Color Bets (Green, Red, Violet)
         else if (sel === 'green') {
-            if (props.color === 'green') {
+            if ([1, 3, 7, 9].includes(winNum)) {
                 isWin = true;
-                payoutMultiplier = multConfig.pureColor; // 2x
-            } else if (props.color === 'violet-green') {
+                payoutMultiplier = multConfig.pureColor || 2; // 2x
+            } else if (winNum === 5) {
                 isWin = true;
-                payoutMultiplier = multConfig.halfColor; // 1.5x
+                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x
             }
         } else if (sel === 'red') {
-            if (props.color === 'red') {
+            if ([2, 4, 6, 8].includes(winNum)) {
                 isWin = true;
-                payoutMultiplier = multConfig.pureColor; // 2x
-            } else if (props.color === 'violet-red') {
+                payoutMultiplier = multConfig.pureColor || 2; // 2x
+            } else if (winNum === 0) {
                 isWin = true;
-                payoutMultiplier = multConfig.halfColor; // 1.5x
+                payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x
             }
         } else if (sel === 'violet') {
-            if (winningNumber === 0 || winningNumber === 5) {
+            if (winNum === 0 || winNum === 5) {
                 isWin = true;
-                payoutMultiplier = multConfig.violet; // 4.5x
+                payoutMultiplier = multConfig.violet || 4.5; // 4.5x
             }
         }
         // 3. Big / Small Bets (Big: 5-9, Small: 0-4) -> 2x
-        else if (sel === 'big' && props.size === 'big') {
-            isWin = true;
-            payoutMultiplier = multConfig.bigSmall; // 2x
-        } else if (sel === 'small' && props.size === 'small') {
-            isWin = true;
-            payoutMultiplier = multConfig.bigSmall; // 2x
+        else if (sel === 'big' || sel === 'b') {
+            if (isBigWin) {
+                isWin = true;
+                payoutMultiplier = multConfig.bigSmall || 2; // 2x
+            }
+        } else if (sel === 'small' || sel === 's') {
+            if (!isBigWin) {
+                isWin = true;
+                payoutMultiplier = multConfig.bigSmall || 2; // 2x
+            }
         }
 
         const payoutAmount = isWin ? Number((contractAmount * payoutMultiplier).toFixed(2)) : 0;
@@ -1228,9 +1237,12 @@ class Smarty91ServerEngine {
             settledAt: null
         };
 
-        // Instant Atomic In-Memory Balance Deduction
+        // Instant Atomic In-Memory Balance Deduction & Turnover Deduction
         const balanceBefore = user.balance;
         user.balance = Number((user.balance - totalAmount).toFixed(2));
+        if (user.requiredTurnover && user.requiredTurnover > 0) {
+            user.requiredTurnover = Math.max(0, Number((user.requiredTurnover - totalAmount).toFixed(2)));
+        }
         const balanceAfter = user.balance;
 
         const ledgerEntry = {
@@ -1702,6 +1714,8 @@ class Smarty91ServerEngine {
             const balanceBefore = userObj.balance;
             userObj.balance = Number((userObj.balance + numAmount).toFixed(2));
             userObj.bonus = Number(((userObj.bonus || 0) + bonusAmount).toFixed(2));
+            // 2x Mandatory Deposit Turnover Rule
+            userObj.requiredTurnover = Number(((userObj.requiredTurnover || 0) + (numAmount * 2.0)).toFixed(2));
             const balanceAfter = userObj.balance;
 
             this.transactions.unshift(req);
@@ -1808,6 +1822,12 @@ class Smarty91ServerEngine {
         const user = this.users.get(userId);
         if (!user) throw new Error('User account not found');
 
+        // 2x Mandatory Deposit Betting Turnover Rule check
+        const reqTurnover = Number(user.requiredTurnover || 0);
+        if (reqTurnover > 0) {
+            throw new Error(`🔒 Withdrawal Locked! You must complete mandatory 2x deposit betting turnover before withdrawing. Remaining required turnover to bet: ₹${reqTurnover.toFixed(2)}.`);
+        }
+
         // If this is a specific referral income withdrawal, enforce 1st of month constraint
         if (isReferralWithdrawal) {
             const check = this.canWithdrawReferralIncome(userId);
@@ -1816,15 +1836,38 @@ class Smarty91ServerEngine {
             }
         }
 
-        const numAmount = Number(amount);
-        if (isNaN(numAmount) || numAmount < 500) {
-            throw new Error('Minimum withdrawal amount is ₹500');
+        const isUsdt = channel === 'USDT' || channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().length >= 10);
+
+        if (!isUsdt && !isReferralWithdrawal) {
+            throw new Error('Bank Transfer is currently under system upgrade (Coming Soon). Please use USDT Crypto Withdrawal for instant 0% fee payouts!');
         }
+
+        const rate = Number(this.config.usdtRate || 102);
+        let numAmount = Number(amount);
+        let usdtVal = Number(usdtAmount);
+
+        if (isUsdt) {
+            if (isNaN(usdtVal) || usdtVal <= 0) {
+                if (!isNaN(numAmount) && numAmount > 0) {
+                    usdtVal = numAmount / rate;
+                }
+            }
+            if (isNaN(usdtVal) || usdtVal < 10) {
+                throw new Error('Minimum USDT withdrawal amount is 10 USDT ($10)');
+            }
+            numAmount = Number((usdtVal * rate).toFixed(2));
+            usdtVal = Number(usdtVal.toFixed(2));
+        } else {
+            if (isNaN(numAmount) || numAmount < 500) {
+                throw new Error('Minimum withdrawal amount is ₹500');
+            }
+        }
+
         if (numAmount > 100000) {
             throw new Error('Maximum withdrawal amount is ₹1,00,000 per request');
         }
         if (user.balance < numAmount) {
-            throw new Error(`Insufficient main balance. Available: ₹${user.balance.toFixed(2)}`);
+            throw new Error(`Insufficient main balance. Available: ₹${user.balance.toFixed(2)} (Required for $${usdtVal || '0'} USDT: ₹${numAmount.toFixed(2)})`);
         }
 
         if (securityPin) {
@@ -1833,8 +1876,6 @@ class Smarty91ServerEngine {
                 throw new Error('Invalid 6-Digit Security PIN. Please verify your security PIN.');
             }
         }
-
-        const isUsdt = channel === 'USDT' || channel === 'USDT_TRC20' || Boolean(usdtAddress && String(usdtAddress).trim().length >= 10);
 
         let cleanAcc = String(accountNumber || '').trim();
         let cleanIfsc = String(ifsc || '').trim().toUpperCase();
@@ -1857,9 +1898,6 @@ class Smarty91ServerEngine {
         user.balance = Number((user.balance - numAmount).toFixed(2));
         const balanceAfter = user.balance;
 
-        const rate = Number(this.config.usdtRate || 90);
-        const usdtEquivalent = isUsdt ? (numAmount / rate).toFixed(2) : null;
-
         const txId = 'WTH_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
         const req = {
             id: txId,
@@ -1867,7 +1905,7 @@ class Smarty91ServerEngine {
             type: 'WITHDRAWAL',
             channel: isUsdt ? 'USDT' : 'BANK',
             amount: numAmount,
-            usdtAmount: isUsdt ? Number(usdtEquivalent) : null,
+            usdtAmount: isUsdt ? usdtVal : null,
             usdtAddress: isUsdt ? cleanUsdtAddress : null,
             accountHolderName: isUsdt ? `USDT Wallet (${cleanUsdtAddress.slice(0, 6)}...)` : (accountHolderName || user.username || 'Account Holder'),
             bankName: isUsdt ? 'USDT Crypto Wallet' : (bankName || 'Bank Transfer'),
@@ -1940,6 +1978,7 @@ class Smarty91ServerEngine {
             phone: user.phone || '9876543210',
             balance: Number((user.balance || 0).toFixed(2)),
             bonusBalance: Number((user.bonusBalance || 0).toFixed(2)),
+            requiredTurnover: Number((user.requiredTurnover || 0).toFixed(2)),
             totalDeposited: Number(totalDeposited.toFixed(2)),
             totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
             pendingWithdrawals: Number(pendingWithdrawals.toFixed(2)),
@@ -1971,6 +2010,8 @@ class Smarty91ServerEngine {
             if (tx.type === 'DEPOSIT') {
                 const balanceBefore = user.balance;
                 user.balance += tx.amount;
+                // 2x Mandatory Deposit Turnover Rule
+                user.requiredTurnover = Number(((user.requiredTurnover || 0) + (tx.amount * 2.0)).toFixed(2));
                 const balanceAfter = user.balance;
 
                 this.ledger.unshift({
@@ -2007,17 +2048,20 @@ class Smarty91ServerEngine {
 
                 firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin');
             } else if (tx.type === 'WITHDRAWAL') {
-                this.ledger.unshift({
+                const ledgerEntry = {
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: tx.userId,
                     type: 'WITHDRAWAL_PAID',
-                    amount: 0,
+                    amount: -Math.abs(tx.amount),
                     balanceBefore: user.balance,
                     balanceAfter: user.balance,
                     referenceId: tx.id,
                     timestamp: new Date().toISOString(),
-                    description: `Withdrawal payout completed: ₹${tx.amount}`
-                });
+                    description: `Withdrawal payout approved: ₹${tx.amount}${tx.usdtAmount ? ` ($${tx.usdtAmount} USDT)` : ''}`
+                };
+                this.ledger.unshift(ledgerEntry);
+                firebaseSync.saveLedgerEntry(ledgerEntry);
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal approved by admin');
             }
 
             const logMsg = `Approved ${tx.type} #${tx.id} for user ${tx.userId} amount ₹${tx.amount}`;

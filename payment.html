@@ -1393,6 +1393,26 @@
                     </div>
                 </div>
 
+                <!-- 2x Deposit Turnover Status Card -->
+                <div class="glass-panel" id="turnover-status-card" style="margin-top: 8px; margin-bottom: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(245, 158, 11, 0.35); padding: 12px 14px; border-radius: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 0.82rem; color: #fbbf24;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            <span>Mandatory 2x Turnover Requirement</span>
+                        </div>
+                        <span id="turnover-badge" style="font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">
+                            ✅ Unlocked
+                        </span>
+                    </div>
+                    <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 8px;">
+                        To maintain fair play and safety, deposits require <b>2x betting turnover</b> before withdrawal is allowed.
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 8px;">
+                        <span style="font-size: 0.75rem; color: #cbd5e1;">Remaining Required Turnover:</span>
+                        <span id="turnover-remaining-val" style="font-size: 0.95rem; font-weight: 900; color: #fbbf24; font-family: 'JetBrains Mono', monospace;">₹0.00</span>
+                    </div>
+                </div>
+
                 <!-- Withdrawal Method Switcher (USDT Highlighted by default vs Bank) -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
                     <button type="button" id="wtab-usdt-btn" onclick="switchWithdrawMethod('USDT')" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #FFFFFF; border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 8px; font-weight: 800; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.35); transition: all 0.2s;">
@@ -1403,9 +1423,9 @@
                         <span>USDT Crypto</span>
                     </button>
 
-                    <button type="button" id="wtab-bank-btn" onclick="switchWithdrawMethod('BANK')" style="background: var(--card-elevated); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                    <button type="button" id="wtab-bank-btn" onclick="switchWithdrawMethod('BANK')" style="background: var(--card-elevated); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0.85; transition: all 0.2s;">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                        <span>Bank Transfer</span>
+                        <span>Bank (Coming Soon 🔒)</span>
                     </button>
                 </div>
 
@@ -1428,18 +1448,21 @@
                     </div>
 
                     <div class="form-group-item">
-                        <label class="form-group-label">Withdrawal Amount in ₹ (Min 10 USDT / Equivalent in INR) <span style="color: var(--red-primary);">*</span></label>
+                        <label class="form-group-label">Withdrawal Amount in USDT ($) (Min 10 USDT) <span style="color: #34d399;">*</span></label>
                         <div class="currency-input-wrapper" style="border-color: rgba(16,185,129,0.3);">
-                            <span class="currency-prefix" style="color: #34d399;">₹</span>
-                            <input type="number" id="withdraw-usdt-amount-input" class="custom-number-input" placeholder="Min 900" min="900" max="50000" required oninput="calculateUsdtPayoutAmount(this.value)">
-                            <button type="button" class="quick-chip-btn" onclick="withdrawAllBalanceUsdt()" style="margin-left: 6px; background: #059669; color: #fff; border: none;">MAX</button>
+                            <span class="currency-prefix" style="color: #34d399; font-weight: 800;">$</span>
+                            <input type="number" id="withdraw-usdt-amount-input" class="custom-number-input" placeholder="Min 10 USDT" min="10" max="10000" step="1" required oninput="calculateUsdtPayoutAmount(this.value)">
+                            <button type="button" class="quick-chip-btn" onclick="withdrawAllBalanceUsdt()" style="margin-left: 6px; background: #059669; color: #fff; border: none; font-weight: 800;">MAX</button>
                         </div>
                     </div>
 
                     <!-- Live Conversion Box -->
-                    <div style="background: rgba(5, 150, 105, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9px; padding: 10px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 600;">You will receive:</span>
-                        <span id="withdraw-usdt-get-amount" style="font-size: 1.1rem; font-weight: 900; color: #34d399; font-family: 'JetBrains Mono', monospace;">$0.00 USDT</span>
+                    <div style="background: rgba(5, 150, 105, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">INR Equivalent (Rate: 1 USDT = ₹102):</div>
+                            <div style="font-size: 0.68rem; color: #34d399; margin-top: 2px;">⚡ Instant 0% Fee Payout</div>
+                        </div>
+                        <span id="withdraw-usdt-get-amount" style="font-size: 1.15rem; font-weight: 900; color: #34d399; font-family: 'JetBrains Mono', monospace;">₹0.00 INR</span>
                     </div>
 
                     <button type="button" id="submit-usdt-withdraw-btn" class="btn-vip-primary" onclick="submitUsdtWithdrawalRequest()" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); border-color: #34d399; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);">
@@ -1450,6 +1473,9 @@
 
                 <!-- 2. BANK WITHDRAWAL FORM -->
                 <div id="withdraw-bank-form-container" class="glass-panel" style="display: none;">
+                    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 10px; padding: 12px; margin-bottom: 14px; color: #f87171; font-size: 0.82rem; font-weight: 700; text-align: center; line-height: 1.4;">
+                        🔒 Bank Transfer payout channel is currently undergoing system upgrade (Coming Soon). Please use <b>USDT Crypto Withdrawal</b> for instant, zero-fee payouts directly to your wallet!
+                    </div>
                     <div class="panel-heading">
                         <span style="display: flex; align-items: center; gap: 6px;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>

@@ -115,6 +115,7 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
     currentBetContext.type = type;
     currentBetContext.selection = selection;
     currentBetContext.selectionLabel = selectionLabel;
+    currentBetContext.baseBalance = currentBetContext.baseBalance || 1;
     currentBetContext.multiplier = preSelectedMultiplier || 1;
 
     if (bettingPopup) {
@@ -130,8 +131,18 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
         inputField.value = currentBetContext.multiplier;
     }
 
-    const popupMultiplierChips = document.querySelectorAll('.Betting__Popup-body-line-list .Betting__Popup-body-line-item');
-    popupMultiplierChips.forEach(chip => {
+    const allItems = document.querySelectorAll('.Betting__Popup-body-line-item');
+    const balanceItems = Array.from(allItems).filter((item) => /^\d+$/.test(item.textContent.trim()));
+    const quantityItems = Array.from(allItems).filter((item) => /^X\d+$/.test(item.textContent.trim()));
+
+    balanceItems.forEach(chip => {
+        const val = parseInt(chip.textContent.trim(), 10);
+        const isActive = val === currentBetContext.baseBalance;
+        chip.classList.toggle('bgcolor', isActive);
+        chip.classList.toggle('active', isActive);
+    });
+
+    quantityItems.forEach(chip => {
         if (/^X\d+$/.test(chip.textContent.trim())) {
             const multVal = parseInt(chip.textContent.trim().replace('X', ''), 10);
             chip.classList.toggle('bgcolor', multVal === currentBetContext.multiplier);
@@ -274,8 +285,8 @@ export function handleBettingOverlay_clicks() {
         isAgree.classList.toggle('active');
     });
 
-    let selectedBalance = 1;
-    let selectedQuantity = preSelectedMultiplier || 1;
+    let selectedBalance = currentBetContext.baseBalance || 1;
+    let selectedQuantity = currentBetContext.multiplier || preSelectedMultiplier || 1;
 
     if (inputField) inputField.value = selectedQuantity;
 
@@ -292,8 +303,12 @@ export function handleBettingOverlay_clicks() {
     balanceItems.forEach(item => {
         item.addEventListener("click", () => {
             playClickSound();
-            balanceItems.forEach(b => b.classList.remove('bgcolor'));
+            balanceItems.forEach(b => {
+                b.classList.remove('bgcolor');
+                b.classList.remove('active');
+            });
             item.classList.add('bgcolor');
+            item.classList.add('active');
             selectedBalance = parseInt(item.textContent.trim(), 10) || 1;
             updateTotalAmount();
         });
@@ -320,12 +335,19 @@ export function handleBettingOverlay_clicks() {
         });
     });
 
-    // Input field change
+    // Manual Input field handler
     if (inputField) {
         inputField.addEventListener("input", function () {
-            let val = parseInt(this.value.replace(/\D/g, ''), 10) || 1;
-            val = Math.min(1000, Math.max(1, val));
-            this.value = val;
+            const raw = this.value.trim();
+            if (raw === '') {
+                selectedQuantity = 1;
+                updateTotalAmount();
+                return;
+            }
+            let val = parseInt(raw.replace(/\D/g, ''), 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > 100000) val = 100000;
+
             selectedQuantity = val;
             preSelectedMultiplier = val;
 
@@ -341,48 +363,47 @@ export function handleBettingOverlay_clicks() {
 
             updateTotalAmount();
         });
+
+        inputField.addEventListener("blur", function () {
+            if (!this.value || parseInt(this.value, 10) < 1) {
+                this.value = 1;
+                selectedQuantity = 1;
+                preSelectedMultiplier = 1;
+                updateTotalAmount();
+            }
+        });
     }
 
+    // Global Adjust Quantity Helper for + / - buttons
+    window.adjustBetQuantity = function(delta) {
+        playClickSound();
+        const inputField = document.querySelector("#van-field-5-input");
+        let currentVal = parseInt(inputField ? inputField.value : '1', 10);
+        if (isNaN(currentVal) || currentVal < 1) currentVal = 1;
+
+        let newVal = currentVal + delta;
+        if (newVal < 1) newVal = 1;
+        if (newVal > 100000) newVal = 100000;
+
+        if (inputField) {
+            inputField.value = newVal;
+            inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+            preSelectedMultiplier = newVal;
+            currentBetContext.multiplier = newVal;
+        }
+    };
+
     // Increment and Decrement Stepper Buttons
-    const decrementBtn = document.querySelector(".Betting__Popup-btn:first-child");
-    const incrementBtn = document.querySelector(".Betting__Popup-btn:last-child");
+    const decrementBtn = document.querySelector("#bet-pop-decrement") || document.querySelector(".Betting__Popup-btn:first-child");
+    const incrementBtn = document.querySelector("#bet-pop-increment") || document.querySelector(".Betting__Popup-btn:last-child");
 
     decrementBtn?.addEventListener("click", () => {
-        playClickSound();
-        selectedQuantity = Math.max(1, selectedQuantity - 1);
-        preSelectedMultiplier = selectedQuantity;
-        if (inputField) inputField.value = selectedQuantity;
-
-        quantityItems.forEach(item => {
-            const multiplierValue = parseInt(item.textContent.trim().replace('X', ''), 10);
-            item.classList.toggle('bgcolor', multiplierValue === selectedQuantity);
-        });
-
-        outerMultipleChips.forEach(outerChip => {
-            const outerVal = parseInt(outerChip.textContent.trim().replace('X', ''), 10);
-            outerChip.classList.toggle('active', outerVal === selectedQuantity);
-        });
-
-        updateTotalAmount();
+        window.adjustBetQuantity(-1);
     });
 
     incrementBtn?.addEventListener("click", () => {
-        playClickSound();
-        selectedQuantity = Math.min(1000, selectedQuantity + 1);
-        preSelectedMultiplier = selectedQuantity;
-        if (inputField) inputField.value = selectedQuantity;
-
-        quantityItems.forEach(item => {
-            const multiplierValue = parseInt(item.textContent.trim().replace('X', ''), 10);
-            item.classList.toggle('bgcolor', multiplierValue === selectedQuantity);
-        });
-
-        outerMultipleChips.forEach(outerChip => {
-            const outerVal = parseInt(outerChip.textContent.trim().replace('X', ''), 10);
-            outerChip.classList.toggle('active', outerVal === selectedQuantity);
-        });
-
-        updateTotalAmount();
+        window.adjustBetQuantity(1);
     });
 
     // Agreement Checkbox Toggle

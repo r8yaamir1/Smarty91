@@ -131,23 +131,26 @@ export function evaluateModeBets(modeInput, result) {
         const contractAmount = bet.contractAmount; // betAmount * 0.98
         let multiplier = 0;
 
-        if (bet.type === 'number') {
-            if (parseInt(bet.selection, 10) === result.number) {
-                multiplier = 9;
+        const sel = String(bet.selection || '').toLowerCase().trim();
+        const betType = String(bet.type || '').toLowerCase().trim();
+        const winNum = Number(result.number !== undefined ? result.number : (result.winningNumber !== undefined ? result.winningNumber : 0));
+        const isBigRes = winNum >= 5;
+
+        if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
+            if (parseInt(sel, 10) === winNum) multiplier = 9;
+        } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
+            if (sel === 'green') {
+                if ([1, 3, 7, 9].includes(winNum)) multiplier = 2;
+                else if (winNum === 5) multiplier = 1.5;
+            } else if (sel === 'red') {
+                if ([2, 4, 6, 8].includes(winNum)) multiplier = 2;
+                else if (winNum === 0) multiplier = 1.5;
+            } else if (sel === 'violet') {
+                if ([0, 5].includes(winNum)) multiplier = 4.5;
             }
-        } else if (bet.type === 'color') {
-            if (bet.selection === 'green') {
-                if ([1, 3, 7, 9].includes(result.number)) multiplier = 2;
-                else if (result.number === 5) multiplier = 1.5;
-            } else if (bet.selection === 'red') {
-                if ([2, 4, 6, 8].includes(result.number)) multiplier = 2;
-                else if (result.number === 0) multiplier = 1.5;
-            } else if (bet.selection === 'violet') {
-                if ([0, 5].includes(result.number)) multiplier = 4.5;
-            }
-        } else if (bet.type === 'size') {
-            if (bet.selection === 'big' && result.isBig) multiplier = 2;
-            else if (bet.selection === 'small' && !result.isBig) multiplier = 2;
+        } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
+            if ((sel === 'big' || sel === 'b') && isBigRes) multiplier = 2;
+            else if ((sel === 'small' || sel === 's') && !isBigRes) multiplier = 2;
         }
 
         const winAmount = multiplier > 0 ? (contractAmount * multiplier) : 0;
@@ -156,9 +159,9 @@ export function evaluateModeBets(modeInput, result) {
         const evaluatedBet = {
             ...bet,
             mode,
-            resultNumber: result.number,
-            resultColor: result.colorName,
-            resultBig: result.isBig,
+            resultNumber: winNum,
+            resultColor: NUMBER_PROPERTIES[winNum]?.colorName || '',
+            resultBig: isBigRes,
             multiplier,
             winAmount,
             status: winAmount > 0 ? 'win' : 'lose',
@@ -549,6 +552,8 @@ export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 
                 const contractAmt = Number(b.contractAmount !== undefined ? b.contractAmount : (betAmt * 0.98));
                 const feeAmt = Number(b.fee !== undefined ? b.fee : (b.serviceFee !== undefined ? b.serviceFee : (betAmt * 0.02)));
 
+                const resNum = b.resultNumber !== undefined && b.resultNumber !== null ? b.resultNumber : (b.winningNumber !== undefined && b.winningNumber !== null ? b.winningNumber : undefined);
+
                 return {
                     id: b.id,
                     mode: b.mode || mode,
@@ -563,7 +568,7 @@ export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 
                     winAmount: winAmt,
                     payoutAmount: winAmt,
                     status: isWon ? 'win' : (isPending ? 'pending' : 'lose'),
-                    resultNumber: b.resultNumber,
+                    resultNumber: resNum,
                     resultColor: b.resultColor,
                     resultSize: b.resultSize,
                     placedAt: b.placedAt || Date.now(),
@@ -823,16 +828,26 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
     };
 
     const formatted = serverHistoryItems
+        .filter(item => {
+            if (!item) return false;
+            // Exclude pending/unsettled items with no valid outcome number to prevent millisecond "0" flicker
+            const numVal = item.number !== undefined && item.number !== null ? item.number : (item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : null);
+            if (numVal === null || numVal === undefined) return false;
+            if (item.status && (item.status === 'PENDING' || item.status === 'pending')) return false;
+            return true;
+        })
         .map(item => {
-            const num = Number(item.number !== undefined && item.number !== null ? item.number : 0);
+            const rawNum = item.number !== undefined && item.number !== null ? item.number : item.winningNumber;
+            const num = Number(rawNum);
             const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
             const rawTime = item.timestamp || item.settledAt;
             const periodIdStr = String(item.period || item.periodId || '');
+            const isBig = num >= 5 || item.size === 'big' || item.isBig === true || prop.isBig === true;
             return {
                 mode,
                 periodId: periodIdStr,
                 number: num,
-                isBig: prop.isBig,
+                isBig,
                 primaryColor: prop.primaryColor,
                 secondaryColor: prop.secondaryColor,
                 colorName: prop.colorName,

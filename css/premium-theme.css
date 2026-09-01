@@ -3589,5 +3589,78 @@ body {
   animation: smartyPulse 1.2s infinite ease-in-out;
 }
 
+/* Fix Betting Popup Quantity Box & Stepper Buttons */
+.Betting__Popup-body-line-btnL {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+}
+
+.Betting__Popup-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #000000 !important;
+  border-radius: 6px !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
+  transition: all 0.15s ease !important;
+}
+
+.Betting__Popup-btn:active {
+  transform: scale(0.92) !important;
+  background: #222222 !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.Betting__Popup-input {
+  width: 72px !important;
+  max-width: 72px !important;
+  height: 36px !important;
+  background: #000000 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.Betting__Popup-input input::-webkit-outer-spin-button,
+.Betting__Popup-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+.Betting__Popup-input input[type=number],
+.Betting__Popup-input input {
+  -moz-appearance: textfield !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #000000 !important;
+  border: none !important;
+  text-align: center !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  outline: none !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
 
 

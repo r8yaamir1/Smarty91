@@ -123,6 +123,25 @@ function renderHeaderWalletInfo() {
         phoneEl.innerText = masked;
     }
     if (availBalEl) availBalEl.innerText = `₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    // Render 2x Turnover status
+    const reqTurnover = Number(currentWalletSummary.requiredTurnover || 0);
+    const turnoverValEl = document.getElementById('turnover-remaining-val');
+    const turnoverBadgeEl = document.getElementById('turnover-badge');
+    if (turnoverValEl) turnoverValEl.innerText = `₹${reqTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (turnoverBadgeEl) {
+        if (reqTurnover > 0) {
+            turnoverBadgeEl.innerText = '🔒 Locked';
+            turnoverBadgeEl.style.background = 'rgba(245, 158, 11, 0.2)';
+            turnoverBadgeEl.style.color = '#fbbf24';
+            turnoverBadgeEl.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        } else {
+            turnoverBadgeEl.innerText = '✅ Unlocked';
+            turnoverBadgeEl.style.background = 'rgba(16, 185, 129, 0.2)';
+            turnoverBadgeEl.style.color = '#34d399';
+            turnoverBadgeEl.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        }
+    }
 }
 
 // Global Tab Switcher (Deposit, Withdraw, Passbook)
@@ -701,6 +720,8 @@ window.switchWithdrawMethod = function(method) {
         if (usdtContainer) usdtContainer.style.display = 'none';
         if (bankContainer) bankContainer.style.display = 'block';
 
+        showToast('🔒 Bank Transfer is under maintenance (Coming Soon). Please use USDT Crypto Payouts!');
+
         if (bankBtn) {
             bankBtn.style.background = 'linear-gradient(135deg, #E51837 0%, #C10C27 100%)';
             bankBtn.style.color = '#FFFFFF';
@@ -716,20 +737,21 @@ window.switchWithdrawMethod = function(method) {
     }
 };
 
-window.calculateUsdtPayoutAmount = function(inrVal) {
-    const num = Number(inrVal) || 0;
-    const rate = activeUsdtRate || 90;
-    const usdtVal = (num / rate).toFixed(2);
+window.calculateUsdtPayoutAmount = function(usdtVal) {
+    const num = Number(usdtVal) || 0;
+    const rate = 102;
+    const inrVal = num * rate;
     const getEl = document.getElementById('withdraw-usdt-get-amount');
-    if (getEl) getEl.innerText = `$${usdtVal} USDT`;
+    if (getEl) getEl.innerText = `₹${inrVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} INR`;
 };
 
 window.withdrawAllBalanceUsdt = function() {
     const bal = currentWalletSummary ? Number(currentWalletSummary.balance || 0) : 0;
+    const maxUsdt = Math.floor(bal / 102);
     const input = document.getElementById('withdraw-usdt-amount-input');
     if (input) {
-        input.value = Math.floor(bal);
-        calculateUsdtPayoutAmount(Math.floor(bal));
+        input.value = maxUsdt > 0 ? maxUsdt : 0;
+        calculateUsdtPayoutAmount(input.value);
     }
 };
 
@@ -740,23 +762,27 @@ window.submitUsdtWithdrawalRequest = async function() {
     const pinInput = document.getElementById('withdraw-usdt-pin-input');
     const submitBtn = document.getElementById('submit-usdt-withdraw-btn');
 
-    const amount = Number(amountInput ? amountInput.value : 0);
+    const usdtAmount = Number(amountInput ? amountInput.value : 0);
     const usdtAddress = addressInput ? addressInput.value.trim() : '';
     const pin = pinInput ? pinInput.value.trim() : '';
 
-    const minUsdtValue = 10;
-    const requiredInr = minUsdtValue * activeUsdtRate;
-    if (isNaN(amount) || amount < requiredInr) {
-        showToast(`Minimum withdrawal is 10 USDT (₹${requiredInr})`);
+    if (isNaN(usdtAmount) || usdtAmount < 10) {
+        showToast('Minimum withdrawal is 10 USDT ($10)');
+        return;
+    }
+    const requiredInr = usdtAmount * 102;
+    const availBal = currentWalletSummary ? Number(currentWalletSummary.balance || 0) : 0;
+    if (availBal < requiredInr) {
+        showToast(`Insufficient balance! You need ₹${requiredInr.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (Available: ₹${availBal.toFixed(2)})`);
         return;
     }
     if (!usdtAddress || usdtAddress.length < 15) {
-        showToast('Please enter a valid USDT wallet address');
+        showToast('Please enter a valid USDT Wallet Address (TRC20 / BEP20)');
         return;
     }
 
     try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Submitting USDT Withdrawal...');
+        if (window.SmartyLoader) window.SmartyLoader.show('Submitting USDT Withdrawal Request...');
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerText = 'Submitting Request...';
@@ -769,7 +795,8 @@ window.submitUsdtWithdrawalRequest = async function() {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                amount,
+                usdtAmount,
+                amount: requiredInr,
                 channel: 'USDT',
                 usdtAddress,
                 securityPin: pin
@@ -787,11 +814,14 @@ window.submitUsdtWithdrawalRequest = async function() {
             return;
         }
 
-        showToast(data.message || 'USDT Withdrawal request submitted!');
+        showToast(data.message || 'USDT Withdrawal request submitted successfully!');
 
+        // Clear inputs
         if (amountInput) amountInput.value = '';
         if (pinInput) pinInput.value = '';
+        calculateUsdtPayoutAmount(0);
 
+        // Refresh wallet
         loadWalletData();
 
         setTimeout(() => {
@@ -799,7 +829,7 @@ window.submitUsdtWithdrawalRequest = async function() {
         }, 1200);
 
     } catch (err) {
-        showToast('Network error during USDT withdrawal submission');
+        showToast('Network error during withdrawal submission');
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerText = 'Confirm USDT Withdrawal';
@@ -819,94 +849,8 @@ window.fillMaxWithdraw = window.withdrawAllBalance;
 
 // Submit Withdrawal Request
 window.submitWithdrawalRequest = async function() {
-    const token = localStorage.getItem('smarty91_auth_token');
-    const amountInput = document.getElementById('withdraw-amount-input');
-    const holderInput = document.getElementById('withdraw-holder-name') || document.getElementById('withdraw-holder-input');
-    const accountInput = document.getElementById('withdraw-acc-num') || document.getElementById('withdraw-account-input');
-    const ifscInput = document.getElementById('withdraw-ifsc') || document.getElementById('withdraw-ifsc-input');
-    const mobileInput = document.getElementById('withdraw-mobile');
-    const bankNameInput = document.getElementById('withdraw-bank-name-input');
-    const pinInput = document.getElementById('withdraw-pin-input');
-    const submitBtn = document.getElementById('withdraw-submit-btn') || document.getElementById('submit-withdraw-btn');
-
-    const amount = Number(amountInput ? amountInput.value : 0);
-    const holderName = holderInput ? holderInput.value.trim() : '';
-    const accountNum = accountInput ? accountInput.value.trim() : '';
-    const ifsc = ifscInput ? ifscInput.value.trim().toUpperCase() : '';
-    const bankName = bankNameInput ? bankNameInput.value.trim() : 'Bank Transfer';
-    const pin = pinInput ? pinInput.value.trim() : '';
-    const mobile = mobileInput ? mobileInput.value.trim() : '';
-
-    if (isNaN(amount) || amount < 200) {
-        showToast('Minimum withdrawal amount is ₹200');
-        return;
-    }
-    if (!accountNum || accountNum.length < 6) {
-        showToast('Please enter a valid bank account number');
-        return;
-    }
-    if (!ifsc || ifsc.length < 8) {
-        showToast('Please enter a valid Bank IFSC code');
-        return;
-    }
-
-    try {
-        if (window.SmartyLoader) window.SmartyLoader.show('Processing Withdrawal Request...');
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'Submitting...';
-        }
-
-        const res = await fetch('/api/wallet/withdraw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                amount,
-                accountHolderName: holderName,
-                bankName,
-                accountNumber: accountNum,
-                ifsc,
-                mobile,
-                securityPin: pin
-            })
-        });
-
-        const data = await res.json();
-
-        if (!data.success) {
-            showToast(data.message || 'Withdrawal failed');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerText = 'Confirm Bank Withdrawal';
-            }
-            return;
-        }
-
-        showToast(data.message || 'Withdrawal request submitted successfully!');
-
-        // Clear inputs
-        if (amountInput) amountInput.value = '';
-        if (pinInput) pinInput.value = '';
-
-        // Refresh wallet
-        loadWalletData();
-
-        setTimeout(() => {
-            switchCashierTab('history');
-        }, 1200);
-
-    } catch (err) {
-        showToast('Network error during withdrawal submission');
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerText = 'Confirm Bank Withdrawal';
-        }
-    } finally {
-        if (window.SmartyLoader) window.SmartyLoader.hide();
-    }
+    showToast('🔒 Bank Transfer payout is under maintenance (Coming Soon). Please use USDT Crypto Withdrawal!');
+    return;
 };
 
 window.handleWithdrawalSubmit = function(e) {

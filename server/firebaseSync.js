@@ -235,7 +235,7 @@ class FirebaseSyncManager {
                     usdtBep20Address: this.engine.config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
                     usdtBep20QrImage: this.engine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
                     usdtBep20Url: this.engine.config.usdtBep20Url || '',
-                    usdtRate: this.engine.config.usdtRate || 90,
+                    usdtRate: this.engine.config.usdtRate || 102,
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -327,6 +327,7 @@ class FirebaseSyncManager {
                                 passwordHash: u.passwordHash || '',
                                 securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
                                 balance: Number(u.balance !== undefined ? u.balance : 0),
+                                requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
                                 inviteCode: u.inviteCode || '',
                                 referredBy: u.referredBy || null,
                                 hasDeposited: !!u.hasDeposited,
@@ -365,6 +366,7 @@ class FirebaseSyncManager {
                     passwordHash: u.passwordHash || '',
                     securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
                     balance: Number(u.balance !== undefined ? u.balance : 0),
+                    requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
                     inviteCode: u.inviteCode || '',
                     referredBy: u.referredBy || null,
                     hasDeposited: !!u.hasDeposited,
@@ -403,6 +405,7 @@ class FirebaseSyncManager {
                     passwordHash: u.passwordHash || '',
                     securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
                     balance: Number(u.balance !== undefined ? u.balance : 0),
+                    requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
                     inviteCode: u.inviteCode || '',
                     referredBy: u.referredBy || null,
                     hasDeposited: !!u.hasDeposited,
@@ -643,6 +646,7 @@ class FirebaseSyncManager {
                 passwordHash: user.passwordHash || '',
                 securityPin: user.securityPin || '',
                 balance: Number(user.balance !== undefined ? user.balance : 0),
+                requiredTurnover: Number(user.requiredTurnover !== undefined ? user.requiredTurnover : 0),
                 inviteCode: user.inviteCode || '',
                 referredBy: user.referredBy || null,
                 hasDeposited: !!user.hasDeposited,
@@ -787,12 +791,12 @@ class FirebaseSyncManager {
         if (!this._checkQuota()) return;
         try {
             const txRef = doc(db, 'transactions', tx.id);
-            await updateDoc(txRef, {
+            await setDoc(txRef, {
                 status: tx.status,
-                processedAt: tx.processedAt,
-                adminRemarks: tx.adminRemarks,
+                processedAt: tx.processedAt || new Date().toISOString(),
+                adminRemarks: tx.adminRemarks || '',
                 updatedAt: new Date().toISOString()
-            });
+            }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
         }
