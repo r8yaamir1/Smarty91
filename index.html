@@ -866,16 +866,27 @@
                 <button class="ref-copy-btn" onclick="window.copyReferralLink()">COPY LINK</button>
             </div>
 
-            <!-- Rules Summary -->
-            <div class="ref-rules-list">
-                <p>• <strong>Direct Cash Bonus:</strong> ₹100 real money credited on every friend's first recharge.</p>
-                <p>• <strong>Lifetime Commission:</strong> Earn 0.6% on every game turnover from your referred players.</p>
-                <p>• <strong>Instant Withdrawal:</strong> Referral commission can be withdrawn directly to UPI anytime with 0 fees!</p>
+            <!-- Uplink / Referrer Details Tag -->
+            <div id="modal-inviter-tag" style="background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.25); border-radius: 8px; padding: 8px 12px; font-size: 11px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #8E94A5;">My Referrer (VIP Uplink):</span>
+                <span id="modal-inviter-phone" style="font-weight: 800; color: #34d399;">Smarty91 Official</span>
             </div>
 
-            <button class="modal-claim-btn" onclick="window.copyReferralLink()">
-                <span>🚀 Share Invite Link</span>
-            </button>
+            <!-- Rules Summary -->
+            <div class="ref-rules-list">
+                <p>• <strong>Direct Cash Bonus:</strong> 10% real money instant commission on every friend's recharge.</p>
+                <p>• <strong>Lifetime Bet Commission:</strong> Earn 1% daily bet commission on every game turnover.</p>
+                <p>• <strong>Detailed Tracking:</strong> View deposit amounts, total bets & real-time activity of your downline team.</p>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button class="modal-claim-btn" style="flex: 1;" onclick="window.copyReferralLink()">
+                    <span>🚀 Share Link</span>
+                </button>
+                <button class="modal-claim-btn" style="flex: 1; background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="window.location.href='referral.html'">
+                    <span>👥 Team Details</span>
+                </button>
+            </div>
         </div>
     </div>
 

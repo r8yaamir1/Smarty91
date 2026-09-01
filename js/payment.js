@@ -11,8 +11,10 @@ let secondsRemaining = 600; // 10 minutes
 let currentWalletSummary = null;
 let activeMerchantUpi = '6289140468@axl';
 let activeMerchantName = 'Smarty91';
-let activeMerchantUsdtAddress = 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
-let activeMerchantUsdtQrImage = '';
+let activeMerchantUsdtAddress = '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+let activeMerchantUsdtQrImage = 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
+let activeMerchantUsdtBep20Address = '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+let activeMerchantUsdtBep20QrImage = 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
 let activeUsdtRate = 90;
 
 // Load live merchant config (UPI & USDT)
@@ -30,10 +32,16 @@ async function fetchMerchantConfig() {
             if (data.usdtAddress) {
                 activeMerchantUsdtAddress = data.usdtAddress;
                 const usdtAddrEl = document.getElementById('usdt-merchant-address');
-                if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
+                if (usdtAddrEl && selectedChannel !== 'USDT_BEP20') usdtAddrEl.textContent = activeMerchantUsdtAddress;
             }
             if (data.usdtQrImage) {
                 activeMerchantUsdtQrImage = data.usdtQrImage;
+            }
+            if (data.usdtBep20Address) {
+                activeMerchantUsdtBep20Address = data.usdtBep20Address;
+            }
+            if (data.usdtBep20QrImage) {
+                activeMerchantUsdtBep20QrImage = data.usdtBep20QrImage;
             }
             if (data.usdtRate) {
                 activeUsdtRate = Number(data.usdtRate) || 90;
@@ -419,15 +427,19 @@ window.startDepositCheckoutPhase = function() {
         const inrEquivalent = currentDepositAmountUsdt * activeUsdtRate;
         const usdtBonusVal = inrEquivalent; // 100% matching bonus
 
-        if (usdtAmtEl) usdtAmtEl.innerText = `$${currentDepositAmountUsdt.toFixed(2)} USDT`;
+        const isBep20 = selectedChannel === 'USDT_BEP20';
+        const targetAddress = isBep20 ? (activeMerchantUsdtBep20Address || activeMerchantUsdtAddress) : activeMerchantUsdtAddress;
+        const targetQrImage = isBep20 ? (activeMerchantUsdtBep20QrImage || activeMerchantUsdtQrImage) : activeMerchantUsdtQrImage;
+
+        if (usdtAmtEl) usdtAmtEl.innerText = `$${currentDepositAmountUsdt.toFixed(2)} USDT (${isBep20 ? 'BEP20' : 'TRC20'})`;
         if (usdtConvEl) usdtConvEl.innerText = `Equivalent to ₹${inrEquivalent.toLocaleString('en-IN')} (@ ₹${activeUsdtRate.toFixed(2)} / USDT)`;
         if (usdtBonusEl) usdtBonusEl.innerText = `+ Includes ₹${usdtBonusVal.toLocaleString('en-IN')} VIP Bonus`;
-        if (usdtAddrEl) usdtAddrEl.textContent = activeMerchantUsdtAddress;
+        if (usdtAddrEl) usdtAddrEl.textContent = targetAddress;
         if (usdtQrImg) {
-            if (activeMerchantUsdtQrImage && activeMerchantUsdtQrImage.trim() !== '') {
-                usdtQrImg.src = activeMerchantUsdtQrImage.trim();
+            if (targetQrImage && targetQrImage.trim() !== '') {
+                usdtQrImg.src = targetQrImage.trim();
             } else {
-                usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(activeMerchantUsdtAddress)}`;
+                usdtQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=10&data=${encodeURIComponent(targetAddress)}`;
             }
         }
     } else {
@@ -506,9 +518,12 @@ window.copyUpiAddress = window.copyUpiId;
 
 // Copy USDT Address helper
 window.copyUsdtAddress = function() {
-    const addr = activeMerchantUsdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
+    const el = document.getElementById('usdt-merchant-address');
+    const isBep20 = selectedChannel === 'USDT_BEP20';
+    const fallback = isBep20 ? (activeMerchantUsdtBep20Address || activeMerchantUsdtAddress) : activeMerchantUsdtAddress;
+    const addr = (el && el.textContent.trim()) ? el.textContent.trim() : (fallback || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c');
     navigator.clipboard.writeText(addr)
-        .then(() => showToast('USDT Address Copied!'))
+        .then(() => showToast(`USDT (${isBep20 ? 'BEP20' : 'TRC20'}) Address Copied!`))
         .catch(() => showToast('Address: ' + addr));
 };
 

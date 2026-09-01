@@ -170,6 +170,14 @@ class FirebaseSyncManager {
                 if (data.maxBetAmount !== undefined) this.engine.config.maxBetAmount = data.maxBetAmount;
                 if (data.upiId) this.engine.config.upiId = data.upiId;
                 if (data.upiName) this.engine.config.upiName = data.upiName;
+                if (data.upiQrImage !== undefined) this.engine.config.upiQrImage = data.upiQrImage;
+                if (data.usdtAddress) this.engine.config.usdtAddress = data.usdtAddress;
+                if (data.usdtQrImage !== undefined) this.engine.config.usdtQrImage = data.usdtQrImage;
+                if (data.usdtUrl !== undefined) this.engine.config.usdtUrl = data.usdtUrl;
+                if (data.usdtBep20Address) this.engine.config.usdtBep20Address = data.usdtBep20Address;
+                if (data.usdtBep20QrImage !== undefined) this.engine.config.usdtBep20QrImage = data.usdtBep20QrImage;
+                if (data.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = data.usdtBep20Url;
+                if (data.usdtRate !== undefined) this.engine.config.usdtRate = data.usdtRate;
             } else {
                 await setDoc(configRef, {
                     multipliers: this.engine.config.multipliers,
@@ -178,6 +186,14 @@ class FirebaseSyncManager {
                     maxBetAmount: this.engine.config.maxBetAmount,
                     upiId: this.engine.config.upiId || '6289140468@axl',
                     upiName: this.engine.config.upiName || 'Smarty91',
+                    upiQrImage: this.engine.config.upiQrImage || '',
+                    usdtAddress: this.engine.config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+                    usdtQrImage: this.engine.config.usdtQrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+                    usdtUrl: this.engine.config.usdtUrl || '',
+                    usdtBep20Address: this.engine.config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+                    usdtBep20QrImage: this.engine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+                    usdtBep20Url: this.engine.config.usdtBep20Url || '',
+                    usdtRate: this.engine.config.usdtRate || 90,
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -188,6 +204,14 @@ class FirebaseSyncManager {
                     const d = docSnap.data();
                     if (d.upiId) this.engine.config.upiId = d.upiId;
                     if (d.upiName) this.engine.config.upiName = d.upiName;
+                    if (d.upiQrImage !== undefined) this.engine.config.upiQrImage = d.upiQrImage;
+                    if (d.usdtAddress) this.engine.config.usdtAddress = d.usdtAddress;
+                    if (d.usdtQrImage !== undefined) this.engine.config.usdtQrImage = d.usdtQrImage;
+                    if (d.usdtUrl !== undefined) this.engine.config.usdtUrl = d.usdtUrl;
+                    if (d.usdtBep20Address) this.engine.config.usdtBep20Address = d.usdtBep20Address;
+                    if (d.usdtBep20QrImage !== undefined) this.engine.config.usdtBep20QrImage = d.usdtBep20QrImage;
+                    if (d.usdtBep20Url !== undefined) this.engine.config.usdtBep20Url = d.usdtBep20Url;
+                    if (d.usdtRate !== undefined) this.engine.config.usdtRate = d.usdtRate;
                 }
             });
         } catch (e) {
@@ -744,6 +768,14 @@ class FirebaseSyncManager {
                 modes: config.modes,
                 upiId: config.upiId || '6289140468@axl',
                 upiName: config.upiName || 'Smarty91',
+                upiQrImage: config.upiQrImage || '',
+                usdtAddress: config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+                usdtQrImage: config.usdtQrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+                usdtUrl: config.usdtUrl || '',
+                usdtBep20Address: config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+                usdtBep20QrImage: config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+                usdtBep20Url: config.usdtBep20Url || '',
+                usdtRate: config.usdtRate || 90,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {

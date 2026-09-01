@@ -1869,6 +1869,9 @@ function renderLogsView(container) {
 // 8. SECRET DEVELOPER PORTAL (TRIPLE-TAP TRIGGER ON AUDIT LOG)
 // -------------------------------------------------------------
 let tapTimestamps = [];
+let uploadedTrc20Qr = null;
+let uploadedBep20Qr = null;
+let uploadedUpiQr = null;
 
 function handleAuditLogTap() {
     const now = Date.now();
@@ -1881,6 +1884,49 @@ function handleAuditLogTap() {
         tapTimestamps = [];
         openDeveloperAuthModal();
     }
+}
+
+// Global subtab switcher for Developer Portal
+window.switchDevPortalTab = function(tabId) {
+    const tabs = ['usdt', 'bep20', 'upi', 'preview'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`dev-tab-${t}`);
+        const panel = document.getElementById(`dev-panel-${t}`);
+        if (btn) {
+            if (t === tabId) {
+                btn.style.background = t === 'usdt' ? '#10b981' : t === 'bep20' ? '#f59e0b' : t === 'upi' ? '#38bdf8' : '#8b5cf6';
+                btn.style.color = '#fff';
+            } else {
+                btn.style.background = 'transparent';
+                btn.style.color = '#94a3b8';
+            }
+        }
+        if (panel) {
+            panel.style.display = t === tabId ? 'block' : 'none';
+        }
+    });
+
+    if (tabId === 'preview') {
+        updateDevPreviewCards();
+    }
+};
+
+function updateDevPreviewCards() {
+    const trc20Addr = document.getElementById('dev-portal-new-usdt-input')?.value || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+    const bep20Addr = document.getElementById('dev-portal-new-bep20-input')?.value || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+    
+    const trc20Qr = uploadedTrc20Qr || document.getElementById('dev-portal-new-qr-input')?.value || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
+    const bep20Qr = uploadedBep20Qr || document.getElementById('dev-portal-new-bep20-qr-input')?.value || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
+
+    const pTrcQr = document.getElementById('dev-preview-trc20-qr');
+    const pTrcAddr = document.getElementById('dev-preview-trc20-addr');
+    const pBepQr = document.getElementById('dev-preview-bep20-qr');
+    const pBepAddr = document.getElementById('dev-preview-bep20-addr');
+
+    if (pTrcQr) pTrcQr.src = trc20Qr;
+    if (pTrcAddr) pTrcAddr.textContent = trc20Addr;
+    if (pBepQr) pBepQr.src = bep20Qr;
+    if (pBepAddr) pBepAddr.textContent = bep20Addr;
 }
 
 function initDeveloperPortal() {
@@ -1900,20 +1946,113 @@ function initDeveloperPortal() {
     const authError = document.getElementById('dev-portal-auth-error');
 
     const closeMainBtn = document.getElementById('close-dev-portal-modal-btn');
-    const currentUpiEl = document.getElementById('dev-portal-current-upi');
-    const currentUsdtEl = document.getElementById('dev-portal-current-usdt');
-    const currentNameEl = document.getElementById('dev-portal-current-name');
-    const newUpiInput = document.getElementById('dev-portal-new-upi-input');
+    
+    // Inputs
     const newUsdtInput = document.getElementById('dev-portal-new-usdt-input');
+    const newUsdtUrlInput = document.getElementById('dev-portal-new-usdt-url-input');
     const newQrInput = document.getElementById('dev-portal-new-qr-input');
+    const trc20FileInput = document.getElementById('dev-portal-trc20-file-input');
+    const trc20FileStatus = document.getElementById('dev-portal-trc20-file-status');
+    const trc20PreviewImg = document.getElementById('dev-portal-trc20-preview-img');
+    const trc20PreviewText = document.getElementById('dev-portal-trc20-preview-text');
+
+    const newBep20Input = document.getElementById('dev-portal-new-bep20-input');
+    const newBep20UrlInput = document.getElementById('dev-portal-new-bep20-url-input');
+    const newBep20QrInput = document.getElementById('dev-portal-new-bep20-qr-input');
+    const bep20FileInput = document.getElementById('dev-portal-bep20-file-input');
+    const bep20FileStatus = document.getElementById('dev-portal-bep20-file-status');
+    const bep20PreviewImg = document.getElementById('dev-portal-bep20-preview-img');
+    const bep20PreviewText = document.getElementById('dev-portal-bep20-preview-text');
+
     const newRateInput = document.getElementById('dev-portal-new-rate-input');
+    const newUpiInput = document.getElementById('dev-portal-new-upi-input');
     const newNameInput = document.getElementById('dev-portal-new-name-input');
+    const newUpiQrInput = document.getElementById('dev-portal-new-upi-qr-input');
+    const upiFileInput = document.getElementById('dev-portal-upi-file-input');
+    const upiFileStatus = document.getElementById('dev-portal-upi-file-status');
+    const newPinInput = document.getElementById('dev-portal-new-pin-input');
+
     const updateBtn = document.getElementById('dev-portal-update-btn');
     const feedbackMsg = document.getElementById('dev-portal-feedback-msg');
 
     if (closeAuthBtn) closeAuthBtn.addEventListener('click', () => authModal.style.display = 'none');
     if (cancelAuthBtn) cancelAuthBtn.addEventListener('click', () => authModal.style.display = 'none');
     if (closeMainBtn) closeMainBtn.addEventListener('click', () => mainModal.style.display = 'none');
+
+    // Setup TRC20 File upload
+    if (trc20FileInput) {
+        trc20FileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    uploadedTrc20Qr = evt.target.result;
+                    if (trc20PreviewImg) trc20PreviewImg.src = uploadedTrc20Qr;
+                    if (trc20FileStatus) trc20FileStatus.textContent = `✓ Uploaded: ${file.name} (${Math.round(file.size/1024)} KB)`;
+                    if (trc20PreviewText) trc20PreviewText.textContent = `Custom device image (${file.name})`;
+                    if (newQrInput) newQrInput.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Setup BEP20 File upload
+    if (bep20FileInput) {
+        bep20FileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    uploadedBep20Qr = evt.target.result;
+                    if (bep20PreviewImg) bep20PreviewImg.src = uploadedBep20Qr;
+                    if (bep20FileStatus) bep20FileStatus.textContent = `✓ Uploaded: ${file.name} (${Math.round(file.size/1024)} KB)`;
+                    if (bep20PreviewText) bep20PreviewText.textContent = `Custom device image (${file.name})`;
+                    if (newBep20QrInput) newBep20QrInput.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Setup UPI File upload
+    if (upiFileInput) {
+        upiFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    uploadedUpiQr = evt.target.result;
+                    if (upiFileStatus) upiFileStatus.textContent = `✓ Uploaded: ${file.name}`;
+                    if (newUpiQrInput) newUpiQrInput.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // URL input listeners to update preview thumbnails
+    if (newQrInput) {
+        newQrInput.addEventListener('input', () => {
+            if (newQrInput.value.trim()) {
+                uploadedTrc20Qr = null;
+                if (trc20PreviewImg) trc20PreviewImg.src = newQrInput.value.trim();
+                if (trc20FileStatus) trc20FileStatus.textContent = 'Using image URL';
+                if (trc20PreviewText) trc20PreviewText.textContent = newQrInput.value.trim();
+            }
+        });
+    }
+
+    if (newBep20QrInput) {
+        newBep20QrInput.addEventListener('input', () => {
+            if (newBep20QrInput.value.trim()) {
+                uploadedBep20Qr = null;
+                if (bep20PreviewImg) bep20PreviewImg.src = newBep20QrInput.value.trim();
+                if (bep20FileStatus) bep20FileStatus.textContent = 'Using image URL';
+                if (bep20PreviewText) bep20PreviewText.textContent = newBep20QrInput.value.trim();
+            }
+        });
+    }
 
     // Password unlock submit
     if (submitAuthBtn) {
@@ -1925,31 +2064,64 @@ function initDeveloperPortal() {
         });
     }
 
-    function verifyDevPassword() {
+    async function verifyDevPassword() {
         const entered = passwordInput.value.trim();
-        if (entered === 'Aamir@639900' || entered === '7117' || entered === '919191') {
+        if (entered === 'Smarty071' || entered === 'Aamir@639900' || entered === '7117' || entered === '919191') {
             authError.style.display = 'none';
             authModal.style.display = 'none';
             passwordInput.value = '';
 
-            // Open main developer portal
-            const activeUpi = liveData?.config?.upiId || '6289140468@axl';
-            const activeUsdt = liveData?.config?.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh';
-            const activeQr = liveData?.config?.usdtQrImage || '';
-            const activeRate = liveData?.config?.usdtRate || 90;
-            const activeName = liveData?.config?.upiName || 'Smarty91';
+            // Fetch live config from server
+            let liveConfig = liveData?.config || {};
+            try {
+                const confRes = await fetch('/api/wallet/config');
+                const confData = await confRes.json();
+                if (confData.success) {
+                    liveConfig = { ...liveConfig, ...confData };
+                }
+            } catch (err) {
+                console.warn('Could not fetch wallet config directly', err);
+            }
 
-            if (currentUpiEl) currentUpiEl.textContent = activeUpi;
-            if (currentUsdtEl) currentUsdtEl.textContent = activeUsdt;
-            if (currentNameEl) currentNameEl.textContent = activeName;
+            const activeUpi = liveConfig.upiId || '6289140468@axl';
+            const activeName = liveConfig.upiName || 'Smarty91';
+            const activeUpiQr = liveConfig.upiQrImage || '';
 
-            if (newUpiInput) newUpiInput.value = activeUpi;
+            const activeUsdt = liveConfig.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+            const activeQr = liveConfig.usdtQrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
+            const activeUsdtUrl = liveConfig.usdtUrl || '';
+
+            const activeBep20 = liveConfig.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c';
+            const activeBep20Qr = liveConfig.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg';
+            const activeBep20Url = liveConfig.usdtBep20Url || '';
+
+            const activeRate = liveConfig.usdtRate || 90;
+
             if (newUsdtInput) newUsdtInput.value = activeUsdt;
-            if (newQrInput) newQrInput.value = activeQr;
+            if (newUsdtUrlInput) newUsdtUrlInput.value = activeUsdtUrl;
+            if (newQrInput) newQrInput.value = activeQr.startsWith('data:image') ? '' : activeQr;
+            if (trc20PreviewImg) trc20PreviewImg.src = activeQr;
+            if (trc20PreviewText) trc20PreviewText.textContent = activeQr.startsWith('data:image') ? 'Uploaded Base64 image' : activeQr;
+
+            if (newBep20Input) newBep20Input.value = activeBep20;
+            if (newBep20UrlInput) newBep20UrlInput.value = activeBep20Url;
+            if (newBep20QrInput) newBep20QrInput.value = activeBep20Qr.startsWith('data:image') ? '' : activeBep20Qr;
+            if (bep20PreviewImg) bep20PreviewImg.src = activeBep20Qr;
+            if (bep20PreviewText) bep20PreviewText.textContent = activeBep20Qr.startsWith('data:image') ? 'Uploaded Base64 image' : activeBep20Qr;
+
             if (newRateInput) newRateInput.value = activeRate;
+            if (newUpiInput) newUpiInput.value = activeUpi;
             if (newNameInput) newNameInput.value = activeName;
+            if (newUpiQrInput) newUpiQrInput.value = activeUpiQr;
+            if (newPinInput) newPinInput.value = '';
+
+            uploadedTrc20Qr = activeQr.startsWith('data:image') ? activeQr : null;
+            uploadedBep20Qr = activeBep20Qr.startsWith('data:image') ? activeBep20Qr : null;
+            uploadedUpiQr = activeUpiQr.startsWith('data:image') ? activeUpiQr : null;
+
             if (feedbackMsg) feedbackMsg.style.display = 'none';
 
+            window.switchDevPortalTab('usdt');
             mainModal.style.display = 'flex';
         } else {
             authError.textContent = 'Invalid Master Developer Password. Access Denied.';
@@ -1960,35 +2132,47 @@ function initDeveloperPortal() {
     // Realtime Config update submit
     if (updateBtn) {
         updateBtn.addEventListener('click', async () => {
-            const upiId = newUpiInput ? newUpiInput.value.trim() : '';
             const usdtAddress = newUsdtInput ? newUsdtInput.value.trim() : '';
-            const usdtQrImage = newQrInput ? newQrInput.value.trim() : '';
+            const usdtUrl = newUsdtUrlInput ? newUsdtUrlInput.value.trim() : '';
+            const usdtQrImage = uploadedTrc20Qr || (newQrInput ? newQrInput.value.trim() : '');
+
+            const usdtBep20Address = newBep20Input ? newBep20Input.value.trim() : '';
+            const usdtBep20Url = newBep20UrlInput ? newBep20UrlInput.value.trim() : '';
+            const usdtBep20QrImage = uploadedBep20Qr || (newBep20QrInput ? newBep20QrInput.value.trim() : '');
+
             const usdtRate = newRateInput ? Number(newRateInput.value) : 90;
+            const upiId = newUpiInput ? newUpiInput.value.trim() : '';
             const upiName = newNameInput ? newNameInput.value.trim() : 'Smarty91';
+            const upiQrImage = uploadedUpiQr || (newUpiQrInput ? newUpiQrInput.value.trim() : '');
+            const masterPin = newPinInput ? newPinInput.value.trim() : undefined;
 
             updateBtn.disabled = true;
-            updateBtn.innerHTML = '<span>⏳</span><span>SAVING DEVELOPER CONFIG...</span>';
+            updateBtn.innerHTML = '<span>⏳</span><span>SAVING & SYNCING TO FIREBASE...</span>';
 
             try {
                 const res = await fetch('/api/developer/update-config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        secretKey: 'Aamir@639900',
+                        secretKey: 'Smarty071',
+                        usdtAddress,
+                        usdtUrl,
+                        usdtQrImage,
+                        usdtBep20Address,
+                        usdtBep20Url,
+                        usdtBep20QrImage,
+                        usdtRate,
                         upiId,
                         upiName,
-                        usdtAddress,
-                        usdtQrImage,
-                        usdtRate
+                        upiQrImage,
+                        masterPin: masterPin || undefined
                     })
                 });
 
                 const data = await res.json();
                 if (data.success) {
-                    showFeedback(`✓ Live Config & USDT Address successfully updated in Realtime Database!`, true);
-                    if (currentUpiEl) currentUpiEl.textContent = data.upiId || upiId;
-                    if (currentUsdtEl) currentUsdtEl.textContent = data.usdtAddress || usdtAddress;
-                    if (currentNameEl) currentNameEl.textContent = data.upiName || upiName;
+                    showFeedback(`✓ Realtime Firebase Sync Successful! All USDT (TRC20 & BEP20) & Deposit settings are LIVE!`, true);
+                    updateDevPreviewCards();
                     await fetchAndRefreshData();
                 } else {
                     showFeedback(data.message || 'Update failed', false);
@@ -1997,7 +2181,7 @@ function initDeveloperPortal() {
                 showFeedback(err.message || 'Server error', false);
             } finally {
                 updateBtn.disabled = false;
-                updateBtn.innerHTML = '<span>⚡</span><span>SAVE DEVELOPER CONFIG IN REALTIME DATABASE</span>';
+                updateBtn.innerHTML = '<span>⚡</span><span>SAVE & SYNC TO FIREBASE IN REAL-TIME</span>';
             }
         });
     }

@@ -40,7 +40,7 @@ export const MODE_DISPLAY_NAMES = {
 
 class Smarty91ServerEngine {
     constructor() {
-        this.masterPin = process.env.ADMIN_MASTER_PIN || '919191';
+        this.masterPin = process.env.ADMIN_MASTER_PIN || 'Smarty071';
         
         // Payout Multipliers & Settings
         this.config = {
@@ -63,8 +63,13 @@ class Smarty91ServerEngine {
             // UPI & USDT Crypto Config
             upiId: '6289140468@axl',
             upiName: 'Smarty91',
-            usdtAddress: 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
-            usdtQrImage: '',
+            upiQrImage: '',
+            usdtAddress: '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+            usdtQrImage: 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+            usdtUrl: '',
+            usdtBep20Address: '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+            usdtBep20QrImage: 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+            usdtBep20Url: '',
             usdtRate: 90,
             minDeposit: 200,
             maxDeposit: 100000,
@@ -454,7 +459,7 @@ class Smarty91ServerEngine {
         // Validation via Security PIN OR Master Admin PIN
         const providedPin = String(securityPin || masterPin || '').trim();
         const expectedPin = String(targetUser.securityPin || targetUser.phone.slice(-4));
-        const isAdminMaster = providedPin === this.masterPin || providedPin === '919191';
+        const isAdminMaster = providedPin === this.masterPin || providedPin === 'Smarty071' || providedPin === 'Aamir@639900' || providedPin === '919191';
 
         if (!isAdminMaster && providedPin !== expectedPin) {
             throw new Error('Incorrect Security PIN. If you forgot your PIN, please contact 24/7 Official Support.');
@@ -1323,7 +1328,7 @@ class Smarty91ServerEngine {
             throw new Error('Please enter a valid USDT Transaction Hash (TxID)');
         }
         const cleanTxid = txid.trim().toLowerCase();
-        const merchantUsdtAddress = (this.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh').trim();
+        const merchantUsdtAddress = (this.config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c').trim();
         const conversionRate = Number(this.config.usdtRate || 90);
 
         if (this.processedUsdtTxids.has(cleanTxid)) {
@@ -2126,6 +2131,7 @@ class Smarty91ServerEngine {
 
         // Find all referred users
         const referredList = [];
+        const downlineDepositEvents = [];
         let totalDepositVolume = 0;
         let totalBetVolume = 0;
 
@@ -2136,6 +2142,25 @@ class Smarty91ServerEngine {
                 const hasDep = Boolean(u.hasDeposited || userDeposits.length > 0);
                 const depSum = userDeposits.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
                 totalDepositVolume += depSum;
+
+                // Collect individual deposit events for live stream timeline
+                userDeposits.forEach(depTx => {
+                    const dAmt = Number(depTx.amount) || 0;
+                    const comm = Number((dAmt * 0.10).toFixed(2));
+                    const phoneStr = String(u.phone || u.username || '9876543210');
+                    const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
+                    downlineDepositEvents.push({
+                        id: depTx.id || ('DEP_EVT_' + Date.now()),
+                        friendPhone: maskedPhone,
+                        friendUserId: u.id,
+                        depositAmount: dAmt,
+                        commissionRate: 10,
+                        commissionEarned: comm,
+                        channel: depTx.channel || 'UPI',
+                        timestamp: depTx.timestamp || new Date().toISOString(),
+                        status: 'COMPLETED'
+                    });
+                });
 
                 const userBets = Array.from(this.bets.values()).filter(b => b.userId === u.id);
                 const betSum = userBets.reduce((acc, b) => acc + (Number(b.totalAmount) || 0), 0);
@@ -2148,9 +2173,26 @@ class Smarty91ServerEngine {
                 const phoneStr = String(u.phone || u.username || '9876543210');
                 const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
 
+                const isMemberActive = hasDep || betSum > 0 || userBets.length > 0;
+                let statusBadge = 'REGISTERED';
+                let statusLabel = 'Registered (Pending Deposit)';
+                if (hasDep && betSum > 0) {
+                    statusBadge = 'ACTIVE_PRO';
+                    statusLabel = 'Active (Playing & Recharged)';
+                } else if (hasDep) {
+                    statusBadge = 'RECHARGED';
+                    statusLabel = 'Recharged (Deposit Complete)';
+                } else if (betSum > 0) {
+                    statusBadge = 'ACTIVE_BETS';
+                    statusLabel = 'Active (Bets Placed)';
+                }
+
                 referredList.push({
                     userId: u.id,
                     phone: maskedPhone,
+                    isActive: isMemberActive,
+                    statusBadge: statusBadge,
+                    statusLabel: statusLabel,
                     hasDeposited: hasDep,
                     depositCount: userDeposits.length,
                     totalDeposited: depSum,
@@ -2164,8 +2206,49 @@ class Smarty91ServerEngine {
             }
         }
 
-        const activeCount = referredList.filter(r => r.hasDeposited).length;
+        const activeCount = referredList.filter(r => r.hasDeposited || r.totalDeposited > 0).length;
         const totalInvites = referredList.length;
+
+        // Calculate my inviter details (for user who was referred)
+        let myInviter = null;
+        if (user.referredBy) {
+            let inviterUser = this.users.get(user.referredBy);
+            if (!inviterUser) {
+                for (const u of this.users.values()) {
+                    if (u.id === user.referredBy || (u.inviteCode && u.inviteCode.toUpperCase() === String(user.referredBy).toUpperCase())) {
+                        inviterUser = u;
+                        break;
+                    }
+                }
+            }
+            if (inviterUser) {
+                const phoneStr = String(inviterUser.phone || inviterUser.username || '');
+                const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : (phoneStr || 'VIP Agent');
+                myInviter = {
+                    isReferred: true,
+                    phone: maskedPhone,
+                    inviteCode: inviterUser.inviteCode || String(user.referredBy),
+                    statusText: 'Connected & Verified VIP Uplink',
+                    perks: ['100% First Deposit Match Bonus Active', 'Daily Sign-in VIP Bonus Active', '24/7 Priority Support']
+                };
+            } else {
+                myInviter = {
+                    isReferred: true,
+                    phone: 'Official VIP Uplink',
+                    inviteCode: String(user.referredBy),
+                    statusText: 'Connected & Verified VIP Uplink',
+                    perks: ['100% First Deposit Match Bonus Active', 'Daily Sign-in VIP Bonus Active']
+                };
+            }
+        } else {
+            myInviter = {
+                isReferred: false,
+                phone: 'Smarty91 Official',
+                inviteCode: 'SM9101',
+                statusText: 'Direct VIP Member',
+                perks: ['100% First Deposit Match Bonus Active', 'Standard VIP Tier']
+            };
+        }
 
         // Calculate total earnings from ledger entries
         const userLedgers = this.ledger.filter(l => l.userId === user.id);
@@ -2224,7 +2307,9 @@ class Smarty91ServerEngine {
                 remaining: Math.max(0, target5 - activeCount)
             },
             milestones: milestoneDefinitions,
+            myInviter,
             referrals: referredList.reverse(),
+            downlineDepositEvents: downlineDepositEvents.reverse(),
             recentCommissions
         };
     }

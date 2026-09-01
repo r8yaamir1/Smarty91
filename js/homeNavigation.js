@@ -274,6 +274,11 @@ export function renderReferralModal() {
     if (totalInvEl) totalInvEl.textContent = referralState.totalInvites || 0;
     if (activeDepEl) activeDepEl.textContent = referralState.activeDepositors || 0;
     if (commissionEl) commissionEl.textContent = `₹${(referralState.totalCommissionEarned || 0).toLocaleString('en-IN')}`;
+
+    const invPhoneEl = document.getElementById('modal-inviter-phone');
+    if (invPhoneEl && referralState.myInviter) {
+        invPhoneEl.textContent = referralState.myInviter.phone || 'Smarty91 Official';
+    }
 }
 
 // Copy Helper

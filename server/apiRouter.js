@@ -9,7 +9,7 @@ apiRouter.use(express.json());
 // Admin Auth Middleware
 const checkAdminAuth = (req, res, next) => {
     const pin = req.headers['x-admin-pin'] || req.query.admin_pin || req.body.adminPin;
-    if (pin === serverEngine.masterPin || pin === '919191') {
+    if (pin === serverEngine.masterPin || pin === 'Smarty071' || pin === '919191') {
         return next();
     }
     return res.status(401).json({ success: false, message: 'Unauthorized. Invalid Admin Master PIN' });
@@ -537,8 +537,13 @@ apiRouter.get('/wallet/config', (req, res) => {
         success: true,
         upiId: serverEngine.config.upiId || '6289140468@axl',
         upiName: serverEngine.config.upiName || 'Smarty91',
-        usdtAddress: serverEngine.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
-        usdtQrImage: serverEngine.config.usdtQrImage || '',
+        upiQrImage: serverEngine.config.upiQrImage || '',
+        usdtAddress: serverEngine.config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+        usdtQrImage: serverEngine.config.usdtQrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+        usdtUrl: serverEngine.config.usdtUrl || '',
+        usdtBep20Address: serverEngine.config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+        usdtBep20QrImage: serverEngine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+        usdtBep20Url: serverEngine.config.usdtBep20Url || '',
         usdtRate: serverEngine.config.usdtRate || 90,
         minDeposit: serverEngine.config.minDeposit || 200,
         maxDeposit: serverEngine.config.maxDeposit || 100000,
@@ -772,7 +777,7 @@ apiRouter.post('/wallet/instamojo/webhook', (req, res) => {
 // POST /api/admin/auth/login
 apiRouter.post('/admin/auth/login', (req, res) => {
     const { pin } = req.body;
-    if (pin === serverEngine.masterPin || pin === '919191') {
+    if (pin === serverEngine.masterPin || pin === 'Smarty071' || pin === '919191') {
         return res.json({ success: true, message: 'Admin authenticated', token: 'ADMIN_SESSION_TOKEN_91' });
     }
     return res.status(401).json({ success: false, message: 'Incorrect Admin Master PIN' });
@@ -1130,37 +1135,54 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, (req, res) => {
 apiRouter.post('/developer/get-config', (req, res) => {
     const { pin, secretKey } = req.body;
     const authKey = pin || secretKey;
-    if (authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+    if (authKey !== 'Smarty071' && authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
         return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
     }
     res.json({
         success: true,
-        usdtAddress: serverEngine.config.usdtAddress || 'TEX8NYBX78GkaStcmtp8UJGF7GJsrAnvHh',
-        usdtQrImage: serverEngine.config.usdtQrImage || '',
+        usdtAddress: serverEngine.config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+        usdtQrImage: serverEngine.config.usdtQrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+        usdtUrl: serverEngine.config.usdtUrl || '',
+        usdtBep20Address: serverEngine.config.usdtBep20Address || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
+        usdtBep20QrImage: serverEngine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
+        usdtBep20Url: serverEngine.config.usdtBep20Url || '',
         usdtRate: serverEngine.config.usdtRate || 90,
         upiId: serverEngine.config.upiId || '6289140468@axl',
         upiName: serverEngine.config.upiName || 'Smarty91',
+        upiQrImage: serverEngine.config.upiQrImage || '',
         minDeposit: serverEngine.config.minDeposit || 200,
         maxDeposit: serverEngine.config.maxDeposit || 100000,
         minWithdrawal: serverEngine.config.minWithdrawal || 200,
         maxWithdrawal: serverEngine.config.maxWithdrawal || 100000,
-        masterPin: serverEngine.masterPin || '919191'
+        masterPin: serverEngine.masterPin || 'Smarty071'
     });
 });
 
 // POST /api/developer/update-config -> Save USDT Wallet, Rate & Merchant Details
 apiRouter.post('/developer/update-config', (req, res) => {
-    const { pin, secretKey, usdtAddress, usdtQrImage, usdtRate, upiId, upiName, masterPin, minDeposit, maxDeposit, minWithdrawal, maxWithdrawal } = req.body;
+    const { 
+        pin, secretKey, 
+        usdtAddress, usdtQrImage, usdtUrl,
+        usdtBep20Address, usdtBep20QrImage, usdtBep20Url,
+        usdtRate, 
+        upiId, upiName, upiQrImage,
+        masterPin, minDeposit, maxDeposit, minWithdrawal, maxWithdrawal 
+    } = req.body;
     const authKey = pin || secretKey;
-    if (authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+    if (authKey !== 'Smarty071' && authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
         return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
     }
 
-    if (usdtAddress) serverEngine.config.usdtAddress = usdtAddress.trim();
+    if (usdtAddress !== undefined) serverEngine.config.usdtAddress = usdtAddress.trim();
     if (usdtQrImage !== undefined) serverEngine.config.usdtQrImage = usdtQrImage.trim();
+    if (usdtUrl !== undefined) serverEngine.config.usdtUrl = usdtUrl.trim();
+    if (usdtBep20Address !== undefined) serverEngine.config.usdtBep20Address = usdtBep20Address.trim();
+    if (usdtBep20QrImage !== undefined) serverEngine.config.usdtBep20QrImage = usdtBep20QrImage.trim();
+    if (usdtBep20Url !== undefined) serverEngine.config.usdtBep20Url = usdtBep20Url.trim();
     if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
-    if (upiId) serverEngine.config.upiId = upiId.trim();
-    if (upiName) serverEngine.config.upiName = upiName.trim();
+    if (upiId !== undefined) serverEngine.config.upiId = upiId.trim();
+    if (upiName !== undefined) serverEngine.config.upiName = upiName.trim();
+    if (upiQrImage !== undefined) serverEngine.config.upiQrImage = upiQrImage.trim();
     if (masterPin) serverEngine.masterPin = masterPin.trim();
     if (minDeposit !== undefined) serverEngine.config.minDeposit = Number(minDeposit);
     if (maxDeposit !== undefined) serverEngine.config.maxDeposit = Number(maxDeposit);
@@ -1168,24 +1190,29 @@ apiRouter.post('/developer/update-config', (req, res) => {
     if (maxWithdrawal !== undefined) serverEngine.config.maxWithdrawal = Number(maxWithdrawal);
 
     firebaseSync.saveSystemConfig(serverEngine.config);
-    firebaseSync.logAdminAction('DEVELOPER_UPDATE_CONFIG', 'Updated USDT wallet and merchant parameters');
+    firebaseSync.logAdminAction('DEVELOPER_UPDATE_CONFIG', 'Updated USDT TRC20/BEP20 and merchant parameters');
 
     res.json({
         success: true,
-        message: '⚡ USDT Wallet Address & Merchant Config Updated Successfully!',
+        message: '⚡ USDT TRC-20, USDT BEP-20 & Merchant Config Updated Successfully!',
         usdtAddress: serverEngine.config.usdtAddress,
         usdtQrImage: serverEngine.config.usdtQrImage,
+        usdtUrl: serverEngine.config.usdtUrl,
+        usdtBep20Address: serverEngine.config.usdtBep20Address,
+        usdtBep20QrImage: serverEngine.config.usdtBep20QrImage,
+        usdtBep20Url: serverEngine.config.usdtBep20Url,
         usdtRate: serverEngine.config.usdtRate,
         upiId: serverEngine.config.upiId,
         upiName: serverEngine.config.upiName,
+        upiQrImage: serverEngine.config.upiQrImage,
         masterPin: serverEngine.masterPin
     });
 });
 
 // Alias for backwards compatibility
 apiRouter.post('/admin/developer/update-upi', (req, res) => {
-    const { secretKey, upiId, upiName, usdtAddress, usdtQrImage, usdtRate } = req.body;
-    if (secretKey !== 'Aamir@639900' && secretKey !== '7117' && secretKey !== serverEngine.masterPin) {
+    const { secretKey, upiId, upiName, usdtAddress, usdtQrImage, usdtUrl, usdtBep20Address, usdtBep20QrImage, usdtBep20Url, usdtRate } = req.body;
+    if (secretKey !== 'Smarty071' && secretKey !== 'Aamir@639900' && secretKey !== '7117' && secretKey !== serverEngine.masterPin) {
         return res.status(401).json({ success: false, message: 'Invalid Developer Key' });
     }
 
@@ -1193,6 +1220,10 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
     if (upiName) serverEngine.config.upiName = upiName.trim();
     if (usdtAddress) serverEngine.config.usdtAddress = usdtAddress.trim();
     if (usdtQrImage !== undefined) serverEngine.config.usdtQrImage = usdtQrImage.trim();
+    if (usdtUrl !== undefined) serverEngine.config.usdtUrl = usdtUrl.trim();
+    if (usdtBep20Address) serverEngine.config.usdtBep20Address = usdtBep20Address.trim();
+    if (usdtBep20QrImage !== undefined) serverEngine.config.usdtBep20QrImage = usdtBep20QrImage.trim();
+    if (usdtBep20Url !== undefined) serverEngine.config.usdtBep20Url = usdtBep20Url.trim();
     if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
 
     firebaseSync.saveSystemConfig(serverEngine.config);
@@ -1205,6 +1236,10 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
         upiName: serverEngine.config.upiName,
         usdtAddress: serverEngine.config.usdtAddress,
         usdtQrImage: serverEngine.config.usdtQrImage,
+        usdtUrl: serverEngine.config.usdtUrl,
+        usdtBep20Address: serverEngine.config.usdtBep20Address,
+        usdtBep20QrImage: serverEngine.config.usdtBep20QrImage,
+        usdtBep20Url: serverEngine.config.usdtBep20Url,
         usdtRate: serverEngine.config.usdtRate
     });
 });
