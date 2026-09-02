@@ -7,6 +7,7 @@ import { notifyNewDeposit, notifyNewWithdrawal } from './telegramAlert.js';
 const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users_store.json');
 const BETS_FILE = path.join(DATA_DIR, 'bets_store.json');
+const HISTORY_FILE = path.join(DATA_DIR, 'history_store.json');
 const TOKEN_SECRET = process.env.SESSION_SECRET || 'smarty91_vip_secure_master_session_secret_2026';
 
 // Number Properties mapping (0-9)
@@ -132,9 +133,10 @@ class Smarty91ServerEngine {
         this.userTokens = new Map(); // token -> userId
         this.referralCodes = new Map(); // inviteCode -> userId
         
-        // Ensure disk directory exists and load persistent users immediately
+        // Ensure disk directory exists and load persistent users and history immediately
         this._ensureDataDir();
         this._loadUsersFromDisk();
+        this._loadHistoryFromDisk();
 
         // Transaction Ledger: Array of { id, userId, type, amount, balanceBefore, balanceAfter, referenceId, timestamp, description }
         this.ledger = [];
@@ -245,6 +247,56 @@ class Smarty91ServerEngine {
             fs.writeFileSync(BETS_FILE, JSON.stringify(betsArr, null, 2), 'utf8');
         } catch (e) {
             console.warn('[Engine] saveBetsToDisk note:', e.message);
+        }
+    }
+
+    _loadHistoryFromDisk() {
+        try {
+            if (fs.existsSync(HISTORY_FILE)) {
+                const data = fs.readFileSync(HISTORY_FILE, 'utf8');
+                const parsed = JSON.parse(data);
+                if (parsed && typeof parsed === 'object') {
+                    ['30s', '1m', '3m', '5m'].forEach(mode => {
+                        if (Array.isArray(parsed[mode]) && parsed[mode].length > 0) {
+                            const state = this.modes[mode];
+                            if (state) {
+                                state.history = parsed[mode];
+                                if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+                                parsed[mode].forEach(r => {
+                                    const pid = String(r.period || r.periodId || '');
+                                    if (pid && r.number !== undefined && r.number !== null) {
+                                        const num = Number(r.number);
+                                        const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+                                        state.settledOutcomesHistory.set(pid, {
+                                            number: num,
+                                            color: props.color,
+                                            size: props.size,
+                                            isOverridden: !!r.isOverridden,
+                                            reason: 'DISK_STORE'
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    console.log('[Engine] Loaded game history and settled outcomes map from persistent disk.');
+                }
+            }
+        } catch (e) {
+            console.warn('[Engine] loadHistoryFromDisk note:', e.message);
+        }
+    }
+
+    _saveHistoryToDisk() {
+        try {
+            this._ensureDataDir();
+            const exportData = {};
+            ['30s', '1m', '3m', '5m'].forEach(mode => {
+                exportData[mode] = (this.modes[mode] && this.modes[mode].history) ? this.modes[mode].history.slice(0, 50) : [];
+            });
+            fs.writeFileSync(HISTORY_FILE, JSON.stringify(exportData, null, 2), 'utf8');
+        } catch (e) {
+            console.warn('[Engine] saveHistoryToDisk note:', e.message);
         }
     }
 
@@ -681,6 +733,26 @@ class Smarty91ServerEngine {
         const state = this.modes[mode];
         if (!state) return;
         if (!state.history) state.history = [];
+        if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+
+        // 1. Index all existing history items into settledOutcomesHistory to prevent ANY recalculation
+        state.history.forEach(h => {
+            const pid = String(h.period || h.periodId || '');
+            if (pid && h.number !== undefined && h.number !== null) {
+                const num = Number(h.number);
+                const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+                if (!state.settledOutcomesHistory.has(pid)) {
+                    state.settledOutcomesHistory.set(pid, {
+                        number: num,
+                        color: props.color,
+                        size: props.size,
+                        isOverridden: !!h.isOverridden,
+                        reason: 'EXISTING_HISTORY'
+                    });
+                }
+            }
+        });
+
         // Filter out stale non-14-digit universal sync rounds
         state.history = state.history.filter(h => {
             const pId = String(h.period || h.periodId || '');
@@ -699,18 +771,19 @@ class Smarty91ServerEngine {
             if (state.history.length + newRounds.length >= 50) break;
             const pastTime = now - (i * interval);
             const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
+            const pastPeriodStr = String(pastPeriodId);
 
-            if (pastPeriodId !== currentActivePeriod && !existingPeriods.has(String(pastPeriodId))) {
-                existingPeriods.add(String(pastPeriodId));
+            if (pastPeriodId !== currentActivePeriod && !existingPeriods.has(pastPeriodStr)) {
+                existingPeriods.add(pastPeriodStr);
                 let num;
-                if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(String(pastPeriodId))) {
-                    num = state.settledOutcomesHistory.get(String(pastPeriodId)).number;
-                } else if (state.preDecidedOutcomes && state.preDecidedOutcomes[String(pastPeriodId)]) {
-                    num = state.preDecidedOutcomes[String(pastPeriodId)].number;
+                if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pastPeriodStr)) {
+                    num = state.settledOutcomesHistory.get(pastPeriodStr).number;
+                } else if (state.preDecidedOutcomes && state.preDecidedOutcomes[pastPeriodStr]) {
+                    num = state.preDecidedOutcomes[pastPeriodStr].number;
                 } else {
-                    num = this._calculateDeterministicOutcome(mode, pastPeriodId);
+                    num = this._calculateDeterministicOutcome(mode, pastPeriodStr);
                 }
-                const props = NUMBER_PROPERTIES[num];
+                const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
                 const roundRecord = {
                     period: pastPeriodId,
                     number: num,
@@ -721,6 +794,15 @@ class Smarty91ServerEngine {
                     isOverridden: false
                 };
                 newRounds.push(roundRecord);
+                if (!state.settledOutcomesHistory.has(pastPeriodStr)) {
+                    state.settledOutcomesHistory.set(pastPeriodStr, {
+                        number: num,
+                        color: props.color,
+                        size: props.size,
+                        isOverridden: false,
+                        reason: 'DETERMINISTIC_HISTORY_FILL'
+                    });
+                }
             }
         }
 
@@ -733,7 +815,15 @@ class Smarty91ServerEngine {
         state.history.forEach(item => {
             const pId = String(item.period || item.periodId || '');
             if (pId && !map.has(pId)) {
-                map.set(pId, item);
+                const num = Number(item.number);
+                const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+                map.set(pId, {
+                    ...item,
+                    number: num,
+                    color: props.color,
+                    size: props.size,
+                    colorLabel: props.label
+                });
             }
         });
 
@@ -745,6 +835,7 @@ class Smarty91ServerEngine {
         });
 
         state.history = deduped.slice(0, 50);
+        this._saveHistoryToDisk();
     }
 
     _seedInitialHistory() {
@@ -805,9 +896,37 @@ class Smarty91ServerEngine {
 
     // Secret 24/7 Cryptographic Seed Formula for Natural Outcomes
     _calculateDeterministicOutcome(mode, periodId) {
-        const seedStr = `SMARTY91_SECRET_MASTER_SEED_2026_${mode}_${periodId}`;
+        const state = this.modes[mode];
+        const pidStr = String(periodId);
+        if (state) {
+            if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
+                return state.settledOutcomesHistory.get(pidStr).number;
+            }
+            if (state.preDecidedOutcomes && state.preDecidedOutcomes[pidStr]) {
+                return state.preDecidedOutcomes[pidStr].number;
+            }
+            if (state.history && Array.isArray(state.history)) {
+                const found = state.history.find(h => String(h.period || h.periodId) === pidStr);
+                if (found && found.number !== undefined && found.number !== null) {
+                    return Number(found.number);
+                }
+            }
+        }
+        const seedStr = `SMARTY91_SECRET_MASTER_SEED_2026_${mode}_${pidStr}`;
         const hex = crypto.createHash('sha256').update(seedStr).digest('hex');
         const num = parseInt(hex.substring(0, 8), 16) % 10;
+
+        if (state) {
+            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+            const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
+            state.settledOutcomesHistory.set(pidStr, {
+                number: num,
+                color: props.color,
+                size: props.size,
+                isOverridden: false,
+                reason: 'DETERMINISTIC_COMPUTED'
+            });
+        }
         return num;
     }
 
@@ -1347,6 +1466,16 @@ class Smarty91ServerEngine {
         state.history = state.history.filter(h => String(h.period || h.periodId) !== String(periodId));
         state.history.unshift(roundRecord);
         if (state.history.length > 50) state.history.length = 50;
+
+        if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+        state.settledOutcomesHistory.set(String(periodId), {
+            number: roundRecord.number,
+            color: roundRecord.color,
+            size: roundRecord.size,
+            isOverridden: !!roundRecord.isOverridden,
+            reason: 'SETTLED_ROUND'
+        });
+        this._saveHistoryToDisk();
 
         // Save users, bets, and ledger changes synchronously to local disk to ensure data integrity
         if (evaluatedBets.length > 0) {

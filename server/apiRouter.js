@@ -278,6 +278,10 @@ apiRouter.get('/games/history/:mode', (req, res) => {
         return res.status(404).json({ success: false, message: 'Invalid mode' });
     }
 
+    if (!state.history || state.history.length < 50) {
+        serverEngine.ensureFull50RoundsHistory(mode);
+    }
+
     const start = (page - 1) * limit;
     const items = state.history.slice(start, start + limit);
     const totalPages = Math.max(1, Math.ceil(state.history.length / limit));
@@ -299,6 +303,10 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
     const state = serverEngine.modes[mode];
     if (!state) {
         return res.status(404).json({ success: false, message: 'Invalid mode' });
+    }
+
+    if (!state.history || state.history.length < 50) {
+        serverEngine.ensureFull50RoundsHistory(mode);
     }
 
     const recent = state.history.slice(0, 50);

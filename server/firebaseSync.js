@@ -140,9 +140,26 @@ class FirebaseSyncManager {
                     if (snap.exists()) {
                         const data = snap.data();
                         if (data && Array.isArray(data.rounds) && data.rounds.length > 0) {
-                            this.engine.modes[mode].history = data.rounds.filter(r => {
+                            const validRounds = data.rounds.filter(r => {
                                 const pId = String(r.period || r.periodId || '');
                                 return pId.length === 14;
+                            });
+                            this.engine.modes[mode].history = validRounds;
+                            if (!this.engine.modes[mode].settledOutcomesHistory) {
+                                this.engine.modes[mode].settledOutcomesHistory = new Map();
+                            }
+                            validRounds.forEach(r => {
+                                const pId = String(r.period || r.periodId || '');
+                                if (pId && r.number !== undefined && r.number !== null) {
+                                    const num = Number(r.number);
+                                    this.engine.modes[mode].settledOutcomesHistory.set(pId, {
+                                        number: num,
+                                        color: r.color,
+                                        size: r.size,
+                                        isOverridden: !!r.isOverridden,
+                                        reason: 'FIRESTORE_HYDRATE'
+                                    });
+                                }
                             });
                         }
                     }
