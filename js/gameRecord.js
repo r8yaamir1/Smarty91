@@ -86,8 +86,9 @@ export function renderWinningTokensForActiveMode() {
         tokens = state.tokens.slice(0, 5).map(n => Number(n));
     }
 
+    const currentlyRenderedMode = tokenParent.getAttribute('data-rendered-mode');
     const tokensKey = `${mode}:${tokens.join(',')}`;
-    if (renderedTokensMap.get(mode) === tokensKey && tokenParent.children.length === tokens.length) {
+    if (currentlyRenderedMode === mode && renderedTokensMap.get(mode) === tokensKey && tokenParent.children.length === tokens.length) {
         return;
     }
     renderedTokensMap.set(mode, tokensKey);
@@ -101,6 +102,7 @@ export function renderWinningTokensForActiveMode() {
     });
 
     tokenParent.replaceChildren(fragment);
+    tokenParent.setAttribute('data-rendered-mode', mode);
 }
 
 // Format and update 5-box digital stopwatch display

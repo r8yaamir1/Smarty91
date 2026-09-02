@@ -336,8 +336,9 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     // Fast structural diff check: if the exact same page & items are already displayed, do not wipe/touch DOM
+    const currentlyRenderedMode = container.getAttribute('data-rendered-mode');
     const cacheKey = `${mode}:${state.historyPage}:${items.map(it => `${it.periodId}_${it.number}_${it.isBig}`).join('|')}`;
-    if (renderedHistoryCache.get(mode) === cacheKey && container.children.length === items.length) {
+    if (currentlyRenderedMode === mode && renderedHistoryCache.get(mode) === cacheKey && container.children.length === items.length) {
         if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
         if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
         if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
@@ -403,6 +404,7 @@ export function renderGameHistory(modeInput = activeModeKey) {
     });
 
     container.replaceChildren(fragment);
+    container.setAttribute('data-rendered-mode', mode);
 
     if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
     if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
@@ -436,8 +438,9 @@ export function renderChartTrend(modeInput = activeModeKey) {
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     // Fast structural diff check for chart
+    const currentlyRenderedMode = chartView.getAttribute('data-rendered-mode');
     const chartKey = `${mode}:${state.chartPage}:${items.map(it => `${it.periodId}_${it.number}`).join('|')}`;
-    if (renderedChartCache.get(mode) === chartKey && chartView.children.length > 0) {
+    if (currentlyRenderedMode === mode && renderedChartCache.get(mode) === chartKey && chartView.children.length > 0) {
         return;
     }
     renderedChartCache.set(mode, chartKey);
@@ -559,6 +562,8 @@ export function renderChartTrend(modeInput = activeModeKey) {
             </div>
         </div>
     `;
+
+    chartView.setAttribute('data-rendered-mode', mode);
 
     // Bind pagination for Chart Trend
     const prevBtn = chartView.querySelector('.Trend__C-foot-previous');
