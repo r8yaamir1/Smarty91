@@ -499,7 +499,14 @@ export async function initGameRecord() {
                 if (!periodData) return;
                 const state = gameModes[mode];
                 if (!state) return;
-                if (periodData.currentPeriodId) state.currentIssueNumber = periodData.currentPeriodId;
+                if (periodData.currentPeriodId) {
+                    state.currentIssueNumber = periodData.currentPeriodId;
+                    if (String(periodData.currentPeriodId).length === 17) {
+                        localStorage.setItem('universal_sync_active', 'true');
+                    } else {
+                        localStorage.setItem('universal_sync_active', 'false');
+                    }
+                }
                 if (periodData.remainingSeconds !== undefined) state.remainingSeconds = periodData.remainingSeconds;
                 if (periodData.isLocked !== undefined) state.isLockoutActive = periodData.isLocked;
                 if (periodData.currentEndTimeMs) state.currentEndTimeMs = periodData.currentEndTimeMs;

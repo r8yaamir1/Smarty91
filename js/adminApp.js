@@ -635,6 +635,16 @@ function renderOutcomesView(container) {
                     <input type="checkbox" id="universal-sync-toggle" ${liveData.config?.universalSync ? 'checked' : ''} style="transform: scale(1.6); accent-color: #10b981; cursor: pointer; margin-right: 6px;" />
                 </div>
             </div>
+            <div class="sync-api-container" style="margin-top: 12px; border-top: 1px dashed rgba(16,185,129,0.2); padding-top: 12px; display: ${liveData.config?.universalSync ? 'block' : 'none'};">
+                <label style="font-size: 12px; font-weight: 700; color: #10b981; display: block; margin-bottom: 6px;">🔗 Real-time Sync API URL (Optional)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="url" class="sync-api-url" placeholder="e.g. https://api.tiranga.live/wingo/latest" value="${liveData.config?.syncApiUrl || ''}" style="flex: 1; padding: 8px 12px; font-size: 12px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); background: var(--bg-input); color: #fff;" />
+                    <button class="save-sync-url-btn" style="padding: 8px 14px; font-size: 11px; font-weight: 800; border-radius: 6px; background: #10b981; color: #000; border: none; cursor: pointer;">Save URL</button>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                    Provide any REST API URL that returns current Wingo results (JSON format: <code>{"period": "2026...", "number": 5}</code>). If empty or request fails, the engine falls back to 100% accurate cryptographic auto-sync.
+                </div>
+            </div>
         </div>
 
         <div class="admin-card">
@@ -1045,16 +1055,44 @@ function renderOutcomesView(container) {
 
     // Universal Sync Toggle Event Listener
     const syncToggle = container.querySelector('#universal-sync-toggle');
+    const syncApiContainer = container.querySelector('.sync-api-container');
     if (syncToggle) {
         syncToggle.addEventListener('change', async () => {
             const isChecked = syncToggle.checked;
+            if (syncApiContainer) {
+                syncApiContainer.style.display = isChecked ? 'block' : 'none';
+            }
             try {
                 await adminService.updateRiskEngineConfig({ universalSync: isChecked });
                 alert(`Universal Betting Sync is now ${isChecked ? 'ENABLED' : 'DISABLED'}.`);
                 await fetchAndRefreshData();
             } catch (err) {
                 syncToggle.checked = !isChecked; // Revert checkbox on error
+                if (syncApiContainer) {
+                    syncApiContainer.style.display = !isChecked ? 'block' : 'none';
+                }
                 alert(err.message || 'Failed to update Universal Sync state');
+            }
+        });
+    }
+
+    // Save Sync API URL
+    const saveSyncUrlBtn = container.querySelector('.save-sync-url-btn');
+    const syncApiUrlInput = container.querySelector('.sync-api-url');
+    if (saveSyncUrlBtn && syncApiUrlInput) {
+        saveSyncUrlBtn.addEventListener('click', async () => {
+            const url = syncApiUrlInput.value.trim();
+            saveSyncUrlBtn.disabled = true;
+            saveSyncUrlBtn.textContent = 'Saving...';
+            try {
+                await adminService.updateRiskEngineConfig({ syncApiUrl: url });
+                alert('Universal Sync API URL updated successfully!');
+                await fetchAndRefreshData();
+            } catch (err) {
+                alert(err.message || 'Failed to save Sync API URL');
+            } finally {
+                saveSyncUrlBtn.disabled = false;
+                saveSyncUrlBtn.textContent = 'Save URL';
             }
         });
     }
@@ -1090,6 +1128,16 @@ function renderChancesView(container) {
                 </div>
                 <div>
                     <input type="checkbox" id="universal-sync-toggle" ${liveData.config?.universalSync ? 'checked' : ''} style="transform: scale(1.6); accent-color: #10b981; cursor: pointer; margin-right: 6px;" />
+                </div>
+            </div>
+            <div class="sync-api-container" style="margin-top: 12px; border-top: 1px dashed rgba(16,185,129,0.2); padding-top: 12px; display: ${liveData.config?.universalSync ? 'block' : 'none'};">
+                <label style="font-size: 12px; font-weight: 700; color: #10b981; display: block; margin-bottom: 6px;">🔗 Real-time Sync API URL (Optional)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="url" class="sync-api-url" placeholder="e.g. https://api.tiranga.live/wingo/latest" value="${liveData.config?.syncApiUrl || ''}" style="flex: 1; padding: 8px 12px; font-size: 12px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); background: var(--bg-input); color: #fff;" />
+                    <button class="save-sync-url-btn" style="padding: 8px 14px; font-size: 11px; font-weight: 800; border-radius: 6px; background: #10b981; color: #000; border: none; cursor: pointer;">Save URL</button>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+                    Provide any REST API URL that returns current Wingo results (JSON format: <code>{"period": "2026...", "number": 5}</code>). If empty or request fails, the engine falls back to 100% accurate cryptographic auto-sync.
                 </div>
             </div>
         </div>
@@ -1279,16 +1327,44 @@ function renderChancesView(container) {
 
     // Universal Sync Toggle Event Listener
     const syncToggle = container.querySelector('#universal-sync-toggle');
+    const syncApiContainer = container.querySelector('.sync-api-container');
     if (syncToggle) {
         syncToggle.addEventListener('change', async () => {
             const isChecked = syncToggle.checked;
+            if (syncApiContainer) {
+                syncApiContainer.style.display = isChecked ? 'block' : 'none';
+            }
             try {
                 await adminService.updateRiskEngineConfig({ universalSync: isChecked });
                 alert(`Universal Betting Sync is now ${isChecked ? 'ENABLED' : 'DISABLED'}.`);
                 await fetchAndRefreshData();
             } catch (err) {
                 syncToggle.checked = !isChecked; // Revert checkbox on error
+                if (syncApiContainer) {
+                    syncApiContainer.style.display = !isChecked ? 'block' : 'none';
+                }
                 alert(err.message || 'Failed to update Universal Sync state');
+            }
+        });
+    }
+
+    // Save Sync API URL
+    const saveSyncUrlBtn = container.querySelector('.save-sync-url-btn');
+    const syncApiUrlInput = container.querySelector('.sync-api-url');
+    if (saveSyncUrlBtn && syncApiUrlInput) {
+        saveSyncUrlBtn.addEventListener('click', async () => {
+            const url = syncApiUrlInput.value.trim();
+            saveSyncUrlBtn.disabled = true;
+            saveSyncUrlBtn.textContent = 'Saving...';
+            try {
+                await adminService.updateRiskEngineConfig({ syncApiUrl: url });
+                alert('Universal Sync API URL updated successfully!');
+                await fetchAndRefreshData();
+            } catch (err) {
+                alert(err.message || 'Failed to save Sync API URL');
+            } finally {
+                saveSyncUrlBtn.disabled = false;
+                saveSyncUrlBtn.textContent = 'Save URL';
             }
         });
     }
