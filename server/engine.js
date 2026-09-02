@@ -2339,14 +2339,26 @@ class Smarty91ServerEngine {
         return null;
     }
 
+    _getReferralDepositRate(depositAmount) {
+        const amt = Number(depositAmount) || 0;
+        if (amt >= 1000000) return 10;
+        if (amt >= 500000) return 8;
+        if (amt >= 200000) return 7;
+        if (amt >= 100000) return 6;
+        if (amt >= 5000) return 5;
+        return 5;
+    }
+
     _processReferralDepositCommission(depositingUser, depositAmount, txReferenceId = '') {
         try {
-            if (!depositingUser || Number(depositAmount) <= 0) return;
+            const numDeposit = Number(depositAmount);
+            if (!depositingUser || numDeposit <= 0) return;
             const referrer = this._getReferrer(depositingUser);
             if (!referrer) return;
 
-            // 10% Instant Deposit Commission
-            const commission = Number((Number(depositAmount) * 0.10).toFixed(2));
+            // Tiered Deposit Commission (5k-100k: 5%, 100k-200k: 6%, 200k-500k: 7%, 500k-1000k: 8%, 1000k+: 10%)
+            const commRate = this._getReferralDepositRate(numDeposit);
+            const commission = Number((numDeposit * (commRate / 100)).toFixed(2));
             if (commission <= 0) return;
 
             const refBalBefore = referrer.balance;
@@ -2367,19 +2379,19 @@ class Smarty91ServerEngine {
                 balanceAfter: refBalAfter,
                 referenceId: txReferenceId || ('DEP_' + Date.now()),
                 timestamp: new Date().toISOString(),
-                description: `⚡ 10% Deposit Bonus: ₹${commission} from invited friend (${maskedPhone}) on ₹${depositAmount} recharge`
+                description: `⚡ ${commRate}% Deposit Bonus: ₹${commission} from invited friend (${maskedPhone}) on ₹${depositAmount} recharge`
             };
 
             this.ledger.unshift(ledgerEntry);
             this._saveUsersToDisk();
 
-            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `10% Deposit Referral Bonus ₹${commission}`);
+            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `${commRate}% Deposit Referral Bonus ₹${commission}`);
             firebaseSync.saveTransaction(ledgerEntry);
 
             this.auditLogs.unshift({
                 id: 'AUDIT_' + Date.now(),
                 action: 'REFERRAL_DEPOSIT_COMMISSION',
-                details: `Awarded ₹${commission} (10%) to ${referrer.phone} for ₹${depositAmount} deposit from ${depositingUser.phone}`,
+                details: `Awarded ₹${commission} (${commRate}%) to ${referrer.phone} for ₹${depositAmount} deposit from ${depositingUser.phone}`,
                 timestamp: new Date().toISOString()
             });
 
@@ -2517,7 +2529,8 @@ class Smarty91ServerEngine {
                 // Collect individual deposit events for live stream timeline
                 userDeposits.forEach(depTx => {
                     const dAmt = Number(depTx.amount) || 0;
-                    const comm = Number((dAmt * 0.10).toFixed(2));
+                    const commRate = this._getReferralDepositRate(dAmt);
+                    const comm = Number((dAmt * (commRate / 100)).toFixed(2));
                     const phoneStr = String(u.phone || u.username || '9876543210');
                     const maskedPhone = phoneStr.length >= 10 ? phoneStr.slice(0, 2) + '******' + phoneStr.slice(-2) : phoneStr;
                     downlineDepositEvents.push({
@@ -2525,7 +2538,7 @@ class Smarty91ServerEngine {
                         friendPhone: maskedPhone,
                         friendUserId: u.id,
                         depositAmount: dAmt,
-                        commissionRate: 10,
+                        commissionRate: commRate,
                         commissionEarned: comm,
                         channel: depTx.channel || 'UPI',
                         timestamp: depTx.timestamp || new Date().toISOString(),
@@ -2537,7 +2550,19 @@ class Smarty91ServerEngine {
                 const betSum = userBets.reduce((acc, b) => acc + (Number(b.totalAmount) || 0), 0);
                 totalBetVolume += betSum;
 
-                const depCommFromUser = Number((depSum * 0.10).toFixed(2));
+                // Calculate total deposit commission accurately per deposit transaction
+                let depCommFromUser = userDeposits.reduce((acc, depTx) => {
+                    const dAmt = Number(depTx.amount) || 0;
+                    const commRate = this._getReferralDepositRate(dAmt);
+                    return acc + Number((dAmt * (commRate / 100)).toFixed(2));
+                }, 0);
+
+                if (userDeposits.length === 0 && depSum > 0) {
+                    const commRate = this._getReferralDepositRate(depSum);
+                    depCommFromUser = Number((depSum * (commRate / 100)).toFixed(2));
+                }
+                depCommFromUser = Number(depCommFromUser.toFixed(2));
+
                 const betCommFromUser = Number((betSum * 0.01).toFixed(2));
                 const totalCommFromUser = Number((depCommFromUser + betCommFromUser).toFixed(2));
 
@@ -2627,7 +2652,7 @@ class Smarty91ServerEngine {
         const betCommLedger = userLedgers.filter(l => l.type === 'REFERRAL_BET_COMMISSION').reduce((s, l) => s + Math.max(0, Number(l.amount) || 0), 0);
         const milestoneLedger = userLedgers.filter(l => l.type === 'REFERRAL_MILESTONE_BONUS').reduce((s, l) => s + Math.max(0, Number(l.amount) || 0), 0);
 
-        const depComm = Number((user.depositCommissionEarned !== undefined ? user.depositCommissionEarned : (depCommLedger || (totalDepositVolume * 0.10))).toFixed(2));
+        const depComm = Number((user.depositCommissionEarned !== undefined ? user.depositCommissionEarned : (depCommLedger || referredList.reduce((acc, r) => acc + (r.depositCommission || 0), 0))).toFixed(2));
         const betComm = Number((user.betCommissionEarned !== undefined ? user.betCommissionEarned : (betCommLedger || (totalBetVolume * 0.01))).toFixed(2));
         const milestoneComm = Number((user.milestoneBonusEarned !== undefined ? user.milestoneBonusEarned : milestoneLedger).toFixed(2));
         const totalEarned = Number((user.totalReferralCommission !== undefined ? user.totalReferralCommission : (depComm + betComm + milestoneComm)).toFixed(2));
@@ -2635,7 +2660,7 @@ class Smarty91ServerEngine {
         const awardedMs = user.awardedMilestones || [];
 
         const milestoneDefinitions = [
-            { count: 1, bonus: 20, title: '1 Active Friend', desc: '10% Deposit + 1% Bet Active', isUnlocked: activeCount >= 1, isAwarded: awardedMs.includes(1) },
+            { count: 1, bonus: 20, title: '1 Active Friend', desc: 'Tiered Deposit + 1% Bet Active', isUnlocked: activeCount >= 1, isAwarded: awardedMs.includes(1) },
             { count: 3, bonus: 50, title: '3 Active Friends', desc: 'Bronze Agent + ₹50 Bonus', isUnlocked: activeCount >= 3, isAwarded: awardedMs.includes(3) },
             { count: 5, bonus: 150, title: '5 Friends (SUPER AGENT)', desc: '5/5 Milestone Complete + ₹150 Bonus', isUnlocked: activeCount >= 5, isAwarded: awardedMs.includes(5), isFeatured: true },
             { count: 10, bonus: 500, title: '10 Active Friends', desc: 'Master Agent + ₹500 Bonus', isUnlocked: activeCount >= 10, isAwarded: awardedMs.includes(10) },

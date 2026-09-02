@@ -541,7 +541,7 @@
         <div class="salary-chart-card">
             <div class="salary-chart-header">
                 <div class="salary-chart-title">💰 REFERRAL SALARY CHART</div>
-                <div class="salary-chart-pill">FIXED SALARY — 10%</div>
+                <div class="salary-chart-pill">TIERED SALARY — 5% TO 10%</div>
             </div>
 
             <table class="salary-chart-table">
@@ -554,19 +554,19 @@
                 <tbody>
                     <tr>
                         <td>🔹 ₹5,000 – ₹1,00,000</td>
-                        <td style="text-align: right;"><span class="pct-badge">10%</span></td>
+                        <td style="text-align: right;"><span class="pct-badge">5%</span></td>
                     </tr>
                     <tr>
                         <td>🔹 ₹1,00,000 – ₹2,00,000</td>
-                        <td style="text-align: right;"><span class="pct-badge">10%</span></td>
+                        <td style="text-align: right;"><span class="pct-badge">6%</span></td>
                     </tr>
                     <tr>
                         <td>🔹 ₹2,00,000 – ₹5,00,000</td>
-                        <td style="text-align: right;"><span class="pct-badge">10%</span></td>
+                        <td style="text-align: right;"><span class="pct-badge">7%</span></td>
                     </tr>
                     <tr>
                         <td>🔹 ₹5,00,000 – ₹10,00,000</td>
-                        <td style="text-align: right;"><span class="pct-badge">10%</span></td>
+                        <td style="text-align: right;"><span class="pct-badge">8%</span></td>
                     </tr>
                     <tr>
                         <td>👑 ₹10,00,000+</td>
@@ -591,7 +591,7 @@
 
             <div class="hero-stats-row">
                 <div class="mini-stat">
-                    <span class="mini-stat-lbl">10% Deposits</span>
+                    <span class="mini-stat-lbl">Deposit Bonus</span>
                     <div id="comm-depos-val" class="mini-stat-val" style="color:#34d399;">₹0.00</div>
                 </div>
                 <div class="mini-stat">
@@ -773,6 +773,22 @@
             }
         }
 
+        function getReferralDepositRate(amount) {
+            const num = Number(amount) || 0;
+            if (num >= 1000000) return 10;
+            if (num >= 500000) return 8;
+            if (num >= 200000) return 7;
+            if (num >= 100000) return 6;
+            if (num >= 5000) return 5;
+            return 5;
+        }
+
+        function calculateDepositCommission(amount) {
+            const num = Number(amount) || 0;
+            const rate = getReferralDepositRate(num);
+            return Number((num * (rate / 100)).toFixed(2));
+        }
+
         function renderTeamList(referralsList) {
             const teamListEl = document.getElementById('team-records-list');
             const searchCountEl = document.getElementById('search-member-count');
@@ -801,7 +817,7 @@
                     }
 
                     const depAmt = Number(r.totalDeposited) || 0;
-                    const comm = Number(r.totalCommission) || (depAmt * 0.10);
+                    const comm = Number(r.totalCommission) || (r.depositCommission !== undefined ? (Number(r.depositCommission) + Number(r.betCommission || 0)) : calculateDepositCommission(depAmt));
 
                     return `
                     <div class="member-item-row">
@@ -811,7 +827,7 @@
                                 <span class="uid-tag">UID: ${memberUid}</span>
                             </div>
                             <div class="member-sub-info">
-                                <span>Dep: ₹${depAmt.toLocaleString('en-IN')}</span>
+                                <span>Dep: ₹${depAmt.toLocaleString('en-IN')} (${getReferralDepositRate(depAmt)}%)</span>
                             </div>
                         </div>
 
@@ -892,12 +908,14 @@
                 renderTeamList(refData.referrals || []);
             }
 
-            // Render Live 10% Cash Stream Events
+            // Render Live Cash Stream Events
             const liveStreamListEl = document.getElementById('live-deposit-events-list');
             if (liveStreamListEl) {
                 const events = refData.downlineDepositEvents || [];
                 if (events.length > 0) {
-                    liveStreamListEl.innerHTML = events.map(e => `
+                    liveStreamListEl.innerHTML = events.map(e => {
+                        const rate = e.commissionRate || getReferralDepositRate(e.depositAmount);
+                        return `
                         <div class="member-item-row">
                             <div>
                                 <div style="font-size: 11.5px; font-weight: 700;">📱 ${e.friendPhone}</div>
@@ -905,14 +923,14 @@
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-size: 12px; font-weight: 800; color: #34d399;">+₹${Number(e.commissionEarned).toFixed(2)}</div>
-                                <span class="status-dot-tag active">10% Cash</span>
+                                <span class="status-dot-tag active">${rate}% Cash</span>
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 } else {
                     liveStreamListEl.innerHTML = `
                         <div style="font-size: 11px; color: #8E94A5; text-align: center; padding: 12px;">
-                            Share your link to see live 10% cash payout activity!
+                            Share your link to see live tiered cash payout activity!
                         </div>
                     `;
                 }
@@ -945,8 +963,10 @@
             document.getElementById('calc-bet-val').textContent = `₹${dailyBet.toLocaleString('en-IN')}/day`;
 
             const monthlyBetCommission = friends * dailyBet * 0.01 * 30;
-            const estimatedDepositCommission = friends * (dailyBet * 0.5) * 0.10;
-            const totalMonthly = monthlyBetCommission + estimatedDepositCommission;
+            const avgDeposit = dailyBet * 0.5;
+            const depRate = getReferralDepositRate(avgDeposit);
+            const estimatedDepositCommission = friends * avgDeposit * (depRate / 100) * 30;
+            const totalMonthly = monthlyBetCommission + (friends * avgDeposit * (depRate / 100));
 
             document.getElementById('calc-result-total').textContent = `₹${Math.round(totalMonthly).toLocaleString('en-IN')}/mo`;
         };
