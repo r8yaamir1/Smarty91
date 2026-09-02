@@ -20,6 +20,97 @@ let referralState = {
 };
 
 // Switch between Home Dashboard and Live Colour Prediction
+export function showDepositRequiredModal() {
+    let modal = document.getElementById('deposit-required-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'deposit-required-modal';
+        modal.className = 'van-overlay';
+        modal.style.cssText = 'display: flex; position: fixed; inset: 0; background: rgba(10, 14, 23, 0.82); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; opacity: 0; transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);';
+        modal.innerHTML = `
+            <div id="deposit-required-modal-box" style="background: #171c28; border: 1px solid rgba(243, 186, 47, 0.35); border-radius: 4px; padding: 24px 20px 20px 20px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.85), 0 0 20px rgba(243, 186, 47, 0.12); transform: scale(0.92); transition: transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative;">
+                <button id="deposit-modal-close-x" style="position: absolute; top: 10px; right: 12px; background: transparent; border: none; color: #718096; font-size: 18px; cursor: pointer; line-height: 1; padding: 4px; display: flex; align-items: center; justify-content: center;">&times;</button>
+                <div style="width: 52px; height: 52px; margin: 0 auto 16px; background: rgba(243, 186, 47, 0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(243, 186, 47, 0.3);">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#f3ba2f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h3 style="color: #f3ba2f; font-size: 17px; font-weight: 800; margin: 0 0 8px 0; letter-spacing: 0.3px;">First Deposit Required</h3>
+                <p style="color: #94a3b8; font-size: 13px; line-height: 1.55; margin: 0 0 22px 0;">
+                    Please complete your first deposit to unlock all live games and start playing.
+                </p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="deposit-modal-cancel-btn" style="flex: 1; background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.12); padding: 11px; border-radius: 4px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.15s ease;">Cancel</button>
+                    <a href="payment.html?tab=deposit" style="flex: 1.3; background: linear-gradient(135deg, #f3ba2f 0%, #e1a116 100%); color: #0d1117; text-decoration: none; padding: 11px; border-radius: 4px; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 14px rgba(243, 186, 47, 0.25); border: none; transition: all 0.15s ease;">
+                        <span>Deposit Now</span>
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeModalFunc = () => {
+            modal.style.opacity = '0';
+            const box = document.getElementById('deposit-required-modal-box');
+            if (box) box.style.transform = 'scale(0.92)';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
+        };
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModalFunc();
+        });
+
+        const cancelBtn = document.getElementById('deposit-modal-cancel-btn');
+        if (cancelBtn) cancelBtn.onclick = closeModalFunc;
+
+        const closeX = document.getElementById('deposit-modal-close-x');
+        if (closeX) closeX.onclick = closeModalFunc;
+    }
+
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => {
+        modal.style.opacity = '1';
+        const box = document.getElementById('deposit-required-modal-box');
+        if (box) box.style.transform = 'scale(1)';
+    });
+}
+window.showDepositRequiredModal = showDepositRequiredModal;
+
+export async function verifyDepositStatus() {
+    const token = localStorage.getItem('smarty91_auth_token');
+    if (!token) {
+        window.location.href = 'login.html';
+        return false;
+    }
+    try {
+        const resp = await fetch('/api/user/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.success && data.user) {
+                if (data.user.hasDeposited) {
+                    localStorage.setItem('smarty91_has_deposited', 'true');
+                    return true;
+                } else {
+                    localStorage.setItem('smarty91_has_deposited', 'false');
+                    return false;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to verify deposit status:', e);
+    }
+    return localStorage.getItem('smarty91_has_deposited') === 'true';
+}
+
 export function switchView(viewName) {
     const homeView = document.getElementById('home-dashboard-view');
     const wingoView = document.getElementById('wingo-game-view');
@@ -64,6 +155,12 @@ export function switchView(viewName) {
 
 // VIP Game Opening with Sync Loader
 export async function openGameWithLoader(targetView = 'game') {
+    const isDeposited = await verifyDepositStatus();
+    if (!isDeposited) {
+        showDepositRequiredModal();
+        return; // Stop execution: Game will not open without at least 1 deposit!
+    }
+
     const overlay = document.getElementById('game-sync-overlay');
     const meterBar = document.getElementById('game-sync-meter-bar');
     const statusText = document.getElementById('game-sync-status-text');
@@ -359,7 +456,14 @@ export function initHomeNavigation() {
     const tabParam = urlParams.get('tab');
 
     if (viewParam === 'game') {
-        switchView('game');
+        verifyDepositStatus().then(hasDep => {
+            if (hasDep) {
+                switchView('game');
+            } else {
+                switchView('home');
+                showDepositRequiredModal();
+            }
+        });
     } else {
         switchView('home');
     }

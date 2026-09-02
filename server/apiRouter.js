@@ -35,6 +35,16 @@ const getAuthUserAsync = async (req) => {
     return null;
 };
 
+const normalizeMode = (modeInput) => {
+    if (!modeInput) return '30s';
+    const str = String(modeInput).toLowerCase();
+    if (str.includes('30s') || str === '30') return '30s';
+    if (str.includes('1m') || str.includes('1min') || str === '1') return '1m';
+    if (str.includes('3m') || str.includes('3min') || str === '3') return '3m';
+    if (str.includes('5m') || str.includes('5min') || str === '5') return '5m';
+    return '30s';
+};
+
 // -------------------------------------------------------------
 // 0. AUTHENTICATION & USER MANAGEMENT (DIRECT FAST REGISTRATION + SECURE RECOVERY)
 // -------------------------------------------------------------
@@ -269,7 +279,7 @@ apiRouter.get('/games/status', (req, res) => {
 
 // GET /api/games/history/:mode -> Winning history
 apiRouter.get('/games/history/:mode', (req, res) => {
-    const mode = req.params.mode;
+    const mode = normalizeMode(req.params.mode);
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
 
@@ -283,8 +293,17 @@ apiRouter.get('/games/history/:mode', (req, res) => {
     }
 
     const start = (page - 1) * limit;
-    const items = state.history.slice(start, start + limit);
+    const rawItems = state.history.slice(start, start + limit);
     const totalPages = Math.max(1, Math.ceil(state.history.length / limit));
+
+    // Normalize outcome properties for consistent field names
+    const items = rawItems.map(item => ({
+        ...item,
+        period: item.period || item.periodId,
+        periodId: item.periodId || item.period,
+        number: item.number !== undefined && item.number !== null ? item.number : item.winningNumber,
+        winningNumber: item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : item.number
+    }));
 
     res.json({
         success: true,
@@ -299,7 +318,7 @@ apiRouter.get('/games/history/:mode', (req, res) => {
 
 // GET /api/games/chart/:mode -> Chart & trend statistical data
 apiRouter.get('/games/chart/:mode', (req, res) => {
-    const mode = req.params.mode;
+    const mode = normalizeMode(req.params.mode);
     const state = serverEngine.modes[mode];
     if (!state) {
         return res.status(404).json({ success: false, message: 'Invalid mode' });
@@ -314,15 +333,17 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
     const missing = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
 
     recent.forEach(r => {
-        if (frequencies[r.number] !== undefined) {
-            frequencies[r.number]++;
+        const num = r.number !== undefined ? r.number : r.winningNumber;
+        if (frequencies[num] !== undefined) {
+            frequencies[num]++;
         }
     });
 
     for (let num = 0; num <= 9; num++) {
         let count = 0;
         for (const r of recent) {
-            if (r.number === num) break;
+            const rNum = r.number !== undefined ? r.number : r.winningNumber;
+            if (rNum === num) break;
             count++;
         }
         missing[num] = count;
@@ -333,7 +354,13 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
         mode,
         frequencies,
         missing,
-        recentItems: recent.slice(0, 30)
+        recentItems: recent.slice(0, 30).map(item => ({
+            ...item,
+            period: item.period || item.periodId,
+            periodId: item.periodId || item.period,
+            number: item.number !== undefined && item.number !== null ? item.number : item.winningNumber,
+            winningNumber: item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : item.number
+        }))
     });
 });
 
@@ -349,9 +376,10 @@ apiRouter.post('/bets/place', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Please log in to place bets.' });
         }
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
+        const normMode = normalizeMode(mode);
         const result = await serverEngine.placeBet({
             userId: authUser.id,
-            mode,
+            mode: normMode,
             periodId,
             type,
             selection,
@@ -373,7 +401,7 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
         if (!authUser || !authUser.id) {
             return res.json({ success: true, mode: req.params.mode, page: 1, totalPages: 1, totalItems: 0, items: [] });
         }
-        const mode = req.params.mode;
+        const mode = normalizeMode(req.params.mode);
         const page = parseInt(req.query.page, 10) || 1;
         const limitAmount = parseInt(req.query.limit, 10) || 10;
 
@@ -384,31 +412,50 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
         // 1. Add Firestore historical bets
         if (Array.isArray(firestoreBets)) {
             firestoreBets.forEach(b => {
-                if (b && b.id) betMap.set(b.id, b);
+                if (b && b.id) {
+                    if (!b.periodId && b.period) b.periodId = b.period;
+                    betMap.set(b.id, b);
+                }
             });
         }
 
-        // 2. Overlay disk/in-memory settled bets history
+        // 2. Overlay disk/in-memory settled bets history (takes precedence or updates settled state)
         if (serverEngine.settledBetsHistory && serverEngine.settledBetsHistory.size > 0) {
             const targetMode = String(mode).toLowerCase().replace('wingo', '').trim();
             for (const [, b] of serverEngine.settledBetsHistory) {
                 if (b && b.userId === authUser.id) {
                     const betMode = String(b.mode || '').toLowerCase().replace('wingo', '').trim();
                     if (betMode === targetMode || b.mode === mode) {
-                        betMap.set(b.id, b);
+                        if (!b.periodId && b.period) b.periodId = b.period;
+                        const existing = betMap.get(b.id);
+                        if (!existing || existing.status === 'PENDING' || existing.status === 'pending') {
+                            betMap.set(b.id, { ...b });
+                        } else {
+                            // Merge so outcome properties like resultNumber are preserved
+                            betMap.set(b.id, { ...existing, ...b });
+                        }
                     }
                 }
             }
         }
 
-        // 3. Overlay in-memory latest active bets
+        // 3. Overlay in-memory active bets (ONLY if not already settled in Firestore or settledBetsHistory!)
         if (serverEngine.bets && serverEngine.bets.size > 0) {
             const targetMode = String(mode).toLowerCase().replace('wingo', '').trim();
             for (const [, b] of serverEngine.bets) {
                 if (b && b.userId === authUser.id) {
                     const betMode = String(b.mode || '').toLowerCase().replace('wingo', '').trim();
                     if (betMode === targetMode || b.mode === mode) {
-                        betMap.set(b.id, b);
+                        if (!b.periodId && b.period) b.periodId = b.period;
+                        const existing = betMap.get(b.id);
+                        const isExistingSettled = existing && (
+                            existing.status === 'WON' || existing.status === 'LOST' || 
+                            existing.status === 'win' || existing.status === 'lose'
+                        );
+                        // CRITICAL BUGFIX: NEVER overwrite an already settled bet with a pending bet!
+                        if (!isExistingSettled) {
+                            betMap.set(b.id, { ...b });
+                        }
                     }
                 }
             }

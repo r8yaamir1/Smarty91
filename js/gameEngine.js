@@ -702,40 +702,47 @@ export function renderMyHistory(modeInput = activeModeKey) {
         const targetPeriod = String(bet.periodId || '').trim();
         const foundOutcome = historyLookup.get(targetPeriod);
 
-        // Auto-reconcile bet with authoritative round history if settled
-        if (foundOutcome) {
-            const winNum = parseInt(foundOutcome.number, 10);
-            const isBigOutcome = (winNum >= 5 && winNum <= 9);
-            const sel = String(bet.selection || '').toLowerCase().trim();
-            const betType = String(bet.type || '').toLowerCase().trim();
-            let multiplier = 0;
+        // Fallback auto-reconcile for PENDING bets if round outcome is available in history
+        const isAlreadySettled = bet.status === 'win' || bet.status === 'WON' || bet.status === 'lose' || bet.status === 'LOST';
+        if (!isAlreadySettled && foundOutcome) {
+            const rawNum = foundOutcome.number !== undefined && foundOutcome.number !== null 
+                ? foundOutcome.number 
+                : (foundOutcome.winningNumber !== undefined ? foundOutcome.winningNumber : null);
+            
+            if (rawNum !== null && !isNaN(Number(rawNum))) {
+                const winNum = parseInt(rawNum, 10);
+                const isBigOutcome = (winNum >= 5 && winNum <= 9);
+                const sel = String(bet.selection || '').toLowerCase().trim();
+                const betType = String(bet.type || '').toLowerCase().trim();
+                let multiplier = 0;
 
-            if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
-                if (parseInt(sel, 10) === winNum) multiplier = 9.0;
-            } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
-                if (sel === 'green') {
-                    if ([1, 3, 7, 9].includes(winNum)) multiplier = 2.0;
-                    else if (winNum === 5) multiplier = 1.5;
-                } else if (sel === 'red') {
-                    if ([2, 4, 6, 8].includes(winNum)) multiplier = 2.0;
-                    else if (winNum === 0) multiplier = 1.5;
-                } else if (sel === 'violet') {
-                    if (winNum === 0 || winNum === 5) multiplier = 4.5;
+                if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
+                    if (parseInt(sel, 10) === winNum) multiplier = 9.0;
+                } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
+                    if (sel === 'green') {
+                        if ([1, 3, 7, 9].includes(winNum)) multiplier = 2.0;
+                        else if (winNum === 5) multiplier = 1.5;
+                    } else if (sel === 'red') {
+                        if ([2, 4, 6, 8].includes(winNum)) multiplier = 2.0;
+                        else if (winNum === 0) multiplier = 1.5;
+                    } else if (sel === 'violet') {
+                        if (winNum === 0 || winNum === 5) multiplier = 4.5;
+                    }
+                } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
+                    if ((sel === 'big' || sel === 'b') && isBigOutcome) multiplier = 2.0;
+                    else if ((sel === 'small' || sel === 's') && !isBigOutcome) multiplier = 2.0;
                 }
-            } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
-                if ((sel === 'big' || sel === 'b') && isBigOutcome) multiplier = 2.0;
-                else if ((sel === 'small' || sel === 's') && !isBigOutcome) multiplier = 2.0;
+
+                const isWinCalculated = multiplier > 0;
+                const payoutCalculated = isWinCalculated ? Number((contractAmt * multiplier).toFixed(2)) : 0;
+
+                bet.resultNumber = winNum;
+                bet.resultColor = NUMBER_PROPERTIES[winNum]?.colorName;
+                bet.resultSize = isBigOutcome ? 'Big' : 'Small';
+                bet.status = isWinCalculated ? 'win' : 'lose';
+                bet.winAmount = payoutCalculated;
+                bet.payoutAmount = payoutCalculated;
             }
-
-            const isWinCalculated = multiplier > 0;
-            const payoutCalculated = isWinCalculated ? Number((contractAmt * multiplier).toFixed(2)) : 0;
-
-            bet.resultNumber = winNum;
-            bet.resultColor = NUMBER_PROPERTIES[winNum]?.colorName;
-            bet.resultSize = isBigOutcome ? 'Big' : 'Small';
-            bet.status = isWinCalculated ? 'win' : 'lose';
-            bet.winAmount = payoutCalculated;
-            bet.payoutAmount = payoutCalculated;
         }
 
         const isWin = bet.status === 'win' || bet.status === 'WON' || (Number(bet.winAmount || bet.payoutAmount || 0) > 0);

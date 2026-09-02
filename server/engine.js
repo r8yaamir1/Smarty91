@@ -423,31 +423,18 @@ class Smarty91ServerEngine {
             phone: cleanPhone,
             passwordHash: this._hashPassword(password),
             securityPin: cleanPin,
-            balance: 100.00, // Starts with ₹100 VIP Welcome Bonus
+            balance: 0.00, // Starts at 0.00 until first deposit
             requiredTurnover: 0.00,
             inviteCode: userInviteCode,
             referredBy: referrerId,
             hasDeposited: false,
+            hasWelcomeBonusCredited: false,
             isBlocked: false,
             createdAt: new Date().toISOString()
         };
 
         this.users.set(userId, newUser);
         this.referralCodes.set(userInviteCode, userId);
-
-        // Record Welcome Gift Ledger Entry
-        const welcomeLedger = {
-            id: 'LEDGER_WELCOME_' + Date.now(),
-            userId,
-            type: 'WELCOME_BONUS',
-            amount: 100.00,
-            balanceBefore: 0.00,
-            balanceAfter: 100.00,
-            referenceId: 'WELCOME_GIFT',
-            timestamp: new Date().toISOString(),
-            description: 'VIP New User Welcome Bonus ₹100.00'
-        };
-        this.ledger.unshift(welcomeLedger);
 
         // Permanently persist to local disk and Firestore Cloud
         this._saveUsersToDisk();
@@ -1175,7 +1162,7 @@ class Smarty91ServerEngine {
                 firebaseSync.savePeriodState(mode, state).catch(() => {});
             }
 
-            // Immediately settle finished previous period if not already settled
+            // Immediately settle finished previous period at 0s transition if not already settled
             if (isPeriodIdTransition && prevPeriodId && !state.settledRounds.has(prevPeriodId)) {
                 state.settledRounds.add(prevPeriodId);
                 this._settleRound(mode, prevPeriodId).catch(err => {
@@ -1183,25 +1170,26 @@ class Smarty91ServerEngine {
                 });
             }
 
-            // Pre-decide, evaluate risk and pre-compute full settlement in the background at exactly 4s remaining (T-4s lock buffer)
-            if (state.isLocked && remainingSec <= 4) {
+            // Lockout Phase (T-5s): Pre-decide and pre-compute settlement in memory buffer at 5s remaining.
+            // Winning number & bets are locked and determined at 5s, held in buffer, released to user at 0s!
+            if (state.isLocked) {
                 if (!state.preComputedSettlements) state.preComputedSettlements = {};
                 if (!state.preComputedSettlements[currentPeriodId] && (!state.preLockingPeriods || !state.preLockingPeriods.has(currentPeriodId))) {
                     if (!state.preLockingPeriods) state.preLockingPeriods = new Set();
                     state.preLockingPeriods.add(currentPeriodId);
 
                     this.preDecideAndComputeSettlement(mode, currentPeriodId).catch(err => {
-                        console.error(`[Pre-Compute Engine @ 4s] Error pre-computing outcome for mode ${mode} period ${currentPeriodId}:`, err);
+                        console.error(`[Pre-Compute Engine @ 5s] Error pre-computing outcome for mode ${mode} period ${currentPeriodId}:`, err);
                         if (state.preLockingPeriods) state.preLockingPeriods.delete(currentPeriodId);
                     });
                 }
             }
 
-            // Settle and publish immediately if within last 250ms of the period (T-0s instant flush)
+            // At T-0s (end of timer / last 250ms), execute zero-latency settlement release using pre-computed package
             if (times.timeLeftMs <= 250 && !state.settledRounds.has(currentPeriodId)) {
                 state.settledRounds.add(currentPeriodId);
                 this._settleRound(mode, currentPeriodId).catch(err => {
-                    console.error(`[Tick] Settle round error for mode ${mode} period ${currentPeriodId}:`, err);
+                    console.error(`[0s Settlement Flush] Error releasing round for mode ${mode} period ${currentPeriodId}:`, err);
                 });
             }
         });
@@ -1423,7 +1411,9 @@ class Smarty91ServerEngine {
             const props = NUMBER_PROPERTIES[winningNumber] || NUMBER_PROPERTIES[0];
             roundRecord = {
                 period: periodId,
+                periodId: periodId,
                 number: winningNumber,
+                winningNumber: winningNumber,
                 color: props.color,
                 size: props.size,
                 colorLabel: props.label,
@@ -1645,7 +1635,7 @@ class Smarty91ServerEngine {
             throw new Error(`Game mode ${mode} is currently unavailable`);
         }
 
-        if (modeState.isLocked) {
+        if (modeState.isLocked || (modeState.settledRounds && (modeState.settledRounds.has(modeState.currentPeriodId) || modeState.settledRounds.has(periodId)))) {
             throw new Error('Betting is locked for the final 5 seconds. Please wait for next round.');
         }
 
@@ -1664,6 +1654,15 @@ class Smarty91ServerEngine {
         }
         if (!user) {
             throw new Error('User account not found. Please log in again.');
+        }
+
+        // Enforce minimum 1 approved deposit requirement to play games and place bets
+        const hasApprovedDeposit = Boolean(
+            user.hasDeposited || 
+            this.transactions.some(t => t.userId === user.id && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+        );
+        if (!hasApprovedDeposit) {
+            throw new Error('🔒 Recharge Required! Minimum 1 approved deposit (₹200+) is required to play games and place bets. Please deposit funds first.');
         }
 
         const totalAmount = Number(unitAmount) * Number(multiplier) * Number(quantity);
@@ -2512,8 +2511,30 @@ class Smarty91ServerEngine {
                 });
 
                 // 10% Instant Deposit Referral Commission & Progression Milestone check
+                const wasDepositedBefore = Boolean(user.hasDeposited);
                 user.hasDeposited = true;
+
+                // Credit ₹100 Welcome Gift on 1st deposit if not credited yet
+                if (!wasDepositedBefore && !user.hasWelcomeBonusCredited) {
+                    user.hasWelcomeBonusCredited = true;
+                    const preWelcomeBal = user.balance;
+                    user.balance = Number((user.balance + 100.00).toFixed(2));
+                    this.ledger.unshift({
+                        id: 'LEDGER_WELCOME_' + Date.now(),
+                        userId: user.id,
+                        type: 'WELCOME_BONUS',
+                        amount: 100.00,
+                        balanceBefore: preWelcomeBal,
+                        balanceAfter: user.balance,
+                        referenceId: 'WELCOME_GIFT_1ST_DEP',
+                        timestamp: new Date().toISOString(),
+                        description: '🎁 1st Deposit VIP Welcome Gift ₹100 Credited!'
+                    });
+                }
+
                 this._processReferralDepositCommission(user, tx.amount, tx.id);
+                // Also check if this user is a referrer and now unlocks their milestone rewards
+                this._checkAndAwardReferralMilestones(user.id);
 
                 // Credit VIP bonus balance if eligible
                 if (tx.bonusAmount && tx.bonusAmount > 0) {
@@ -2813,6 +2834,16 @@ class Smarty91ServerEngine {
             const referrer = this._getReferrer(depositingUser);
             if (!referrer) return;
 
+            // Strict Rule: Referrer MUST have made at least 1 approved deposit to earn referral commissions
+            const referrerHasDep = Boolean(
+                referrer.hasDeposited || 
+                this.transactions.some(t => t.userId === referrer.id && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+            );
+            if (!referrerHasDep) {
+                console.log(`[Referral Deposit Commission] Referrer ${referrer.phone} has not made a deposit yet. Bonus withheld until referrer deposits.`);
+                return;
+            }
+
             // Tiered Deposit Commission (5k-100k: 5%, 100k-200k: 6%, 200k-500k: 7%, 500k-1000k: 8%, 1000k+: 10%)
             const commRate = this._getReferralDepositRate(numDeposit);
             const commission = Number((numDeposit * (commRate / 100)).toFixed(2));
@@ -2865,6 +2896,13 @@ class Smarty91ServerEngine {
             const referrer = this._getReferrer(bettingUser);
             if (!referrer) return;
 
+            // Strict Rule: Referrer MUST have made at least 1 approved deposit to earn referral bet commissions
+            const referrerHasDep = Boolean(
+                referrer.hasDeposited || 
+                this.transactions.some(t => t.userId === referrer.id && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+            );
+            if (!referrerHasDep) return;
+
             // 1% Lifetime Betting Commission on turnover
             const commission = Number((Number(betAmount) * 0.01).toFixed(2));
             if (commission <= 0) return;
@@ -2904,6 +2942,13 @@ class Smarty91ServerEngine {
         try {
             const referrer = this.users.get(referrerId);
             if (!referrer) return;
+
+            // Strict Rule: Referrer MUST have made at least 1 approved deposit to earn milestone bonuses
+            const referrerHasDep = Boolean(
+                referrer.hasDeposited || 
+                this.transactions.some(t => t.userId === referrer.id && t.type === 'DEPOSIT' && t.status === 'APPROVED')
+            );
+            if (!referrerHasDep) return;
 
             const inviteCode = referrer.inviteCode;
             let activeCount = 0;
