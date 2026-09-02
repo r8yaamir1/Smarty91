@@ -198,22 +198,27 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
         const state = gameModes[mode];
         const targetPeriod = String(settledPeriodId).trim();
 
-        // 1. Fetch official settled game history from server API
-        const historyRes = await gameService.getGameHistory(mode, 1, 50);
-        let foundSettledOutcome = null;
+        // 1. First check if outcome is ALREADY available in local state.history (e.g. from real-time Firestore sync)
+        let foundSettledOutcome = (state.history || []).find(
+            item => String(item.periodId || item.period).trim() === targetPeriod
+        );
 
-        if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
-            foundSettledOutcome = historyRes.items.find(
-                item => String(item.period || item.periodId).trim() === targetPeriod
-            );
-            if (foundSettledOutcome) {
-                updateModeHistoryFromServer(mode, historyRes.items);
+        // 2. If not yet in memory, fetch latest official history from server
+        if (!foundSettledOutcome) {
+            const historyRes = await gameService.getGameHistory(mode, 1, 50);
+            if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
+                foundSettledOutcome = historyRes.items.find(
+                    item => String(item.period || item.periodId).trim() === targetPeriod
+                );
+                if (foundSettledOutcome) {
+                    updateModeHistoryFromServer(mode, historyRes.items);
+                }
             }
         }
 
-        // 2. If outcome for targetPeriod was settled and confirmed by server:
+        // 3. If outcome for targetPeriod is confirmed:
         if (foundSettledOutcome) {
-            // Fetch official settled bets for user from server
+            // Fetch official settled bets for user and updated balance from server
             await fetchUserBetsFromServer(mode, 1);
             await syncServerBalance(true);
 
@@ -308,28 +313,15 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
             return;
         }
 
-        // 3. If server hasn't finished writing outcome yet, retry up to 8 times (total ~2.4s)
-        if (retryCount < 8) {
+        // 4. Retry at most 3 times with 250ms interval if server write is completing
+        if (retryCount < 3) {
             setTimeout(() => {
                 handlePeriodSettledFromServer(mode, settledPeriodId, retryCount + 1);
-            }, 300);
-        } else if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
-            // Fallback to latest available history
-            updateModeHistoryFromServer(mode, historyRes.items);
-            fetchUserBetsFromServer(mode, 1).catch(() => {});
-            syncServerBalance(true).catch(() => {});
-            syncAllActiveViews(mode);
+            }, 250);
         }
     } catch (e) {
         console.warn('handlePeriodSettledFromServer error:', e);
     }
-}
-
-function processSettlementForPeriod(mode, items, targetPeriod) {
-    updateModeHistoryFromServer(mode, items);
-    fetchUserBetsFromServer(mode, 1).catch(() => {});
-    syncServerBalance(true).catch(() => {});
-    syncAllActiveViews(mode);
 }
 
 // Initial fetch of histories for all 4 modes
