@@ -350,18 +350,17 @@ export function renderGameHistory(modeInput = activeModeKey) {
         const firstExistingPeriod = existingRows[0].children[0].textContent.trim();
         // If the new top period is indeed the next successive period
         if (firstExistingPeriod && topPeriodId !== firstExistingPeriod) {
-            // Build the single new top row
+            // Build the single new top row inside a perfect block-level overflow wrapper to prevent any flex layout squishing or overlapping!
+            const wrapper = document.createElement('div');
+            wrapper.style.maxHeight = '0px';
+            wrapper.style.opacity = '0';
+            wrapper.style.overflow = 'hidden';
+            // A super elegant, ultra-smooth cubic-bezier transition that moves with premium physical inertia
+            wrapper.style.transition = 'max-height 0.45s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease-out';
+
             const newRow = document.createElement('div');
-            newRow.className = 'van-row fifo-new-item';
+            newRow.className = 'van-row'; // No 'fifo-new-item' class to avoid conflicting translate animations!
             newRow.setAttribute('data-v-481307ec', '');
-            
-            // Inline styles for ultra-smooth slide-down transition
-            newRow.style.maxHeight = '0px';
-            newRow.style.opacity = '0';
-            newRow.style.overflow = 'hidden';
-            newRow.style.transition = 'max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease-out, padding 0.4s ease-out';
-            newRow.style.paddingTop = '0px';
-            newRow.style.paddingBottom = '0px';
 
             let numClass = 'greenColor';
             if (topItem.number === 0) numClass = 'mixedColor0';
@@ -399,25 +398,24 @@ export function renderGameHistory(modeInput = activeModeKey) {
                 </div>
             `;
 
-            // Prepend new row smoothly
-            container.insertBefore(newRow, container.firstChild);
+            wrapper.appendChild(newRow);
+
+            // Prepend new row wrapper smoothly
+            container.insertBefore(wrapper, container.firstChild);
 
             // Trigger reflow & animate transition
-            newRow.offsetHeight; // trigger reflow
+            wrapper.offsetHeight; // trigger reflow
             requestAnimationFrame(() => {
-                newRow.style.maxHeight = '1.33333rem'; // Normal row height
-                newRow.style.opacity = '1';
-                newRow.style.paddingTop = ''; // Restore default padding
-                newRow.style.paddingBottom = '';
+                wrapper.style.maxHeight = '1.06667rem'; // Normal exact row height
+                wrapper.style.opacity = '1';
             });
 
-            // Cleanup transitional styles after animation finishes to ensure perfect native styling
+            // After animation completes, swap the wrapper out for the raw newRow cleanly to maintain the 100% native DOM structure!
             setTimeout(() => {
-                newRow.style.maxHeight = '';
-                newRow.style.opacity = '';
-                newRow.style.overflow = '';
-                newRow.style.transition = '';
-            }, 450);
+                if (wrapper.parentNode === container) {
+                    container.replaceChild(newRow, wrapper);
+                }
+            }, 500);
 
             // Keep only exactly 10 rows on screen
             while (container.children.length > ITEMS_PER_PAGE) {
