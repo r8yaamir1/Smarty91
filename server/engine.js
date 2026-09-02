@@ -702,7 +702,14 @@ class Smarty91ServerEngine {
 
             if (pastPeriodId !== currentActivePeriod && !existingPeriods.has(String(pastPeriodId))) {
                 existingPeriods.add(String(pastPeriodId));
-                const num = this._calculateDeterministicOutcome(mode, pastPeriodId);
+                let num;
+                if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(String(pastPeriodId))) {
+                    num = state.settledOutcomesHistory.get(String(pastPeriodId)).number;
+                } else if (state.preDecidedOutcomes && state.preDecidedOutcomes[String(pastPeriodId)]) {
+                    num = state.preDecidedOutcomes[String(pastPeriodId)].number;
+                } else {
+                    num = this._calculateDeterministicOutcome(mode, pastPeriodId);
+                }
                 const props = NUMBER_PROPERTIES[num];
                 const roundRecord = {
                     period: pastPeriodId,
@@ -1175,6 +1182,9 @@ class Smarty91ServerEngine {
             if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
             state.preDecidedOutcomes[periodId] = outcomeResult;
 
+            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+            state.settledOutcomesHistory.set(String(periodId), outcomeResult);
+
             // Save to Firestore predecided collection permanently so container restarts maintain exact outcome
             await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
             console.log(`[Pre-Compute Engine @ 2s] Mode ${mode} Period ${periodId} locked & pre-computed: ${winningNumber} (${roundRecord.color}, ${roundRecord.size}). Held in buffer until 0s release.`);
@@ -1185,26 +1195,48 @@ class Smarty91ServerEngine {
 
     async getPreDecidedOutcome(mode, periodId) {
         const state = this.modes[mode];
-        if (state && state.preDecidedOutcomes && state.preDecidedOutcomes[periodId]) {
-            const res = state.preDecidedOutcomes[periodId];
-            delete state.preDecidedOutcomes[periodId];
+        const pidStr = String(periodId);
+
+        // 1. Check in-memory permanent settled/predecided outcomes map
+        if (state && state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
+            return state.settledOutcomesHistory.get(pidStr);
+        }
+        if (state && state.preDecidedOutcomes && state.preDecidedOutcomes[pidStr]) {
+            const res = state.preDecidedOutcomes[pidStr];
+            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+            state.settledOutcomesHistory.set(pidStr, res);
             return res;
         }
 
+        // 2. Check if already present in state.history
+        if (state && state.history) {
+            const existing = state.history.find(h => String(h.period || h.periodId) === pidStr);
+            if (existing && existing.number !== undefined && existing.number !== null) {
+                const res = { number: Number(existing.number), isOverridden: !!existing.isOverridden, reason: 'EXISTING_HISTORY' };
+                if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+                state.settledOutcomesHistory.set(pidStr, res);
+                return res;
+            }
+        }
+
         try {
-            // Check Firestore persistent predecided collection
-            const dbOutcome = await firebaseSync.fetchPreDecidedOutcome(mode, periodId);
+            // 3. Check Firestore persistent predecided collection
+            const dbOutcome = await firebaseSync.fetchPreDecidedOutcome(mode, pidStr);
             if (dbOutcome) {
+                if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+                state.settledOutcomesHistory.set(pidStr, dbOutcome);
                 return dbOutcome;
             }
         } catch (err) {
-            console.warn(`[Engine] fetchPreDecidedOutcome error for ${mode} period ${periodId}:`, err.message);
+            console.warn(`[Engine] fetchPreDecidedOutcome error for ${mode} period ${pidStr}:`, err.message);
         }
 
-        // Fallback if none existed
-        const outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
+        // 4. Fallback if none existed: determine outcome once and store permanently
+        const outcomeResult = this.selectSmartRiskOutcome(mode, pidStr);
+        if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+        state.settledOutcomesHistory.set(pidStr, outcomeResult);
         try {
-            await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
+            await firebaseSync.savePreDecidedOutcome(mode, pidStr, outcomeResult);
         } catch (e) {}
         return outcomeResult;
     }

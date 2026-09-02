@@ -294,7 +294,15 @@ export async function placeBet(betData) {
 
 // ----------------- SUBTAB RENDERING (PER ACTIVE MODE) -----------------
 
-// 1. Render Game History Table for Active Mode
+// Persistent accordion, cache & animation tracking to eliminate redundant DOM wipes and flickering
+const expandedBetIds = new Set();
+const animatedBetIds = new Set();
+const animatedGameHistoryPeriodIds = new Set();
+const animatedChartPeriodIds = new Set();
+const renderedHistoryCache = new Map();
+const renderedChartCache = new Map();
+
+// 1. Render Game History Table for Active Mode (Smooth, Keyed Non-Flickering Diffing)
 export function renderGameHistory(modeInput = activeModeKey) {
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
@@ -317,6 +325,7 @@ export function renderGameHistory(modeInput = activeModeKey) {
                 <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">${state.displayName} rounds updating in real-time</div>
             </div>
         `;
+        renderedHistoryCache.delete(mode);
         if (pageDisplay) pageDisplay.textContent = '1/1';
         if (prevBtn) prevBtn.classList.add('disabled');
         if (nextBtn) nextBtn.classList.add('disabled');
@@ -326,12 +335,31 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const startIndex = (state.historyPage - 1) * ITEMS_PER_PAGE;
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    container.innerHTML = '';
+    // Fast structural diff check: if the exact same page & items are already displayed, do not wipe/touch DOM
+    const cacheKey = `${mode}:${state.historyPage}:${items.map(it => `${it.periodId}_${it.number}_${it.isBig}`).join('|')}`;
+    if (renderedHistoryCache.get(mode) === cacheKey && container.children.length === items.length) {
+        if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
+        if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
+        if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
+        return;
+    }
+
+    renderedHistoryCache.set(mode, cacheKey);
+
+    const fragment = document.createDocumentFragment();
 
     items.forEach((item, index) => {
         const row = document.createElement('div');
-        row.className = index === 0 && state.historyPage === 1 ? 'van-row new-row' : 'van-row';
+        const periodIdStr = String(item.periodId);
+        const shouldAnimate = index === 0 && state.historyPage === 1 && !animatedGameHistoryPeriodIds.has(periodIdStr);
+        if (shouldAnimate) {
+            animatedGameHistoryPeriodIds.add(periodIdStr);
+            row.className = 'van-row new-row';
+        } else {
+            row.className = 'van-row';
+        }
         row.setAttribute('data-v-481307ec', '');
+        row.setAttribute('data-period-id', periodIdStr);
 
         const num = Number(item.number);
         let numClass = 'greenColor';
@@ -371,8 +399,10 @@ export function renderGameHistory(modeInput = activeModeKey) {
                 </div>
             </div>
         `;
-        container.appendChild(row);
+        fragment.appendChild(row);
     });
+
+    container.replaceChildren(fragment);
 
     if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
     if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
@@ -394,8 +424,23 @@ export function renderChartTrend(modeInput = activeModeKey) {
                 <div style="font-size: 0.3rem; margin-top: 0.1rem; color: var(--text_color_L3);">${state.displayName} chart trends will appear after rounds complete</div>
             </div>
         `;
+        renderedChartCache.delete(mode);
         return;
     }
+
+    const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE) || 1;
+    if (state.chartPage > totalPages) state.chartPage = totalPages;
+    if (state.chartPage < 1) state.chartPage = 1;
+
+    const startIndex = (state.chartPage - 1) * ITEMS_PER_PAGE;
+    const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    // Fast structural diff check for chart
+    const chartKey = `${mode}:${state.chartPage}:${items.map(it => `${it.periodId}_${it.number}`).join('|')}`;
+    if (renderedChartCache.get(mode) === chartKey && chartView.children.length > 0) {
+        return;
+    }
+    renderedChartCache.set(mode, chartKey);
 
     // Calculate statistics for digits 0-9 strictly for this mode
     const stats = Array.from({ length: 10 }, (_, i) => ({
@@ -431,15 +476,14 @@ export function renderChartTrend(modeInput = activeModeKey) {
         stats[n].maxStreak = max > 0 ? max : (stats[n].count > 0 ? 1 : 0);
     }
 
-    const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE) || 1;
-    if (state.chartPage > totalPages) state.chartPage = totalPages;
-    if (state.chartPage < 1) state.chartPage = 1;
-
-    const startIndex = (state.chartPage - 1) * ITEMS_PER_PAGE;
-    const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
     let rowsHtml = '';
     items.forEach((item, index) => {
+        const periodIdStr = String(item.periodId);
+        const shouldAnimate = index === 0 && state.chartPage === 1 && !animatedChartPeriodIds.has(periodIdStr);
+        if (shouldAnimate) {
+            animatedChartPeriodIds.add(periodIdStr);
+        }
+
         let cellsHtml = '';
         for (let n = 0; n < 10; n++) {
             const isMatch = item.number === n;
@@ -450,7 +494,7 @@ export function renderChartTrend(modeInput = activeModeKey) {
             `;
         }
         rowsHtml += `
-            <div class="van-row ${index === 0 && state.chartPage === 1 ? 'new-row' : ''}" data-v-9d93d892="" style="display: flex; align-items: center; justify-content: space-between; height: 1.33333rem; padding: .45333rem .13333rem; border-top: .01333rem solid var(--gray-color-1);">
+            <div class="van-row ${shouldAnimate ? 'new-row' : ''}" data-v-9d93d892="" style="display: flex; align-items: center; justify-content: space-between; height: 1.33333rem; padding: .45333rem .13333rem; border-top: .01333rem solid var(--gray-color-1);">
                 <div class="van-col van-col--8 Trend__C-body2-IssueNumber" data-v-9d93d892="">
                     ${item.periodId}
                 </div>
@@ -538,10 +582,6 @@ export function renderChartTrend(modeInput = activeModeKey) {
         };
     }
 }
-
-// Persistent accordion and animation tracking for My History
-const expandedBetIds = new Set();
-const animatedBetIds = new Set();
 
 // 3. Fetch My Bet History from Server/Firestore
 export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 1, forceRender = false) {

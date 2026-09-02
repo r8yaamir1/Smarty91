@@ -48,9 +48,18 @@ export function getRemainingSeconds() {
 }
 
 // ----------------- MASTER UNIFIED VIEW SYNCHRONIZER -----------------
+let pendingSyncTimer = null;
+const renderedTokensMap = new Map();
+
 export function syncAllActiveViews(modeInput = getActiveModeKey()) {
     const mode = normalizeMode(modeInput);
-    if (mode === getActiveModeKey()) {
+    if (mode !== getActiveModeKey()) return;
+
+    if (pendingSyncTimer) {
+        cancelAnimationFrame(pendingSyncTimer);
+    }
+    pendingSyncTimer = requestAnimationFrame(() => {
+        pendingSyncTimer = null;
         try {
             renderWinningTokensForActiveMode();
             renderGameHistory(mode);
@@ -59,15 +68,15 @@ export function syncAllActiveViews(modeInput = getActiveModeKey()) {
         } catch (err) {
             console.warn('[SyncViews] Render error caught safely:', err);
         }
-    }
+    });
 }
 
-// Render top-right winning number tokens for active mode
+// Render top-right winning number tokens for active mode (Non-flickering diff)
 export function renderWinningTokensForActiveMode() {
     const tokenParent = document.querySelector('.TimeLeft__C-num');
     if (!tokenParent) return;
+    const mode = getActiveModeKey();
     const state = getActiveModeState();
-    tokenParent.innerHTML = '';
     
     // Always extract latest 5 tokens directly from state.history (newest first)
     let tokens = [];
@@ -77,12 +86,21 @@ export function renderWinningTokensForActiveMode() {
         tokens = state.tokens.slice(0, 5).map(n => Number(n));
     }
 
+    const tokensKey = `${mode}:${tokens.join(',')}`;
+    if (renderedTokensMap.get(mode) === tokensKey && tokenParent.children.length === tokens.length) {
+        return;
+    }
+    renderedTokensMap.set(mode, tokensKey);
+
+    const fragment = document.createDocumentFragment();
     tokens.forEach(number => {
         const newDiv = document.createElement('div');
         newDiv.setAttribute("data-v-3e4c6499", "");
         newDiv.className = `n${number}`;
-        tokenParent.appendChild(newDiv);
+        fragment.appendChild(newDiv);
     });
+
+    tokenParent.replaceChildren(fragment);
 }
 
 // Format and update 5-box digital stopwatch display
