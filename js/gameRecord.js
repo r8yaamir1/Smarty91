@@ -160,9 +160,6 @@ export async function syncServerGameState() {
                     }
                 }).catch(() => {});
 
-                // Fetch active mode's user bets silently
-                fetchUserBetsFromServer(activeKey, 1).catch(() => {});
-
                 // Fetch server wallet balance silently
                 syncServerBalance(false).catch(() => {});
             }

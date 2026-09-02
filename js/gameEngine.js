@@ -539,8 +539,12 @@ export function renderChartTrend(modeInput = activeModeKey) {
     }
 }
 
+// Persistent accordion and animation tracking for My History
+const expandedBetIds = new Set();
+const animatedBetIds = new Set();
+
 // 3. Fetch My Bet History from Server/Firestore
-export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 1) {
+export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 1, forceRender = false) {
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
     if (!state) return;
@@ -548,14 +552,16 @@ export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 
     try {
         const token = localStorage.getItem('smarty91_auth_token');
         if (!token) {
-            state.userBets = [];
-            renderMyHistory(mode);
+            if (state.userBets && state.userBets.length > 0) {
+                state.userBets = [];
+                renderMyHistory(mode);
+            }
             return;
         }
 
         const res = await gameService.getMyBetHistory(mode, page, 50);
         if (res && res.success && Array.isArray(res.items)) {
-            state.userBets = res.items.map(b => {
+            const mappedBets = res.items.map(b => {
                 const isWon = b.status === 'WON' || b.status === 'win' || (Number(b.payoutAmount || b.winAmount || 0) > 0);
                 const isPending = b.status === 'PENDING' || b.status === 'pending';
                 const isLost = b.status === 'LOST' || b.status === 'lost' || (!isWon && !isPending);
@@ -587,12 +593,21 @@ export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 
                     settledAt: b.settledAt
                 };
             });
+
+            // Fast structural signature to avoid wiping and refreshing DOM if nothing changed
+            const newKey = mappedBets.map(b => `${b.id}:${b.status}:${b.winAmount}:${b.resultNumber}:${b.periodId}`).join('|');
+            const oldKey = (state.userBets || []).map(b => `${b.id}:${b.status}:${b.winAmount}:${b.resultNumber}:${b.periodId}`).join('|');
+
+            const hasChanged = newKey !== oldKey || state.myHistoryPage !== page;
+            state.userBets = mappedBets;
             state.myHistoryPage = page;
-            renderMyHistory(mode);
+
+            if (hasChanged || forceRender) {
+                renderMyHistory(mode);
+            }
         }
     } catch (e) {
         console.warn('[GameEngine] fetchUserBetsFromServer note:', e.message);
-        renderMyHistory(mode);
     }
 }
 
@@ -633,6 +648,13 @@ export function renderMyHistory(modeInput = activeModeKey) {
 
     let cardsHtml = '';
     items.forEach((bet, index) => {
+        const betIdStr = String(bet.id || bet.periodId || index);
+        const isExpanded = expandedBetIds.has(betIdStr);
+        const shouldAnimate = index === 0 && state.myHistoryPage === 1 && !animatedBetIds.has(betIdStr);
+        if (shouldAnimate) {
+            animatedBetIds.add(betIdStr);
+        }
+
         const betAmt = Number(bet.betAmount !== undefined ? bet.betAmount : (bet.totalAmount || 0));
         const contractAmt = Number(bet.contractAmount !== undefined ? bet.contractAmount : (betAmt * 0.98));
         const feeAmt = Number(bet.fee !== undefined ? bet.fee : (betAmt * 0.02));
@@ -709,7 +731,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
             : (isPending ? 'Pending' : '-');
 
         cardsHtml += `
-            <div class="MyGameRecordList__C-item-wrapper ${index === 0 && state.myHistoryPage === 1 ? 'new-card' : ''}" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">
+            <div class="MyGameRecordList__C-item-wrapper ${shouldAnimate ? 'new-card' : ''} ${isExpanded ? 'is-expanded' : ''}" data-bet-id="${betIdStr}" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">
                 <div class="MyGameRecordList__C-item" data-v-8bb41fd5="" style="cursor: pointer;">
                     <div class="MyGameRecordList__C-item-l ${badgeClass}" data-v-8bb41fd5="">${badgeText}</div>
                     <div class="MyGameRecordList__C-item-m" data-v-8bb41fd5="">
@@ -721,7 +743,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
                         <span data-v-8bb41fd5="">${isWin ? '+₹' + winAmt.toFixed(2) : (isPending ? '₹' + betAmt.toFixed(2) : '-₹' + betAmt.toFixed(2))}</span>
                     </div>
                 </div>
-                <div class="MyGameRecordList__C-detail" data-v-8bb41fd5="" style="display: none;">
+                <div class="MyGameRecordList__C-detail" data-v-8bb41fd5="" style="display: ${isExpanded ? 'block' : 'none'};">
                     <div class="MyGameRecordList__C-detail-text" data-v-8bb41fd5="">Detail</div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Order number</span>
@@ -783,21 +805,30 @@ export function renderMyHistory(modeInput = activeModeKey) {
         </div>
     `;
 
-    // Accordion toggle click handlers
+    // Accordion toggle click handlers with state preservation
     const recordWrappers = myHistoryView.querySelectorAll('.MyGameRecordList__C-item-wrapper');
     recordWrappers.forEach(wrapper => {
         const itemHeader = wrapper.querySelector('.MyGameRecordList__C-item');
         const detailSection = wrapper.querySelector('.MyGameRecordList__C-detail');
+        const betId = wrapper.getAttribute('data-bet-id');
         if (itemHeader && detailSection) {
             itemHeader.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isCurrentlyOpen = detailSection.style.display === 'block';
-                recordWrappers.forEach(w => {
-                    const d = w.querySelector('.MyGameRecordList__C-detail');
-                    if (d) d.style.display = 'none';
-                });
-                if (!isCurrentlyOpen) {
+                if (isCurrentlyOpen) {
+                    detailSection.style.display = 'none';
+                    wrapper.classList.remove('is-expanded');
+                    if (betId) expandedBetIds.delete(betId);
+                } else {
+                    recordWrappers.forEach(w => {
+                        const d = w.querySelector('.MyGameRecordList__C-detail');
+                        if (d) d.style.display = 'none';
+                        w.classList.remove('is-expanded');
+                    });
+                    expandedBetIds.clear();
+                    if (betId) expandedBetIds.add(betId);
                     detailSection.style.display = 'block';
+                    wrapper.classList.add('is-expanded');
                 }
             });
         }
