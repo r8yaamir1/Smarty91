@@ -788,6 +788,12 @@ class Smarty91ServerEngine {
 
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
     selectSmartRiskOutcome(mode, periodId) {
+        // Priority 0: Universal Deterministic Hashing Sync (Auto-Matching)
+        if (this.config.universalSync) {
+            const num = this._calculateDeterministicOutcome(mode, periodId);
+            return { number: num, isOverridden: false, reason: 'UNIVERSAL_SYNC_DETERMINISTIC' };
+        }
+
         // Priority 1: Check Admin Force Override
         if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
             const winningNumber = Number(this.adminOverrides[mode]);
@@ -987,6 +993,22 @@ class Smarty91ServerEngine {
                 }
             }
 
+            // Settle any historical pending bets for this mode that are older than currentPeriodId (self-healing catch-up)
+            const pastPendingPeriods = Array.from(this.bets.values())
+                .filter(b => b.mode === mode && (b.status === 'PENDING' || b.status === 'pending') && b.periodId < currentPeriodId)
+                .map(b => b.periodId);
+            
+            const uniquePastPeriods = Array.from(new Set(pastPendingPeriods)).sort();
+            for (const pastPeriod of uniquePastPeriods) {
+                if (!state.settledRounds.has(pastPeriod)) {
+                    state.settledRounds.add(pastPeriod);
+                    console.log(`[Self-Healing Tick] Catch-up settling missed round for mode ${mode} period ${pastPeriod}`);
+                    this._settleRound(mode, pastPeriod).catch(err => {
+                        console.error(`[Self-Healing Tick] Error settling missed round for mode ${mode} period ${pastPeriod}:`, err);
+                    });
+                }
+            }
+
             state.currentPeriodId = currentPeriodId;
             state.currentEndTimeMs = times.endTime;
             state.remainingSeconds = remainingSec;
@@ -1010,6 +1032,38 @@ class Smarty91ServerEngine {
                 });
             }
         });
+    }
+
+    async settleAllPastPendingBets() {
+        const now = Date.now();
+        console.log('[Self-Healing Engine] Starting comprehensive catch-up settlement for all modes...');
+        
+        for (const mode of Object.keys(this.modes)) {
+            const state = this.modes[mode];
+            const interval = MODE_INTERVALS[mode];
+            if (!interval) continue;
+
+            const currentPeriodId = this._calculatePeriodId(now, interval, mode);
+            
+            const pastPendingPeriods = Array.from(this.bets.values())
+                .filter(b => b.mode === mode && (b.status === 'PENDING' || b.status === 'pending') && b.periodId < currentPeriodId)
+                .map(b => b.periodId);
+            
+            const uniquePastPeriods = Array.from(new Set(pastPendingPeriods)).sort();
+
+            for (const pastPeriod of uniquePastPeriods) {
+                if (!state.settledRounds.has(pastPeriod)) {
+                    state.settledRounds.add(pastPeriod);
+                    console.log(`[Self-Healing Startup] Catch-up settling missed round for mode ${mode} period ${pastPeriod}`);
+                    try {
+                        await this._settleRound(mode, pastPeriod);
+                    } catch (err) {
+                        console.error(`[Self-Healing Startup] Error settling missed round for mode ${mode} period ${pastPeriod}:`, err);
+                    }
+                }
+            }
+        }
+        console.log('[Self-Healing Engine] Comprehensive catch-up settlement completed.');
     }
 
     async _settleRound(mode, periodId) {
@@ -1039,19 +1093,18 @@ class Smarty91ServerEngine {
             isOverridden
         };
 
-        // Prepend to mode history (strictly capped at max 50 rounds)
+        // Prepend to mode history (strictly capped at max 50 rounds) - Synchronous in-memory update
         state.history = state.history.filter(h => String(h.period || h.periodId) !== String(periodId));
         state.history.unshift(roundRecord);
         if (state.history.length > 50) state.history.length = 50;
 
-        // Persist settled round to Firestore
-        await firebaseSync.saveSettledRound(mode, roundRecord);
-
-        // 2. Settle all pending bets for this mode and periodId
+        // 2. Settle all pending bets for this mode and periodId SYNCHRONOUSLY first.
+        // This guarantees that any concurrent api requests like /bets/my-history or /wallet/summary immediately receive the fully settled states and balances.
         const pendingBetsForRound = Array.from(this.bets.values()).filter(
-            b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
+            b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
         );
 
+        const evaluatedBets = [];
         for (const bet of pendingBetsForRound) {
             const settlement = this._evaluateBet(bet, winningNumber);
             bet.status = settlement.isWin ? 'WON' : 'LOST';
@@ -1061,18 +1114,21 @@ class Smarty91ServerEngine {
             bet.payoutAmount = settlement.payoutAmount;
             bet.settledAt = new Date().toISOString();
 
+            let balanceBefore = 0;
+            let balanceAfter = 0;
+            const user = this.users.get(bet.userId);
             if (settlement.isWin && settlement.payoutAmount > 0) {
-                const user = this.users.get(bet.userId);
-                let balanceBefore = 0;
-                let balanceAfter = 0;
                 if (user) {
                     balanceBefore = user.balance;
                     user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
                     balanceAfter = user.balance;
-                    this._saveUsersToDisk();
                 }
+            }
 
-                const ledgerEntry = {
+            // Create ledger entry synchronously
+            let ledgerEntry = null;
+            if (settlement.isWin && settlement.payoutAmount > 0) {
+                ledgerEntry = {
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: bet.userId,
                     type: 'BET_WIN_CREDIT',
@@ -1084,29 +1140,51 @@ class Smarty91ServerEngine {
                     description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
                 };
                 this.ledger.unshift(ledgerEntry);
+            }
 
+            // Put in settled bets cache and remove from active bets Map IMMEDIATELY in-memory
+            this.settledBetsHistory.set(bet.id, { ...bet });
+            this.bets.delete(bet.id);
+
+            evaluatedBets.push({ bet, settlement, user, ledgerEntry });
+        }
+
+        // Save users, bets, and ledger changes synchronously to local disk to ensure data integrity
+        if (evaluatedBets.length > 0) {
+            this._saveUsersToDisk();
+            this._saveBetsToDisk();
+        }
+
+        // 3. Asynchronously persist the settled round, bets, and user balances to Firestore database.
+        // Any concurrent API polling will run completely unaffected because the in-memory state has already transitioned!
+        try {
+            await firebaseSync.saveSettledRound(mode, roundRecord);
+        } catch (err) {
+            console.error(`[Server] Error saving settled round to Firestore:`, err.message);
+        }
+
+        for (const item of evaluatedBets) {
+            const { bet, settlement, user, ledgerEntry } = item;
+            if (settlement.isWin && settlement.payoutAmount > 0) {
                 try {
                     await firebaseSync.settleWinningBetTransaction(bet.userId, settlement.payoutAmount, bet, ledgerEntry);
                 } catch (err) {
                     console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
-                    // Fallback to separate operations in worst case scenarios
-                    await firebaseSync.updateBetSettlement(bet);
+                    // Safe fallback to separate Firestore writes
+                    await firebaseSync.updateBetSettlement(bet).catch(() => {});
                     if (user) {
-                        await firebaseSync.updateUserBalance(bet.userId, user.balance, 'Round win payout');
+                        await firebaseSync.updateUserBalance(bet.userId, user.balance, 'Round win payout').catch(() => {});
                     } else {
-                        await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout');
+                        await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout').catch(() => {});
                     }
                 }
             } else {
-                await firebaseSync.updateBetSettlement(bet);
+                try {
+                    await firebaseSync.updateBetSettlement(bet);
+                } catch (err) {
+                    console.error(`[Server] Error updating loss bet settlement in Firestore:`, err.message);
+                }
             }
-
-            // Archive into settled bets history and persist
-            this.settledBetsHistory.set(bet.id, { ...bet });
-            this._saveBetsToDisk();
-
-            // Remove from active cache since the bet is fully settled
-            this.bets.delete(bet.id);
         }
 
         // 3. Check if Pause was scheduled for after current round completes
@@ -1367,12 +1445,13 @@ class Smarty91ServerEngine {
         return {
             success: true,
             riskEngine: this.config.riskEngine,
+            universalSync: Boolean(this.config.universalSync),
             overrides: this.adminOverrides
         };
     }
 
     // Update Risk Engine Strategy & House Win Rate
-    updateRiskEngineConfig({ strategyMode, houseWinRatePercent, maxPayoutCap, enabled }) {
+    updateRiskEngineConfig({ strategyMode, houseWinRatePercent, maxPayoutCap, enabled, universalSync }) {
         if (!this.config.riskEngine) {
             this.config.riskEngine = { targetedUsers: {} };
         }
@@ -1392,8 +1471,11 @@ class Smarty91ServerEngine {
         if (enabled !== undefined) {
             this.config.riskEngine.enabled = Boolean(enabled);
         }
+        if (universalSync !== undefined) {
+            this.config.universalSync = Boolean(universalSync);
+        }
 
-        const logMsg = `Smart Risk Engine Config updated: Mode=${this.config.riskEngine.strategyMode}, WinRate=${this.config.riskEngine.houseWinRatePercent}%, MaxCap=₹${this.config.riskEngine.maxPayoutCap}`;
+        const logMsg = `Smart Risk Engine Config updated: Mode=${this.config.riskEngine.strategyMode}, WinRate=${this.config.riskEngine.houseWinRatePercent}%, MaxCap=₹${this.config.riskEngine.maxPayoutCap}, UniversalSync=${this.config.universalSync}`;
         this.auditLogs.unshift({
             id: 'AUDIT_' + Date.now(),
             action: 'RISK_ENGINE_CONFIG_UPDATED',
@@ -1406,7 +1488,8 @@ class Smarty91ServerEngine {
         return {
             success: true,
             message: logMsg,
-            riskEngine: this.config.riskEngine
+            riskEngine: this.config.riskEngine,
+            universalSync: Boolean(this.config.universalSync)
         };
     }
 

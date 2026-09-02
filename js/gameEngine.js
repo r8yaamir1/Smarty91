@@ -658,7 +658,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
         }
 
         const dateObj = new Date(bet.placedAt || Date.now());
-        const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}:${String(dateObj.getSeconds()).padStart(2, '0')}`;
+        const dateStr = `${dateObj.getUTCFullYear()}-${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}-${String(dateObj.getUTCDate()).padStart(2, '0')} ${String(dateObj.getUTCHours()).padStart(2, '0')}:${String(dateObj.getUTCMinutes()).padStart(2, '0')}:${String(dateObj.getUTCSeconds()).padStart(2, '0')}`;
 
         cardsHtml += `
             <div class="MyGameRecordList__C-item-wrapper" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">

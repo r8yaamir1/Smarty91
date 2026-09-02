@@ -92,6 +92,9 @@ class FirebaseSyncManager {
             // 4.1 Hydrate active pending bets from Firestore into server memory to prevent pending status bugs on server restart
             await this._hydratePendingBetsFromFirestore();
 
+            // 4.2 Settle any past pending bets that missed their rounds (e.g. while server was scaled to zero/sleeping)
+            await this.engine.settleAllPastPendingBets();
+
             // 5. Sync default user if not already existing
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
 

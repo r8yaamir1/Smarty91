@@ -1031,6 +1031,23 @@ function renderChancesView(container) {
     const smallPercent = 100 - bigPercent;
 
     container.innerHTML = `
+        <!-- UNIVERSAL BETTING SYNC CONTROLLER -->
+        <div class="admin-card" style="margin-bottom: 14px; border: 1.5px solid var(--primary); background: rgba(16,185,129,0.05); padding: 14px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <div>
+                    <div style="font-size: 14px; font-weight: 800; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                        🌐 Universal Betting Sync (Auto-Matching)
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">
+                        When enabled, all rounds generate 100% deterministic cryptographic natural numbers based on a 24/7 master seed epoch hash (matching Jai Club / 91Club live pattern). This disables manual admin overrides and custom risk engine rigging to enforce universal, fair outcome synchronization.
+                    </div>
+                </div>
+                <div>
+                    <input type="checkbox" id="universal-sync-toggle" ${liveData.config?.universalSync ? 'checked' : ''} style="transform: scale(1.6); accent-color: #10b981; cursor: pointer; margin-right: 6px;" />
+                </div>
+            </div>
+        </div>
+
         <div class="admin-card">
             <div class="card-header">
                 <div>
@@ -1213,6 +1230,22 @@ function renderChancesView(container) {
             alert(err.message || 'Failed to update winning chances');
         }
     });
+
+    // Universal Sync Toggle Event Listener
+    const syncToggle = container.querySelector('#universal-sync-toggle');
+    if (syncToggle) {
+        syncToggle.addEventListener('change', async () => {
+            const isChecked = syncToggle.checked;
+            try {
+                await adminService.updateRiskEngineConfig({ universalSync: isChecked });
+                alert(`Universal Betting Sync is now ${isChecked ? 'ENABLED' : 'DISABLED'}.`);
+                await fetchAndRefreshData();
+            } catch (err) {
+                syncToggle.checked = !isChecked; // Revert checkbox on error
+                alert(err.message || 'Failed to update Universal Sync state');
+            }
+        });
+    }
 }
 
 // -------------------------------------------------------------

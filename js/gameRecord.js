@@ -108,8 +108,44 @@ export async function syncServerGameState() {
                 }
             }
 
-            // Sync active view UI
+            // Self-Healing Client Sync & Background Sync Engine:
+            // 1. Detect and instantly heal any stale pending bets older than current period ID across all modes (resolves tab focus sleep/minimize permanently)
+            for (const mode of SUPPORTED_MODES) {
+                const state = gameModes[mode];
+                if (state && state.userBets && state.userBets.length > 0) {
+                    const hasStalePendingBets = state.userBets.some(b => {
+                        const isPending = b.status === 'pending' || b.status === 'PENDING';
+                        return isPending && b.periodId < state.currentIssueNumber;
+                    });
+                    if (hasStalePendingBets) {
+                        console.log(`[Self-Healing Sync] Found stale pending bet(s) in mode ${mode} older than current period ${state.currentIssueNumber}. Instantly updating...`);
+                        fetchUserBetsFromServer(mode, 1).catch(() => {});
+                    }
+                }
+            }
+
+            // 2. Continuous silent background sync for the active mode's history, chart and balance
             const activeState = gameModes[activeKey];
+            if (activeState) {
+                // Fetch active mode's game history silently
+                gameService.getGameHistory(activeKey, 1, 50).then(historyRes => {
+                    if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
+                        const hasChanged = updateModeHistoryFromServer(activeKey, historyRes.items);
+                        if (hasChanged) {
+                            renderGameHistory(activeKey);
+                            renderChartTrend(activeKey);
+                        }
+                    }
+                }).catch(() => {});
+
+                // Fetch active mode's user bets silently
+                fetchUserBetsFromServer(activeKey, 1).catch(() => {});
+
+                // Fetch server wallet balance silently
+                syncServerBalance(false).catch(() => {});
+            }
+
+            // Sync active view UI
             const periodEl = document.querySelector('.TimeLeft__C-id');
             if (activeState && periodEl) {
                 periodEl.textContent = activeState.currentIssueNumber;
