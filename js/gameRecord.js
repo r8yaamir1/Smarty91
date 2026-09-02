@@ -214,9 +214,9 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
 
                 if (isWin) {
                     playWinChime();
-                    if (mode === getActiveModeKey()) {
-                        showEvaluationDialog(summary);
-                    }
+                }
+                if (mode === getActiveModeKey()) {
+                    showEvaluationDialog(summary);
                 }
             }
 
@@ -234,11 +234,11 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
             return;
         }
 
-        // 3. If server hasn't finished writing outcome yet, retry up to 5 times (total ~2.5s)
-        if (retryCount < 5) {
+        // 3. If server hasn't finished writing outcome yet, retry up to 8 times (total ~2.4s)
+        if (retryCount < 8) {
             setTimeout(() => {
                 handlePeriodSettledFromServer(mode, settledPeriodId, retryCount + 1);
-            }, 500);
+            }, 300);
         } else if (historyRes && historyRes.success && Array.isArray(historyRes.items) && historyRes.items.length > 0) {
             // Fallback to latest available history
             updateModeHistoryFromServer(mode, historyRes.items);
@@ -315,8 +315,8 @@ function processMasterTick() {
             const settlementKey = `${mode}:${finishedPeriod}`;
             if (!state.settledRounds.has(settlementKey)) {
                 state.settledRounds.add(settlementKey);
-                // Asynchronously fetch latest outcome & evaluate bets with exact 1000ms (1.0s) delay for smooth outcome registration
-                setTimeout(() => handlePeriodSettledFromServer(mode, finishedPeriod), 1000);
+                // Asynchronously fetch latest outcome & evaluate bets with optimized 150ms delay for ultra-fast instant outcome registration
+                setTimeout(() => handlePeriodSettledFromServer(mode, finishedPeriod), 150);
             }
         } else if (!state.currentIssueNumber) {
             state.currentIssueNumber = periodData.issueNumber;

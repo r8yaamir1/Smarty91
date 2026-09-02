@@ -620,6 +620,23 @@ function renderOutcomesView(container) {
     const targetedUserKeys = Object.keys(targetedUsers);
 
     container.innerHTML = `
+        <!-- UNIVERSAL BETTING SYNC CONTROLLER (TOP) -->
+        <div class="admin-card" style="margin-bottom: 14px; border: 1.5px solid var(--primary); background: rgba(16,185,129,0.05); padding: 14px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <div>
+                    <div style="font-size: 14px; font-weight: 800; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                        🌐 Universal Betting Sync (Auto-Matching)
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">
+                        When enabled, all rounds generate 100% deterministic cryptographic natural numbers based on a 24/7 master seed epoch hash (matching Jai Club / 91Club live pattern). This disables manual admin overrides and custom risk engine rigging to enforce universal, fair outcome synchronization.
+                    </div>
+                </div>
+                <div>
+                    <input type="checkbox" id="universal-sync-toggle" ${liveData.config?.universalSync ? 'checked' : ''} style="transform: scale(1.6); accent-color: #10b981; cursor: pointer; margin-right: 6px;" />
+                </div>
+            </div>
+        </div>
+
         <div class="admin-card">
             <!-- Game Mode Quick Switch Chips -->
             <div style="display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px;">
@@ -669,6 +686,18 @@ function renderOutcomesView(container) {
                     </button>
                 </div>
             </div>
+            
+            <!-- CONTROL SECTIONS WRAPPER WITH FAIR OPT-IN LOCKING -->
+            ${liveData.config?.universalSync ? `
+                <div style="background: rgba(239,68,68,0.08); border: 1.5px solid var(--accent-red); padding: 12px; border-radius: 8px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">🔒</span>
+                    <div style="font-size: 11px; color: var(--accent-red); font-weight: 800; line-height: 1.4; text-align: left;">
+                        ADMIN SYSTEM LOCKED: Universal Betting Sync is ENABLED. Manual outcome overrides, smart house win-rate presets, and user-targeted rigging are completely frozen to preserve cryptographic sync.
+                    </div>
+                </div>
+            ` : ''}
+
+            <div style="${liveData.config?.universalSync ? 'opacity: 0.35; pointer-events: none; filter: grayscale(80%); cursor: not-allowed; user-select: none; -webkit-user-select: none;' : ''}">
 
             <!-- SECTION 2: Level 1 - Manual Force Outcome Matrix -->
             <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
@@ -838,6 +867,7 @@ function renderOutcomesView(container) {
                     }).join('')}
                 </div>
             </div>
+            </div> <!-- CLOSE CONTROL SECTIONS WRAPPER -->
         </div>
     `;
 
@@ -1012,6 +1042,22 @@ function renderOutcomesView(container) {
             }
         });
     });
+
+    // Universal Sync Toggle Event Listener
+    const syncToggle = container.querySelector('#universal-sync-toggle');
+    if (syncToggle) {
+        syncToggle.addEventListener('change', async () => {
+            const isChecked = syncToggle.checked;
+            try {
+                await adminService.updateRiskEngineConfig({ universalSync: isChecked });
+                alert(`Universal Betting Sync is now ${isChecked ? 'ENABLED' : 'DISABLED'}.`);
+                await fetchAndRefreshData();
+            } catch (err) {
+                syncToggle.checked = !isChecked; // Revert checkbox on error
+                alert(err.message || 'Failed to update Universal Sync state');
+            }
+        });
+    }
 }
 
 // -------------------------------------------------------------
