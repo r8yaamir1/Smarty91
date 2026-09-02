@@ -1007,6 +1007,74 @@ class FirebaseSyncManager {
             this._handleQuotaError(e);
         }
     }
+
+    async fetchPendingBetsForPeriod(mode, periodId) {
+        if (!this._checkQuota()) return [];
+        try {
+            const betsCol = collection(db, 'bets');
+            const q = query(
+                betsCol,
+                where('mode', '==', mode),
+                where('periodId', '==', periodId),
+                where('status', '==', 'PENDING')
+            );
+            const querySnap = await getDocs(q);
+            const bets = [];
+            querySnap.forEach(docSnap => {
+                const b = docSnap.data();
+                if (b && b.id) {
+                    bets.push(b);
+                }
+            });
+            return bets;
+        } catch (err) {
+            this._handleQuotaError(err);
+            console.warn(`[Firebase] fetchPendingBetsForPeriod error for mode=${mode} period=${periodId}:`, err.message);
+            return [];
+        }
+    }
+
+    async savePreDecidedOutcome(mode, periodId, outcomeResult) {
+        if (!this._checkQuota()) return;
+        try {
+            const outcomeId = `${mode}_${periodId}`;
+            const outcomeRef = doc(db, 'game_predecided_outcomes', outcomeId);
+            await setDoc(outcomeRef, {
+                id: outcomeId,
+                mode,
+                periodId,
+                number: outcomeResult.number,
+                isOverridden: !!outcomeResult.isOverridden,
+                reason: outcomeResult.reason || 'PRE_DECIDED_LOCK',
+                lockedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            this._handleQuotaError(err);
+            console.warn(`[Firebase] savePreDecidedOutcome error for ${mode} period ${periodId}:`, err.message);
+        }
+    }
+
+    async fetchPreDecidedOutcome(mode, periodId) {
+        if (!this._checkQuota()) return null;
+        try {
+            const outcomeId = `${mode}_${periodId}`;
+            const outcomeRef = doc(db, 'game_predecided_outcomes', outcomeId);
+            const snap = await getDoc(outcomeRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                return {
+                    number: Number(data.number),
+                    isOverridden: !!data.isOverridden,
+                    reason: data.reason || 'PRE_DECIDED_FIRESTORE'
+                };
+            }
+            return null;
+        } catch (err) {
+            this._handleQuotaError(err);
+            console.warn(`[Firebase] fetchPreDecidedOutcome error for ${mode} period ${periodId}:`, err.message);
+            return null;
+        }
+    }
 }
 
 export const firebaseSync = new FirebaseSyncManager();

@@ -332,6 +332,105 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const isNewTopPeriod = lastRenderedTopPeriod[mode] !== topPeriodId;
     lastRenderedTopPeriod[mode] = topPeriodId;
 
+    const existingRows = Array.from(container.querySelectorAll('.van-row'));
+    const isFirstPage = state.historyPage === 1;
+
+    // Check if we can do an incremental smooth slide-down prepend instead of a full clear-and-rebuild
+    if (isFirstPage && existingRows.length > 0 && !isNewTopPeriod) {
+        // Already matching top period and on page 1. No need to clear and rebuild, avoiding any paint flicker completely!
+        if (existingRows.length === items.length) {
+            if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
+            if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
+            if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
+            return;
+        }
+    }
+
+    if (isFirstPage && existingRows.length > 0 && isNewTopPeriod) {
+        const firstExistingPeriod = existingRows[0].children[0].textContent.trim();
+        // If the new top period is indeed the next successive period
+        if (firstExistingPeriod && topPeriodId !== firstExistingPeriod) {
+            // Build the single new top row
+            const newRow = document.createElement('div');
+            newRow.className = 'van-row fifo-new-item';
+            newRow.setAttribute('data-v-481307ec', '');
+            
+            // Inline styles for ultra-smooth slide-down transition
+            newRow.style.maxHeight = '0px';
+            newRow.style.opacity = '0';
+            newRow.style.overflow = 'hidden';
+            newRow.style.transition = 'max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease-out, padding 0.4s ease-out';
+            newRow.style.paddingTop = '0px';
+            newRow.style.paddingBottom = '0px';
+
+            let numClass = 'greenColor';
+            if (topItem.number === 0) numClass = 'mixedColor0';
+            else if (topItem.number === 5) numClass = 'mixedColor5';
+            else if ([2, 4, 6, 8].includes(topItem.number)) numClass = 'defaultColor';
+
+            let colorBadges = '';
+            if (topItem.secondaryColor) {
+                colorBadges = `
+                    <div class="GameRecord__C-origin-I ${topItem.primaryColor}" data-v-481307ec></div>
+                    <div class="GameRecord__C-origin-I ${topItem.secondaryColor}" data-v-481307ec></div>
+                `;
+            } else {
+                colorBadges = `
+                    <div class="GameRecord__C-origin-I ${topItem.primaryColor}" data-v-481307ec></div>
+                `;
+            }
+
+            newRow.innerHTML = `
+                <div class="van-col van-col--9" data-v-481307ec>
+                    ${topItem.periodId}
+                </div>
+                <div class="van-col van-col--5 numcenter" data-v-481307ec>
+                    <div class="GameRecord__C-body-num ${numClass}" data-v-481307ec>
+                        ${topItem.number}
+                    </div>
+                </div>
+                <div class="van-col van-col--5" data-v-481307ec>
+                    <span data-v-481307ec>${topItem.isBig ? 'Big' : 'Small'}</span>
+                </div>
+                <div class="van-col van-col--5" data-v-481307ec>
+                    <div class="GameRecord__C-origin" data-v-481307ec>
+                        ${colorBadges}
+                    </div>
+                </div>
+            `;
+
+            // Prepend new row smoothly
+            container.insertBefore(newRow, container.firstChild);
+
+            // Trigger reflow & animate transition
+            newRow.offsetHeight; // trigger reflow
+            requestAnimationFrame(() => {
+                newRow.style.maxHeight = '1.33333rem'; // Normal row height
+                newRow.style.opacity = '1';
+                newRow.style.paddingTop = ''; // Restore default padding
+                newRow.style.paddingBottom = '';
+            });
+
+            // Cleanup transitional styles after animation finishes to ensure perfect native styling
+            setTimeout(() => {
+                newRow.style.maxHeight = '';
+                newRow.style.opacity = '';
+                newRow.style.overflow = '';
+                newRow.style.transition = '';
+            }, 450);
+
+            // Keep only exactly 10 rows on screen
+            while (container.children.length > ITEMS_PER_PAGE) {
+                container.removeChild(container.lastChild);
+            }
+
+            if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
+            if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
+            if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
+            return;
+        }
+    }
+
     container.innerHTML = '';
 
     items.forEach((item, index) => {

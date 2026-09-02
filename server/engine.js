@@ -1019,18 +1019,30 @@ class Smarty91ServerEngine {
                 }
             }
 
+            const isLockedTransition = (remainingSec <= (modeConfig.lockoutSeconds || 5)) && !state.isLocked;
+            const isPeriodIdTransition = (state.currentPeriodId !== currentPeriodId);
+
             state.currentPeriodId = currentPeriodId;
             state.currentEndTimeMs = times.endTime;
             state.remainingSeconds = remainingSec;
             state.isLocked = remainingSec <= (modeConfig.lockoutSeconds || 5);
 
-            // Pre-decide and safely lock winning outcome in last 5 seconds (T-5s)
+            // Sync transitions to Firestore game_periods collection for zero-latency client subscription
+            if (isPeriodIdTransition || isLockedTransition) {
+                firebaseSync.savePeriodState(mode, state).catch(() => {});
+            }
+
+            // Pre-decide and safely lock winning outcome in last 5 seconds (T-5s) with real-time Firestore persistent fallback
             if (state.isLocked) {
                 if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
-                if (!state.preDecidedOutcomes[currentPeriodId]) {
-                    const outcomeResult = this.selectSmartRiskOutcome(mode, currentPeriodId);
-                    state.preDecidedOutcomes[currentPeriodId] = outcomeResult;
-                    console.log(`[Pre-Lock Engine] Mode ${mode} Period ${currentPeriodId} locked number in last 5s:`, outcomeResult.number);
+                if (!state.preDecidedOutcomes[currentPeriodId] && (!state.preLockingPeriods || !state.preLockingPeriods.has(currentPeriodId))) {
+                    if (!state.preLockingPeriods) state.preLockingPeriods = new Set();
+                    state.preLockingPeriods.add(currentPeriodId);
+
+                    this.preDecideAndLockOutcome(mode, currentPeriodId).catch(err => {
+                        console.error(`[Pre-Lock Engine] Error pre-deciding outcome for mode ${mode} period ${currentPeriodId}:`, err);
+                        if (state.preLockingPeriods) state.preLockingPeriods.delete(currentPeriodId);
+                    });
                 }
             }
 
@@ -1076,19 +1088,65 @@ class Smarty91ServerEngine {
         console.log('[Self-Healing Engine] Comprehensive catch-up settlement completed.');
     }
 
+    async preDecideAndLockOutcome(mode, periodId) {
+        const state = this.modes[mode];
+        if (!state) return;
+
+        try {
+            // 1. Fetch actual pending bets directly from Firestore to ensure 100% accuracy across multiple container scale boundaries
+            const pendingBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+            
+            // Sync into memory maps
+            pendingBets.forEach(bet => {
+                this.bets.set(bet.id, bet);
+            });
+
+            // 2. Process our Smart House-Profit strategy/rigging/RNG rules based on these real-time bets
+            const outcomeResult = this.selectSmartRiskOutcome(mode, periodId, pendingBets);
+
+            if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
+            state.preDecidedOutcomes[periodId] = outcomeResult;
+
+            // 3. Save into Firestore permanently so container recycles or restarts maintain this EXACT outcome
+            await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
+            console.log(`[Pre-Lock Engine] Mode ${mode} Period ${periodId} successfully processed and locked number: ${outcomeResult.number}`);
+        } catch (e) {
+            console.warn(`[Pre-Lock Engine] Error during pre-decide for ${mode} period ${periodId}:`, e.message);
+        }
+    }
+
+    async getPreDecidedOutcome(mode, periodId) {
+        const state = this.modes[mode];
+        if (state && state.preDecidedOutcomes && state.preDecidedOutcomes[periodId]) {
+            const res = state.preDecidedOutcomes[periodId];
+            delete state.preDecidedOutcomes[periodId];
+            return res;
+        }
+
+        try {
+            // Check Firestore persistent predecided collection
+            const dbOutcome = await firebaseSync.fetchPreDecidedOutcome(mode, periodId);
+            if (dbOutcome) {
+                return dbOutcome;
+            }
+        } catch (err) {
+            console.warn(`[Engine] fetchPreDecidedOutcome error for ${mode} period ${periodId}:`, err.message);
+        }
+
+        // Fallback if none existed
+        const outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
+        try {
+            await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
+        } catch (e) {}
+        return outcomeResult;
+    }
+
     async _settleRound(mode, periodId) {
         const state = this.modes[mode];
         const modeConfig = this.config.modes[mode];
         
-        // 1. Determine Winning Number: use pre-decided locked outcome from last 5s if available
-        let outcomeResult;
-        if (state.preDecidedOutcomes && state.preDecidedOutcomes[periodId]) {
-            outcomeResult = state.preDecidedOutcomes[periodId];
-            delete state.preDecidedOutcomes[periodId];
-        } else {
-            outcomeResult = this.selectSmartRiskOutcome(mode, periodId);
-        }
-
+        // 1. Determine Winning Number: use pre-decided locked outcome from Firestore/Memory
+        const outcomeResult = await this.getPreDecidedOutcome(mode, periodId);
         const winningNumber = outcomeResult.number;
         const isOverridden = outcomeResult.isOverridden;
 
@@ -1108,11 +1166,20 @@ class Smarty91ServerEngine {
         state.history.unshift(roundRecord);
         if (state.history.length > 50) state.history.length = 50;
 
-        // 2. Settle all pending bets for this mode and periodId SYNCHRONOUSLY first.
-        // This guarantees that any concurrent api requests like /bets/my-history or /wallet/summary immediately receive the fully settled states and balances.
-        const pendingBetsForRound = Array.from(this.bets.values()).filter(
-            b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
-        );
+        // 2. Fetch latest actual pending bets directly from Firestore to ensure zero-loss settlement
+        let pendingBetsForRound;
+        try {
+            pendingBetsForRound = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+            // Sync to local memory to ensure consistency
+            pendingBetsForRound.forEach(b => {
+                this.bets.set(b.id, b);
+            });
+        } catch (err) {
+            console.warn(`[Engine] Settlement bets fetch fallback for ${mode} period ${periodId}:`, err.message);
+            pendingBetsForRound = Array.from(this.bets.values()).filter(
+                b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
+            );
+        }
 
         const evaluatedBets = [];
         for (const bet of pendingBetsForRound) {
