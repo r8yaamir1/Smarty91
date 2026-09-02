@@ -731,7 +731,7 @@ class Smarty91ServerEngine {
 
         // 1. Index all existing history items into settledOutcomesHistory to prevent ANY recalculation
         state.history.forEach(h => {
-            const pid = String(h.period || h.periodId || '');
+            const pid = String(h.period || h.periodId || '').trim();
             if (pid && h.number !== undefined && h.number !== null) {
                 const num = Number(h.number);
                 const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
@@ -749,51 +749,59 @@ class Smarty91ServerEngine {
 
         // Filter out stale non-14-digit universal sync rounds
         state.history = state.history.filter(h => {
-            const pId = String(h.period || h.periodId || '');
+            const pId = String(h.period || h.periodId || '').trim();
             return pId.length === 14;
         });
 
         const interval = MODE_INTERVALS[mode] || 30000;
         const now = Date.now();
-        const currentActivePeriod = this._calculatePeriodId(now, interval, mode);
-        const prevActivePeriod = this._calculatePeriodId(now - interval, interval, mode);
+        const currentActivePeriod = String(this._calculatePeriodId(now, interval, mode)).trim();
+        const prevActivePeriod = String(this._calculatePeriodId(now - interval, interval, mode)).trim();
+        const prev2ActivePeriod = String(this._calculatePeriodId(now - (2 * interval), interval, mode)).trim();
 
-        const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '')));
-        // Never generate or fill current active round, previous active round (settling), or any period already tracked in state
-        existingPeriods.add(String(currentActivePeriod));
-        existingPeriods.add(String(prevActivePeriod));
-        if (state.currentPeriodId) existingPeriods.add(String(state.currentPeriodId));
+        const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '').trim()));
+        // Never generate or fill current active round, previous active round (settling), or recent transitions
+        existingPeriods.add(currentActivePeriod);
+        existingPeriods.add(prevActivePeriod);
+        existingPeriods.add(prev2ActivePeriod);
+        if (state.currentPeriodId) existingPeriods.add(String(state.currentPeriodId).trim());
         if (state.settledRounds) {
-            state.settledRounds.forEach(p => existingPeriods.add(String(p)));
+            state.settledRounds.forEach(p => existingPeriods.add(String(p).trim()));
         }
         if (state.preComputedSettlements) {
-            Object.keys(state.preComputedSettlements).forEach(p => existingPeriods.add(String(p)));
+            Object.keys(state.preComputedSettlements).forEach(p => existingPeriods.add(String(p).trim()));
         }
         if (state.preDecidedOutcomes) {
-            Object.keys(state.preDecidedOutcomes).forEach(p => existingPeriods.add(String(p)));
+            Object.keys(state.preDecidedOutcomes).forEach(p => existingPeriods.add(String(p).trim()));
+        }
+        if (state.settledOutcomesHistory) {
+            for (const key of state.settledOutcomesHistory.keys()) {
+                existingPeriods.add(String(key).trim());
+            }
         }
 
         const newRounds = [];
         for (let i = 1; i <= 60; i++) {
             if (state.history.length + newRounds.length >= 50) break;
             const pastTime = now - (i * interval);
-            const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
-            const pastPeriodStr = String(pastPeriodId);
+            const pastPeriodId = String(this._calculatePeriodId(pastTime, interval, mode)).trim();
 
-            if (pastPeriodId !== currentActivePeriod && pastPeriodId !== prevActivePeriod && pastPeriodId !== state.currentPeriodId && !existingPeriods.has(pastPeriodStr)) {
-                existingPeriods.add(pastPeriodStr);
+            if (pastPeriodId !== currentActivePeriod && pastPeriodId !== prevActivePeriod && pastPeriodId !== prev2ActivePeriod && !existingPeriods.has(pastPeriodId)) {
+                existingPeriods.add(pastPeriodId);
                 let num;
-                if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pastPeriodStr)) {
-                    num = state.settledOutcomesHistory.get(pastPeriodStr).number;
-                } else if (state.preDecidedOutcomes && state.preDecidedOutcomes[pastPeriodStr]) {
-                    num = state.preDecidedOutcomes[pastPeriodStr].number;
+                if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pastPeriodId)) {
+                    num = state.settledOutcomesHistory.get(pastPeriodId).number;
+                } else if (state.preDecidedOutcomes && state.preDecidedOutcomes[pastPeriodId]) {
+                    num = state.preDecidedOutcomes[pastPeriodId].number;
                 } else {
-                    num = this._calculateDeterministicOutcome(mode, pastPeriodStr);
+                    num = this._calculateDeterministicOutcome(mode, pastPeriodId);
                 }
                 const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
                 const roundRecord = {
                     period: pastPeriodId,
+                    periodId: pastPeriodId,
                     number: num,
+                    winningNumber: num,
                     color: props.color,
                     size: props.size,
                     colorLabel: props.label,
@@ -801,6 +809,13 @@ class Smarty91ServerEngine {
                     isOverridden: false
                 };
                 newRounds.push(roundRecord);
+                state.settledOutcomesHistory.set(pastPeriodId, {
+                    number: num,
+                    color: props.color,
+                    size: props.size,
+                    isOverridden: false,
+                    reason: 'DETERMINISTIC_HISTORY_FILL'
+                });
             }
         }
 
@@ -811,13 +826,16 @@ class Smarty91ServerEngine {
         // Deduplicate and sort descending by period ID
         const map = new Map();
         state.history.forEach(item => {
-            const pId = String(item.period || item.periodId || '');
+            const pId = String(item.period || item.periodId || '').trim();
             if (pId && !map.has(pId)) {
-                const num = Number(item.number);
+                const num = Number(item.number !== undefined ? item.number : item.winningNumber);
                 const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
                 map.set(pId, {
                     ...item,
+                    period: pId,
+                    periodId: pId,
                     number: num,
+                    winningNumber: num,
                     color: props.color,
                     size: props.size,
                     colorLabel: props.label
@@ -827,8 +845,8 @@ class Smarty91ServerEngine {
 
         const deduped = Array.from(map.values());
         deduped.sort((a, b) => {
-            const pA = String(a.period || a.periodId || '');
-            const pB = String(b.period || b.periodId || '');
+            const pA = String(a.period || a.periodId || '').trim();
+            const pB = String(b.period || b.periodId || '').trim();
             return pB.localeCompare(pA, undefined, { numeric: true });
         });
 
@@ -878,10 +896,13 @@ class Smarty91ServerEngine {
     }
 
     // Calculate total user win payout if candidateNumber wins for mode & periodId
-    _calculatePayoutForCandidate(mode, periodId, candidateNumber) {
-        const activeBets = Array.from(this.bets.values()).filter(
-            b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
-        );
+    _calculatePayoutForCandidate(mode, periodId, candidateNumber, pendingBetsInput = null) {
+        const pidStr = String(periodId).trim();
+        const activeBets = Array.isArray(pendingBetsInput)
+            ? pendingBetsInput
+            : Array.from(this.bets.values()).filter(
+                b => b.mode === mode && String(b.periodId).trim() === pidStr && (b.status === 'PENDING' || b.status === 'pending')
+            );
         let totalPayout = 0;
         activeBets.forEach(bet => {
             const evalRes = this._evaluateBet(bet, candidateNumber);
@@ -895,7 +916,7 @@ class Smarty91ServerEngine {
     // Secret 24/7 Cryptographic Seed Formula for Natural Outcomes
     _calculateDeterministicOutcome(mode, periodId) {
         const state = this.modes[mode];
-        const pidStr = String(periodId);
+        const pidStr = String(periodId).trim();
         if (state) {
             if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
                 return state.settledOutcomesHistory.get(pidStr).number;
@@ -904,7 +925,7 @@ class Smarty91ServerEngine {
                 return state.preDecidedOutcomes[pidStr].number;
             }
             if (state.history && Array.isArray(state.history)) {
-                const found = state.history.find(h => String(h.period || h.periodId) === pidStr);
+                const found = state.history.find(h => String(h.period || h.periodId).trim() === pidStr);
                 if (found && found.number !== undefined && found.number !== null) {
                     return Number(found.number);
                 }
@@ -918,7 +939,7 @@ class Smarty91ServerEngine {
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
     selectSmartRiskOutcome(mode, periodId, pendingBetsInput = null) {
         const state = this.modes[mode];
-        const pidStr = String(periodId);
+        const pidStr = String(periodId).trim();
 
         const pendingBets = Array.isArray(pendingBetsInput)
             ? pendingBetsInput
@@ -942,6 +963,17 @@ class Smarty91ServerEngine {
             }
         }
 
+        // Helper to lock decision permanently before returning
+        const lockAndReturn = (outcomeObj) => {
+            if (state) {
+                if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+                state.settledOutcomesHistory.set(pidStr, outcomeObj);
+                if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
+                state.preDecidedOutcomes[pidStr] = outcomeObj;
+            }
+            return outcomeObj;
+        };
+
         // Priority 1: Check Admin Force Override
         if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
             const winningNumber = Number(this.adminOverrides[mode]);
@@ -955,7 +987,7 @@ class Smarty91ServerEngine {
                 timestamp: new Date().toISOString()
             });
             firebaseSync.logAdminAction('ADMIN_RESULT_OVERRIDE_EXECUTED', logMsg);
-            return { number: winningNumber, isOverridden: true, reason: 'ADMIN_FORCE_OVERRIDE' };
+            return lockAndReturn({ number: winningNumber, isOverridden: true, reason: 'ADMIN_FORCE_OVERRIDE' });
         }
 
         const riskConfig = this.config.riskEngine || {};
@@ -964,7 +996,7 @@ class Smarty91ServerEngine {
         // If no bets placed in this round, generate 100% deterministic SHA-256 outcome
         if (pendingBets.length === 0) {
             const num = this._calculateDeterministicOutcome(mode, periodId);
-            return { number: num, isOverridden: false, reason: 'DETERMINISTIC_SHA256_NO_BETS' };
+            return lockAndReturn({ number: num, isOverridden: false, reason: 'DETERMINISTIC_SHA256_NO_BETS' });
         }
 
         // Priority 2: Targeted User Rigging Check
@@ -985,7 +1017,7 @@ class Smarty91ServerEngine {
                 }
                 if (candidateOptions.length > 0) {
                     const picked = candidateOptions[crypto.randomInt(0, candidateOptions.length)];
-                    return { number: picked, isOverridden: true, reason: `TARGETED_USER_${targetMode}` };
+                    return lockAndReturn({ number: picked, isOverridden: true, reason: `TARGETED_USER_${targetMode}` });
                 }
             }
         }
@@ -996,7 +1028,7 @@ class Smarty91ServerEngine {
         
         const matrix = [];
         for (let num = 0; num <= 9; num++) {
-            const payout = this._calculatePayoutForCandidate(mode, periodId, num);
+            const payout = this._calculatePayoutForCandidate(mode, periodId, num, pendingBets);
             const netProfit = totalBetVolume - payout;
             matrix.push({ number: num, payout, netProfit });
         }
@@ -1011,17 +1043,17 @@ class Smarty91ServerEngine {
         eligibleMatrix.sort((a, b) => b.netProfit - a.netProfit);
 
         let houseWinRate = Number(riskConfig.houseWinRatePercent);
-        if (isNaN(houseWinRate)) houseWinRate = 50;
-
-        if (riskConfig.strategyMode === 'SAFE_HOUSE') houseWinRate = 90;
-        else if (riskConfig.strategyMode === 'BALANCED') houseWinRate = 50;
-        else if (riskConfig.strategyMode === 'HOOKING') houseWinRate = 35;
-        else if (riskConfig.strategyMode === 'FAIR') houseWinRate = 50;
+        if (isNaN(houseWinRate) || houseWinRate <= 0) {
+            if (riskConfig.strategyMode === 'SAFE_HOUSE') houseWinRate = 90;
+            else if (riskConfig.strategyMode === 'HOOKING') houseWinRate = 35;
+            else if (riskConfig.strategyMode === 'FAIR') houseWinRate = 50;
+            else houseWinRate = 80;
+        }
 
         if (riskConfig.strategyMode === 'FAIR' || !riskConfig.enabled) {
             // Natural cryptographically random weighted outcome
             const num = this.generateWeightedNumber(mode);
-            return { number: num, isOverridden: false, reason: 'SMART_RISK_FAIR_RNG' };
+            return lockAndReturn({ number: num, isOverridden: false, reason: 'SMART_RISK_FAIR_RNG' });
         }
 
         const roll = Math.floor(Math.random() * 100) + 1; // 1..100
@@ -1044,7 +1076,7 @@ class Smarty91ServerEngine {
             }
         }
 
-        return { number: chosenNumber, isOverridden: false, reason: `SMART_RISK_${riskConfig.strategyMode}_${houseWinRate}PCT` };
+        return lockAndReturn({ number: chosenNumber, isOverridden: false, reason: `SMART_RISK_${riskConfig.strategyMode}_${houseWinRate}PCT` });
     }
 
     // Outcome Generator Fallback

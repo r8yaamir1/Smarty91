@@ -303,13 +303,17 @@ apiRouter.get('/games/history/:mode', (req, res) => {
     const totalPages = Math.max(1, Math.ceil(state.history.length / limit));
 
     // Normalize outcome properties for consistent field names
-    const items = rawItems.map(item => ({
-        ...item,
-        period: item.period || item.periodId,
-        periodId: item.periodId || item.period,
-        number: item.number !== undefined && item.number !== null ? item.number : item.winningNumber,
-        winningNumber: item.winningNumber !== undefined && item.winningNumber !== null ? item.winningNumber : item.number
-    }));
+    const items = rawItems.map(item => {
+        const pid = String(item.period || item.periodId || '').trim();
+        const num = Number(item.number !== undefined && item.number !== null ? item.number : item.winningNumber);
+        return {
+            ...item,
+            period: pid,
+            periodId: pid,
+            number: num,
+            winningNumber: num
+        };
+    });
 
     res.json({
         success: true,

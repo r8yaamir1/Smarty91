@@ -987,7 +987,7 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
             const num = Number(rawNum);
             const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
             const rawTime = item.timestamp || item.settledAt;
-            const periodIdStr = String(item.period || item.periodId || '');
+            const periodIdStr = String(item.period || item.periodId || '').trim();
             const isBig = (num >= 5 && num <= 9);
             return {
                 mode,
@@ -1000,17 +1000,33 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
                 timestamp: parseTime(rawTime)
             };
         })
-        .filter(item => item.periodId !== '');
+        .filter(item => item.periodId !== '' && item.periodId !== 'undefined' && item.periodId !== 'null');
 
-    // Deduplicate history items by unique periodId (server outcomes are authoritative)
+    // Deduplicate history items by unique periodId (immutable lock guarantees no number change)
     const uniqueMap = new Map();
+
+    // 1. Seed with existing state.history to maintain client-side immutability
+    if (state.history && Array.isArray(state.history)) {
+        state.history.forEach(existing => {
+            const pid = String(existing.periodId || existing.period || '').trim();
+            if (pid && pid !== 'undefined' && pid !== 'null') {
+                uniqueMap.set(pid, { ...existing, periodId: pid });
+            }
+        });
+    }
+
+    // 2. Overlay server history items (new periods added, existing locked numbers preserved)
     formatted.forEach(item => {
-        if (!uniqueMap.has(item.periodId)) {
-            uniqueMap.set(item.periodId, item);
+        const pid = item.periodId;
+        if (!uniqueMap.has(pid)) {
+            uniqueMap.set(pid, item);
         } else {
-            const existing = uniqueMap.get(item.periodId);
-            if ((!existing || existing.number === undefined || existing.number === null) && (item.number !== undefined && item.number !== null)) {
-                uniqueMap.set(item.periodId, item);
+            const existing = uniqueMap.get(pid);
+            // IMMUTABLE RULE: If a valid number is already set for this period, keep it permanently
+            if (existing && existing.number !== undefined && existing.number !== null && !isNaN(existing.number)) {
+                // Do not overwrite locked outcome
+            } else {
+                uniqueMap.set(pid, item);
             }
         }
     });
