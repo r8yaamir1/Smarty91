@@ -439,7 +439,7 @@ export function renderChartTrend(modeInput = activeModeKey) {
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     let rowsHtml = '';
-    items.forEach(item => {
+    items.forEach((item, index) => {
         let cellsHtml = '';
         for (let n = 0; n < 10; n++) {
             const isMatch = item.number === n;
@@ -450,7 +450,7 @@ export function renderChartTrend(modeInput = activeModeKey) {
             `;
         }
         rowsHtml += `
-            <div class="van-row" data-v-9d93d892="" style="display: flex; align-items: center; justify-content: space-between; height: 1.33333rem; padding: .45333rem .13333rem; border-top: .01333rem solid var(--gray-color-1);">
+            <div class="van-row ${index === 0 && state.chartPage === 1 ? 'new-row' : ''}" data-v-9d93d892="" style="display: flex; align-items: center; justify-content: space-between; height: 1.33333rem; padding: .45333rem .13333rem; border-top: .01333rem solid var(--gray-color-1);">
                 <div class="van-col van-col--8 Trend__C-body2-IssueNumber" data-v-9d93d892="">
                     ${item.periodId}
                 </div>
@@ -632,7 +632,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
     const items = state.userBets.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     let cardsHtml = '';
-    items.forEach((bet) => {
+    items.forEach((bet, index) => {
         const betAmt = Number(bet.betAmount !== undefined ? bet.betAmount : (bet.totalAmount || 0));
         const contractAmt = Number(bet.contractAmount !== undefined ? bet.contractAmount : (betAmt * 0.98));
         const feeAmt = Number(bet.fee !== undefined ? bet.fee : (betAmt * 0.02));
@@ -709,7 +709,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
             : (isPending ? 'Pending' : '-');
 
         cardsHtml += `
-            <div class="MyGameRecordList__C-item-wrapper" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">
+            <div class="MyGameRecordList__C-item-wrapper ${index === 0 && state.myHistoryPage === 1 ? 'new-card' : ''}" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">
                 <div class="MyGameRecordList__C-item" data-v-8bb41fd5="" style="cursor: pointer;">
                     <div class="MyGameRecordList__C-item-l ${badgeClass}" data-v-8bb41fd5="">${badgeText}</div>
                     <div class="MyGameRecordList__C-item-m" data-v-8bb41fd5="">

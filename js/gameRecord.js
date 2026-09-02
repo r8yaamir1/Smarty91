@@ -51,10 +51,14 @@ export function getRemainingSeconds() {
 export function syncAllActiveViews(modeInput = getActiveModeKey()) {
     const mode = normalizeMode(modeInput);
     if (mode === getActiveModeKey()) {
-        renderWinningTokensForActiveMode();
-        renderGameHistory(mode);
-        renderChartTrend(mode);
-        renderMyHistory(mode);
+        try {
+            renderWinningTokensForActiveMode();
+            renderGameHistory(mode);
+            renderChartTrend(mode);
+            renderMyHistory(mode);
+        } catch (err) {
+            console.warn('[SyncViews] Render error caught safely:', err);
+        }
     }
 }
 
@@ -285,12 +289,7 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
                 state.activeBets = state.activeBets.filter(b => String(b.periodId).trim() !== targetPeriod);
             }
 
-            if (mode === getActiveModeKey()) {
-                renderWinningTokensForActiveMode();
-                renderGameHistory(mode);
-                renderChartTrend(mode);
-                renderMyHistory(mode);
-            }
+            syncAllActiveViews(mode);
             return;
         }
 
@@ -304,12 +303,7 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
             updateModeHistoryFromServer(mode, historyRes.items);
             fetchUserBetsFromServer(mode, 1).catch(() => {});
             syncServerBalance(true).catch(() => {});
-            if (mode === getActiveModeKey()) {
-                renderWinningTokensForActiveMode();
-                renderGameHistory(mode);
-                renderChartTrend(mode);
-                renderMyHistory(mode);
-            }
+            syncAllActiveViews(mode);
         }
     } catch (e) {
         console.warn('handlePeriodSettledFromServer error:', e);
@@ -320,13 +314,7 @@ function processSettlementForPeriod(mode, items, targetPeriod) {
     updateModeHistoryFromServer(mode, items);
     fetchUserBetsFromServer(mode, 1).catch(() => {});
     syncServerBalance(true).catch(() => {});
-
-    if (mode === getActiveModeKey()) {
-        renderWinningTokensForActiveMode();
-        renderGameHistory(mode);
-        renderChartTrend(mode);
-        renderMyHistory(mode);
-    }
+    syncAllActiveViews(mode);
 }
 
 // Initial fetch of histories for all 4 modes
