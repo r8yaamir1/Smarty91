@@ -111,7 +111,7 @@ function updateBettingPopupTheme(type, selection, selectionLabel) {
 }
 
 // Update all betting popup values and chip states cleanly
-export function updateBetState({ balance, quantity }) {
+export function updateBetState({ balance, quantity, skipInputFieldUpdate = false }) {
     if (balance !== undefined) {
         currentBetContext.baseBalance = parseInt(balance, 10) || 1;
     }
@@ -126,9 +126,9 @@ export function updateBetState({ balance, quantity }) {
     const currentBal = currentBetContext.baseBalance || 1;
     const currentQty = currentBetContext.multiplier || 1;
 
-    // Update Input field
+    // Update Input field unless user is actively typing into it
     const inputField = document.querySelector("#van-field-5-input");
-    if (inputField) {
+    if (inputField && !skipInputFieldUpdate) {
         inputField.value = currentQty;
     }
 
@@ -164,7 +164,7 @@ export function updateBetState({ balance, quantity }) {
     }
 }
 
-// Global Stepper Adjust Quantity Helper for + / - buttons
+// Global Stepper Adjust Quantity Helper for + / - buttons (1-by-1 increments)
 window.adjustBetQuantity = function(delta, event) {
     if (event) {
         event.preventDefault();
@@ -185,7 +185,7 @@ window.adjustBetQuantity = function(delta, event) {
     if (newQty < 1) newQty = 1;
     if (newQty > 100000) newQty = 100000;
 
-    updateBetState({ quantity: newQty });
+    updateBetState({ quantity: newQty, skipInputFieldUpdate: false });
 };
 
 export function openBettingForSelection({ type, selection, selectionLabel, classSuffix }) {
@@ -351,26 +351,61 @@ export function handleBettingOverlay_clicks() {
 
     // Manual Input field handler
     if (inputField) {
+        // Auto-select text on focus so user can immediately type their desired number or backspace
+        inputField.addEventListener("focus", function () {
+            setTimeout(() => {
+                try {
+                    this.select();
+                } catch (e) {}
+            }, 50);
+        });
+
         inputField.addEventListener("input", function () {
             const raw = this.value.trim();
+            const currentBal = currentBetContext.baseBalance || 1;
+            const totalAmountDiv = document.querySelector(".Betting__Popup-foot-s");
+
+            // Allow the field to be completely cleared during typing so leading "1" can be deleted
             if (raw === '') {
-                updateBetState({ quantity: 1 });
+                const allItems = document.querySelectorAll('.Betting__Popup-body-line-item');
+                const quantityItems = Array.from(allItems).filter((item) => /^X\d+$/.test(item.textContent.trim()));
+                quantityItems.forEach(chip => chip.classList.remove('bgcolor'));
+
+                const outerMultipleChips = document.querySelectorAll('.Betting__C-multiple-r');
+                outerMultipleChips.forEach(chip => chip.classList.remove('active'));
+
+                if (totalAmountDiv) {
+                    totalAmountDiv.textContent = `Total amount ₹0.00`;
+                }
                 return;
             }
+
             let val = parseInt(raw.replace(/\D/g, ''), 10);
-            if (isNaN(val) || val < 1) val = 1;
-            if (val > 100000) val = 100000;
-            updateBetState({ quantity: val });
+            if (isNaN(val)) return;
+
+            if (val > 100000) {
+                val = 100000;
+                this.value = 100000;
+            }
+
+            updateBetState({ quantity: val, skipInputFieldUpdate: true });
         });
 
         inputField.addEventListener("blur", function () {
-            if (!this.value || parseInt(this.value, 10) < 1) {
-                updateBetState({ quantity: 1 });
+            const raw = this.value.trim();
+            let val = parseInt(raw.replace(/\D/g, ''), 10);
+            if (isNaN(val) || val < 1) {
+                val = 1;
             }
+            if (val > 100000) {
+                val = 100000;
+            }
+            this.value = val;
+            updateBetState({ quantity: val, skipInputFieldUpdate: false });
         });
     }
 
-    // Increment and Decrement Stepper Buttons
+    // Increment and Decrement Stepper Buttons (1-by-1 step)
     const decrementBtn = document.querySelector("#bet-pop-decrement");
     const incrementBtn = document.querySelector("#bet-pop-increment");
 
@@ -411,7 +446,17 @@ export function handleBettingOverlay_clicks() {
         }
 
         const bal = currentBetContext.baseBalance || 1;
-        const qty = currentBetContext.multiplier || 1;
+        let qty = currentBetContext.multiplier || 1;
+        
+        // Ensure manual input quantity is accurately read even if blur hasn't fired
+        if (inputField && inputField.value.trim() !== '') {
+            const parsed = parseInt(inputField.value.trim().replace(/\D/g, ''), 10);
+            if (!isNaN(parsed) && parsed >= 1) {
+                qty = Math.min(parsed, 100000);
+            }
+        }
+        currentBetContext.multiplier = qty;
+
         const total = bal * qty;
         const gameType = getCurrentGameType();
         const periodId = getCurrentIssueNumber();
