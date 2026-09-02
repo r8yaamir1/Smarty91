@@ -93,8 +93,8 @@ apiRouter.post('/admin/users/reset-password', checkAdminAuth, (req, res) => {
     }
 });
 
-// GET /api/auth/me
-apiRouter.get('/auth/me', async (req, res) => {
+// GET /api/auth/me & /api/user/me
+const handleUserMe = async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
         return res.status(401).json({ success: false, message: 'No authorization token provided' });
@@ -103,6 +103,8 @@ apiRouter.get('/auth/me', async (req, res) => {
     if (!user) {
         return res.status(401).json({ success: false, message: 'Invalid or expired session' });
     }
+    const hasDep = serverEngine.hasApprovedDeposit(user.id);
+    const depCount = serverEngine.getDepositCount(user.id);
     res.json({
         success: true,
         user: {
@@ -112,11 +114,15 @@ apiRouter.get('/auth/me', async (req, res) => {
             balance: user.balance,
             inviteCode: user.inviteCode,
             referredBy: user.referredBy,
-            hasDeposited: user.hasDeposited,
+            hasDeposited: hasDep,
+            depositCount: depCount,
             createdAt: user.createdAt
         }
     });
-});
+};
+
+apiRouter.get('/auth/me', handleUserMe);
+apiRouter.get('/user/me', handleUserMe);
 
 // GET /api/game/profit-stars -> Today's Profit Stars (Public)
 apiRouter.get('/game/profit-stars', (req, res) => {

@@ -118,10 +118,18 @@ function renderProfileUI() {
     // Calculate metrics
     let totalDepositAmount = 0;
     let totalWithdrawAmount = 0;
+    let ledgerDepositCount = 0;
     userLedger.forEach(item => {
-        if (item.type === 'DEPOSIT') totalDepositAmount += Math.abs(item.amount || 0);
+        if (item.type === 'DEPOSIT' || item.type === 'DEPOSIT_CREDIT') {
+            totalDepositAmount += Math.abs(item.amount || 0);
+            ledgerDepositCount++;
+        }
         if (item.type === 'WITHDRAWAL') totalWithdrawAmount += Math.abs(item.amount || 0);
     });
+
+    const userDepCount = currentUser.depositCount !== undefined 
+        ? Math.max(Number(currentUser.depositCount) || 0, ledgerDepositCount) 
+        : (currentUser.hasDeposited ? Math.max(1, ledgerDepositCount) : ledgerDepositCount);
 
     const vipInfo = calculateVipLevel(currentBalance, totalDepositAmount);
 
@@ -154,6 +162,7 @@ function renderProfileUI() {
     const vipProgressTextEl = document.getElementById('vip-progress-text');
     const balanceEl = document.getElementById('user-balance-val');
     const depositTotalEl = document.getElementById('stat-total-deposit');
+    const depositCountEl = document.getElementById('stat-deposit-count');
     const withdrawTotalEl = document.getElementById('stat-total-withdraw');
 
     if (phoneEl) phoneEl.textContent = maskPhone(currentUser.phone);
@@ -166,6 +175,7 @@ function renderProfileUI() {
     if (vipProgressTextEl) vipProgressTextEl.textContent = `Progress to VIP ${vipInfo.level + 1}: ${Math.floor(vipInfo.progress)}% (Target ₹${vipInfo.target.toLocaleString('en-IN')})`;
     if (balanceEl) balanceEl.textContent = `₹${currentBalance.toFixed(2)}`;
     if (depositTotalEl) depositTotalEl.textContent = `₹${totalDepositAmount.toFixed(2)}`;
+    if (depositCountEl) depositCountEl.textContent = `${userDepCount} ${userDepCount === 1 ? 'Time' : 'Times'}`;
     if (withdrawTotalEl) withdrawTotalEl.textContent = `₹${totalWithdrawAmount.toFixed(2)}`;
 
     // 2. Performance Stats

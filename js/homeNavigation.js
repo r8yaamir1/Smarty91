@@ -96,7 +96,8 @@ export async function verifyDepositStatus() {
         if (resp.ok) {
             const data = await resp.json();
             if (data && data.success && data.user) {
-                if (data.user.hasDeposited) {
+                const hasDep = Boolean(data.user.hasDeposited || (data.user.depositCount && data.user.depositCount > 0));
+                if (hasDep) {
                     localStorage.setItem('smarty91_has_deposited', 'true');
                     return true;
                 } else {

@@ -41,6 +41,13 @@ export const MODE_DISPLAY_NAMES = {
     '5m': 'Smarty91 5Min'
 };
 
+function isPermanentSettledReason(reason) {
+    if (!reason) return false;
+    if (reason === 'SETTLED_ROUND' || reason === 'ADMIN_FORCE_OVERRIDE' || reason === 'PRE_COMPUTED_SMART_RISK') return true;
+    if (typeof reason === 'string' && (reason.startsWith('SMART_RISK_') || reason.startsWith('TARGETED_USER_'))) return true;
+    return false;
+}
+
 class Smarty91ServerEngine {
     constructor() {
         this.masterPin = process.env.ADMIN_MASTER_PIN || 'Smarty071';
@@ -749,10 +756,22 @@ class Smarty91ServerEngine {
         const interval = MODE_INTERVALS[mode] || 30000;
         const now = Date.now();
         const currentActivePeriod = this._calculatePeriodId(now, interval, mode);
+        const prevActivePeriod = this._calculatePeriodId(now - interval, interval, mode);
+
         const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '')));
-        // Never generate or touch current active round or current period in state
+        // Never generate or fill current active round, previous active round (settling), or any period already tracked in state
         existingPeriods.add(String(currentActivePeriod));
+        existingPeriods.add(String(prevActivePeriod));
         if (state.currentPeriodId) existingPeriods.add(String(state.currentPeriodId));
+        if (state.settledRounds) {
+            state.settledRounds.forEach(p => existingPeriods.add(String(p)));
+        }
+        if (state.preComputedSettlements) {
+            Object.keys(state.preComputedSettlements).forEach(p => existingPeriods.add(String(p)));
+        }
+        if (state.preDecidedOutcomes) {
+            Object.keys(state.preDecidedOutcomes).forEach(p => existingPeriods.add(String(p)));
+        }
 
         const newRounds = [];
         for (let i = 1; i <= 60; i++) {
@@ -761,7 +780,7 @@ class Smarty91ServerEngine {
             const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
             const pastPeriodStr = String(pastPeriodId);
 
-            if (pastPeriodId !== currentActivePeriod && pastPeriodId !== state.currentPeriodId && !existingPeriods.has(pastPeriodStr)) {
+            if (pastPeriodId !== currentActivePeriod && pastPeriodId !== prevActivePeriod && pastPeriodId !== state.currentPeriodId && !existingPeriods.has(pastPeriodStr)) {
                 existingPeriods.add(pastPeriodStr);
                 let num;
                 if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pastPeriodStr)) {
@@ -782,15 +801,6 @@ class Smarty91ServerEngine {
                     isOverridden: false
                 };
                 newRounds.push(roundRecord);
-                if (!state.settledOutcomesHistory.has(pastPeriodStr)) {
-                    state.settledOutcomesHistory.set(pastPeriodStr, {
-                        number: num,
-                        color: props.color,
-                        size: props.size,
-                        isOverridden: false,
-                        reason: 'DETERMINISTIC_HISTORY_FILL'
-                    });
-                }
             }
         }
 
@@ -902,34 +912,33 @@ class Smarty91ServerEngine {
         }
         const seedStr = `SMARTY91_SECRET_MASTER_SEED_2026_${mode}_${pidStr}`;
         const hex = crypto.createHash('sha256').update(seedStr).digest('hex');
-        const num = parseInt(hex.substring(0, 8), 16) % 10;
-
-        if (state) {
-            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
-            const props = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
-            state.settledOutcomesHistory.set(pidStr, {
-                number: num,
-                color: props.color,
-                size: props.size,
-                isOverridden: false,
-                reason: 'DETERMINISTIC_COMPUTED'
-            });
-        }
-        return num;
+        return parseInt(hex.substring(0, 8), 16) % 10;
     }
 
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
-    selectSmartRiskOutcome(mode, periodId) {
+    selectSmartRiskOutcome(mode, periodId, pendingBetsInput = null) {
         const state = this.modes[mode];
         const pidStr = String(periodId);
+
+        const pendingBets = Array.isArray(pendingBetsInput)
+            ? pendingBetsInput
+            : Array.from(this.bets.values()).filter(
+                b => b.mode === mode && String(b.periodId).trim() === pidStr && (b.status === 'PENDING' || b.status === 'pending')
+            );
 
         // Priority 0: Check if already decided and locked
         if (state) {
             if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
-                return state.settledOutcomesHistory.get(pidStr);
+                const existing = state.settledOutcomesHistory.get(pidStr);
+                if (existing && (isPermanentSettledReason(existing.reason) || pendingBets.length === 0)) {
+                    return existing;
+                }
             }
             if (state.preDecidedOutcomes && state.preDecidedOutcomes[pidStr]) {
-                return state.preDecidedOutcomes[pidStr];
+                const existing = state.preDecidedOutcomes[pidStr];
+                if (existing && (isPermanentSettledReason(existing.reason) || pendingBets.length === 0)) {
+                    return existing;
+                }
             }
         }
 
@@ -951,9 +960,6 @@ class Smarty91ServerEngine {
 
         const riskConfig = this.config.riskEngine || {};
         const targetedUsers = riskConfig.targetedUsers || {};
-        const pendingBets = Array.from(this.bets.values()).filter(
-            b => b.mode === mode && b.periodId === periodId && b.status === 'PENDING'
-        );
 
         // If no bets placed in this round, generate 100% deterministic SHA-256 outcome
         if (pendingBets.length === 0) {
@@ -1327,22 +1333,31 @@ class Smarty91ServerEngine {
         const state = this.modes[mode];
         const pidStr = String(periodId);
 
+        const pendingBets = Array.from(this.bets.values()).filter(
+            b => b.mode === mode && String(b.periodId).trim() === pidStr && (b.status === 'PENDING' || b.status === 'pending')
+        );
+
         // 1. Check in-memory permanent settled/predecided outcomes map
         if (state && state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
-            return state.settledOutcomesHistory.get(pidStr);
+            const existing = state.settledOutcomesHistory.get(pidStr);
+            if (existing && (isPermanentSettledReason(existing.reason) || pendingBets.length === 0)) {
+                return existing;
+            }
         }
         if (state && state.preDecidedOutcomes && state.preDecidedOutcomes[pidStr]) {
             const res = state.preDecidedOutcomes[pidStr];
-            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
-            state.settledOutcomesHistory.set(pidStr, res);
-            return res;
+            if (res && (isPermanentSettledReason(res.reason) || pendingBets.length === 0)) {
+                if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+                state.settledOutcomesHistory.set(pidStr, res);
+                return res;
+            }
         }
 
         // 2. Check if already present in state.history
         if (state && state.history) {
             const existing = state.history.find(h => String(h.period || h.periodId) === pidStr);
-            if (existing && existing.number !== undefined && existing.number !== null) {
-                const res = { number: Number(existing.number), isOverridden: !!existing.isOverridden, reason: 'EXISTING_HISTORY' };
+            if (existing && existing.number !== undefined && existing.number !== null && existing.status !== 'PENDING') {
+                const res = { number: Number(existing.number), isOverridden: !!existing.isOverridden, reason: 'SETTLED_ROUND' };
                 if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
                 state.settledOutcomesHistory.set(pidStr, res);
                 return res;
@@ -1352,7 +1367,7 @@ class Smarty91ServerEngine {
         try {
             // 3. Check Firestore persistent predecided collection
             const dbOutcome = await firebaseSync.fetchPreDecidedOutcome(mode, pidStr);
-            if (dbOutcome) {
+            if (dbOutcome && (isPermanentSettledReason(dbOutcome.reason) || pendingBets.length === 0)) {
                 if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
                 state.settledOutcomesHistory.set(pidStr, dbOutcome);
                 return dbOutcome;
@@ -1361,13 +1376,15 @@ class Smarty91ServerEngine {
             console.warn(`[Engine] fetchPreDecidedOutcome error for ${mode} period ${pidStr}:`, err.message);
         }
 
-        // 4. Fallback if none existed: determine outcome once and store permanently
-        const outcomeResult = this.selectSmartRiskOutcome(mode, pidStr);
-        if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
-        state.settledOutcomesHistory.set(pidStr, outcomeResult);
-        try {
-            await firebaseSync.savePreDecidedOutcome(mode, pidStr, outcomeResult);
-        } catch (e) {}
+        // 4. Fallback if none existed: determine outcome using Smart Risk & pendingBets
+        const outcomeResult = this.selectSmartRiskOutcome(mode, pidStr, pendingBets);
+        if (isPermanentSettledReason(outcomeResult?.reason)) {
+            if (!state.settledOutcomesHistory) state.settledOutcomesHistory = new Map();
+            state.settledOutcomesHistory.set(pidStr, outcomeResult);
+            try {
+                await firebaseSync.savePreDecidedOutcome(mode, pidStr, outcomeResult);
+            } catch (e) {}
+        }
         return outcomeResult;
     }
 
@@ -1657,10 +1674,7 @@ class Smarty91ServerEngine {
         }
 
         // Enforce minimum 1 approved deposit requirement to play games and place bets
-        const hasApprovedDeposit = Boolean(
-            user.hasDeposited || 
-            this.transactions.some(t => t.userId === user.id && t.type === 'DEPOSIT' && t.status === 'APPROVED')
-        );
+        const hasApprovedDeposit = this.hasApprovedDeposit(user);
         if (!hasApprovedDeposit) {
             throw new Error('🔒 Recharge Required! Minimum 1 approved deposit (₹200+) is required to play games and place bets. Please deposit funds first.');
         }
@@ -2668,16 +2682,60 @@ class Smarty91ServerEngine {
         return istYesterday.toISOString().slice(0, 10);
     }
 
+    hasApprovedDeposit(userId) {
+        const user = typeof userId === 'object' ? userId : (this.users.get(userId) || null);
+        if (!user) return false;
+
+        if (user.hasDeposited) return true;
+
+        const hasTx = this.transactions.some(t => 
+            t.userId === user.id && 
+            (t.type === 'DEPOSIT' || t.type === 'DEPOSIT_CREDIT') && 
+            (t.status === 'APPROVED' || t.status === 'SUCCESS' || t.status === 'COMPLETED')
+        );
+
+        const hasLedger = (this.ledger || []).some(l => 
+            l.userId === user.id && 
+            (l.type === 'DEPOSIT' || l.type === 'DEPOSIT_CREDIT')
+        );
+
+        if (hasTx || hasLedger) {
+            user.hasDeposited = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    getDepositCount(userId) {
+        const user = typeof userId === 'object' ? userId : (this.users.get(userId) || null);
+        if (!user) return 0;
+
+        const approvedTxs = this.transactions.filter(t => 
+            t.userId === user.id && 
+            (t.type === 'DEPOSIT' || t.type === 'DEPOSIT_CREDIT') && 
+            (t.status === 'APPROVED' || t.status === 'SUCCESS' || t.status === 'COMPLETED')
+        );
+
+        const depositLedgerItems = (this.ledger || []).filter(l => 
+            l.userId === user.id && 
+            (l.type === 'DEPOSIT' || l.type === 'DEPOSIT_CREDIT')
+        );
+
+        const count = Math.max(approvedTxs.length, depositLedgerItems.length, user.hasDeposited ? 1 : 0);
+        if (count > 0 && !user.hasDeposited) {
+            user.hasDeposited = true;
+        }
+        return count;
+    }
+
     getDailyCheckInStatus(userId = 'default_user') {
         const user = this.users.get(userId) || this._ensureDefaultUser(userId, 0.00);
         const todayKey = this._getTodayDateKey();
         const yesterdayKey = this._getYesterdayDateKey();
 
         // Check if user has made at least 1 approved deposit
-        const hasApprovedDeposit = Boolean(
-            user.hasDeposited || 
-            this.transactions.some(t => t.userId === userId && t.type === 'DEPOSIT' && t.status === 'APPROVED')
-        );
+        const hasApprovedDeposit = this.hasApprovedDeposit(user);
 
         user.checkInHistory = user.checkInHistory || [];
         user.checkInStreak = user.checkInStreak || 0;

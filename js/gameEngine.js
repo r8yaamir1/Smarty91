@@ -1005,7 +1005,14 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
     // Deduplicate history items by unique periodId (server outcomes are authoritative)
     const uniqueMap = new Map();
     formatted.forEach(item => {
-        uniqueMap.set(item.periodId, item);
+        if (!uniqueMap.has(item.periodId)) {
+            uniqueMap.set(item.periodId, item);
+        } else {
+            const existing = uniqueMap.get(item.periodId);
+            if ((!existing || existing.number === undefined || existing.number === null) && (item.number !== undefined && item.number !== null)) {
+                uniqueMap.set(item.periodId, item);
+            }
+        }
     });
 
     const deduplicated = Array.from(uniqueMap.values());
