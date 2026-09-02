@@ -1034,15 +1034,15 @@ class Smarty91ServerEngine {
                 firebaseSync.savePeriodState(mode, state).catch(() => {});
             }
 
-            // Pre-decide, evaluate risk and pre-compute full settlement in the background at 4s remaining (T-4s to T-1s buffer)
-            if (state.isLocked && remainingSec <= 4) {
+            // Pre-decide, evaluate risk and pre-compute full settlement in the background at exactly 2s remaining (T-2s lock buffer)
+            if (state.isLocked && remainingSec <= 2) {
                 if (!state.preComputedSettlements) state.preComputedSettlements = {};
                 if (!state.preComputedSettlements[currentPeriodId] && (!state.preLockingPeriods || !state.preLockingPeriods.has(currentPeriodId))) {
                     if (!state.preLockingPeriods) state.preLockingPeriods = new Set();
                     state.preLockingPeriods.add(currentPeriodId);
 
                     this.preDecideAndComputeSettlement(mode, currentPeriodId).catch(err => {
-                        console.error(`[Pre-Compute Engine @ 4s] Error pre-computing outcome for mode ${mode} period ${currentPeriodId}:`, err);
+                        console.error(`[Pre-Compute Engine @ 2s] Error pre-computing outcome for mode ${mode} period ${currentPeriodId}:`, err);
                         if (state.preLockingPeriods) state.preLockingPeriods.delete(currentPeriodId);
                     });
                 }
@@ -1177,9 +1177,9 @@ class Smarty91ServerEngine {
 
             // Save to Firestore predecided collection permanently so container restarts maintain exact outcome
             await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
-            console.log(`[Pre-Compute Engine @ 4s] Mode ${mode} Period ${periodId} fully pre-computed! Outcome: ${winningNumber} (${roundRecord.color}, ${roundRecord.size}). Total bets: ${evaluatedBets.length}. Held in memory until 0s.`);
+            console.log(`[Pre-Compute Engine @ 2s] Mode ${mode} Period ${periodId} locked & pre-computed: ${winningNumber} (${roundRecord.color}, ${roundRecord.size}). Held in buffer until 0s release.`);
         } catch (e) {
-            console.warn(`[Pre-Compute Engine @ 4s] Error during pre-computation for ${mode} period ${periodId}:`, e.message);
+            console.warn(`[Pre-Compute Engine @ 2s] Error during pre-computation for ${mode} period ${periodId}:`, e.message);
         }
     }
 
