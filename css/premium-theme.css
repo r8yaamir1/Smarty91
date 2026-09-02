@@ -635,6 +635,39 @@ body {
   font-weight: 700 !important;
 }
 
+.GameRecord__C-body .van-row {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 1.05rem !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease !important;
+}
+
+.GameRecord__C-body .van-row.new-row {
+  animation: gameRowSlideDown 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+}
+
+.GameRecord__C-body .van-row .van-col {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.GameRecord__C-body .van-row .van-col:first-child {
+  justify-content: flex-start !important;
+  padding-left: 0.2rem !important;
+}
+
+@keyframes gameRowSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ----------------------------------------------------------
    WINNING & LOSS DIALOG - AUTHENTIC WIN GO EXPERIENCE
    ---------------------------------------------------------- */

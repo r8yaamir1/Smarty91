@@ -1034,21 +1034,21 @@ class Smarty91ServerEngine {
                 firebaseSync.savePeriodState(mode, state).catch(() => {});
             }
 
-            // Pre-decide and safely lock winning outcome in last 5 seconds (T-5s) with real-time Firestore persistent fallback
-            if (state.isLocked) {
-                if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
-                if (!state.preDecidedOutcomes[currentPeriodId] && (!state.preLockingPeriods || !state.preLockingPeriods.has(currentPeriodId))) {
+            // Pre-decide, evaluate risk and pre-compute full settlement in the background at 4s remaining (T-4s to T-1s buffer)
+            if (state.isLocked && remainingSec <= 4) {
+                if (!state.preComputedSettlements) state.preComputedSettlements = {};
+                if (!state.preComputedSettlements[currentPeriodId] && (!state.preLockingPeriods || !state.preLockingPeriods.has(currentPeriodId))) {
                     if (!state.preLockingPeriods) state.preLockingPeriods = new Set();
                     state.preLockingPeriods.add(currentPeriodId);
 
-                    this.preDecideAndLockOutcome(mode, currentPeriodId).catch(err => {
-                        console.error(`[Pre-Lock Engine] Error pre-deciding outcome for mode ${mode} period ${currentPeriodId}:`, err);
+                    this.preDecideAndComputeSettlement(mode, currentPeriodId).catch(err => {
+                        console.error(`[Pre-Compute Engine @ 4s] Error pre-computing outcome for mode ${mode} period ${currentPeriodId}:`, err);
                         if (state.preLockingPeriods) state.preLockingPeriods.delete(currentPeriodId);
                     });
                 }
             }
 
-            // Settle immediately if within last 150ms of the period
+            // Settle and publish immediately if within last 150ms of the period (T-0s instant flush)
             if (times.timeLeftMs <= 150 && !state.settledRounds.has(currentPeriodId)) {
                 state.settledRounds.add(currentPeriodId);
                 this._settleRound(mode, currentPeriodId).catch(err => {
@@ -1090,30 +1090,96 @@ class Smarty91ServerEngine {
         console.log('[Self-Healing Engine] Comprehensive catch-up settlement completed.');
     }
 
-    async preDecideAndLockOutcome(mode, periodId) {
+    async preDecideAndComputeSettlement(mode, periodId) {
         const state = this.modes[mode];
         if (!state) return;
 
         try {
-            // 1. Fetch actual pending bets directly from Firestore to ensure 100% accuracy across multiple container scale boundaries
-            const pendingBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
-            
-            // Sync into memory maps
-            pendingBets.forEach(bet => {
-                this.bets.set(bet.id, bet);
-            });
+            // 1. Fetch actual pending bets directly from Firestore to ensure 100% accuracy across scale boundaries
+            let pendingBets = [];
+            try {
+                pendingBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+                pendingBets.forEach(bet => {
+                    this.bets.set(bet.id, bet);
+                });
+            } catch (err) {
+                pendingBets = Array.from(this.bets.values()).filter(
+                    b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
+                );
+            }
 
-            // 2. Process our Smart House-Profit strategy/rigging/RNG rules based on these real-time bets
+            // 2. Determine Winning Number & Evaluate Smart House Risk / Admin Force Override
             const outcomeResult = this.selectSmartRiskOutcome(mode, periodId, pendingBets);
+            const winningNumber = outcomeResult.number;
+            const isOverridden = outcomeResult.isOverridden;
+
+            const props = NUMBER_PROPERTIES[winningNumber] || NUMBER_PROPERTIES[0];
+            const roundRecord = {
+                period: periodId,
+                number: winningNumber,
+                color: props.color,
+                size: props.size,
+                colorLabel: props.label,
+                settledAt: new Date().toISOString(),
+                isOverridden
+            };
+
+            // 3. Pre-evaluate all bets, payouts, ledger entries, and future balances ahead of time
+            const evaluatedBets = [];
+            for (const bet of pendingBets) {
+                const settlement = this._evaluateBet(bet, winningNumber);
+                const betCopy = { ...bet };
+                betCopy.status = settlement.isWin ? 'WON' : 'LOST';
+                betCopy.resultNumber = winningNumber;
+                betCopy.resultColor = props.color;
+                betCopy.resultSize = props.size;
+                betCopy.payoutAmount = settlement.payoutAmount;
+                betCopy.settledAt = roundRecord.settledAt;
+
+                let balanceBefore = 0;
+                let balanceAfter = 0;
+                const user = this.users.get(bet.userId);
+                if (settlement.isWin && settlement.payoutAmount > 0 && user) {
+                    balanceBefore = user.balance;
+                    balanceAfter = Number((user.balance + settlement.payoutAmount).toFixed(2));
+                }
+
+                let ledgerEntry = null;
+                if (settlement.isWin && settlement.payoutAmount > 0) {
+                    ledgerEntry = {
+                        id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        userId: bet.userId,
+                        type: 'BET_WIN_CREDIT',
+                        amount: settlement.payoutAmount,
+                        balanceBefore,
+                        balanceAfter,
+                        referenceId: bet.id,
+                        timestamp: roundRecord.settledAt,
+                        description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
+                    };
+                }
+
+                evaluatedBets.push({ bet: betCopy, originalBetId: bet.id, settlement, user, balanceBefore, balanceAfter, ledgerEntry });
+            }
+
+            // 4. Store complete pre-computed package in internal server memory (Buffer until 0s)
+            if (!state.preComputedSettlements) state.preComputedSettlements = {};
+            state.preComputedSettlements[periodId] = {
+                roundRecord,
+                winningNumber,
+                outcomeResult,
+                evaluatedBets,
+                computedAt: Date.now()
+            };
 
             if (!state.preDecidedOutcomes) state.preDecidedOutcomes = {};
             state.preDecidedOutcomes[periodId] = outcomeResult;
 
-            // 3. Save into Firestore permanently so container recycles or restarts maintain this EXACT outcome
+            // Save to Firestore predecided collection permanently so container restarts maintain exact outcome
             await firebaseSync.savePreDecidedOutcome(mode, periodId, outcomeResult);
-            console.log(`[Pre-Lock Engine] Mode ${mode} Period ${periodId} successfully processed and locked number: ${outcomeResult.number}`);
+            console.log(`[Pre-Compute Engine @ 4s] Mode ${mode} Period ${periodId} fully pre-computed! Outcome: ${winningNumber} (${roundRecord.color}, ${roundRecord.size}). Total bets: ${evaluatedBets.length}. Held in memory until 0s.`);
         } catch (e) {
-            console.warn(`[Pre-Lock Engine] Error during pre-decide for ${mode} period ${periodId}:`, e.message);
+            console.warn(`[Pre-Compute Engine @ 4s] Error during pre-computation for ${mode} period ${periodId}:`, e.message);
         }
     }
 
@@ -1146,87 +1212,109 @@ class Smarty91ServerEngine {
     async _settleRound(mode, periodId) {
         const state = this.modes[mode];
         const modeConfig = this.config.modes[mode];
-        
-        // 1. Determine Winning Number: use pre-decided locked outcome from Firestore/Memory
-        const outcomeResult = await this.getPreDecidedOutcome(mode, periodId);
-        const winningNumber = outcomeResult.number;
-        const isOverridden = outcomeResult.isOverridden;
 
-        const props = NUMBER_PROPERTIES[winningNumber];
-        const roundRecord = {
-            period: periodId,
-            number: winningNumber,
-            color: props.color,
-            size: props.size,
-            colorLabel: props.label,
-            settledAt: new Date().toISOString(),
-            isOverridden
-        };
+        // Check if we already have the pre-computed settlement package ready from the 4s step
+        let preComputed = null;
+        if (state.preComputedSettlements && state.preComputedSettlements[periodId]) {
+            preComputed = state.preComputedSettlements[periodId];
+            delete state.preComputedSettlements[periodId];
+        }
+
+        let roundRecord;
+        let evaluatedBets = [];
+
+        if (preComputed) {
+            // Fast-Path: Use the pre-computed outcome and evaluated bets instantly
+            roundRecord = preComputed.roundRecord;
+            
+            for (const item of preComputed.evaluatedBets) {
+                const { bet, originalBetId, settlement, user, balanceAfter, ledgerEntry } = item;
+                if (settlement.isWin && settlement.payoutAmount > 0 && user) {
+                    user.balance = balanceAfter;
+                }
+                if (ledgerEntry) {
+                    this.ledger.unshift(ledgerEntry);
+                }
+                this.settledBetsHistory.set(bet.id, { ...bet });
+                this.bets.delete(originalBetId);
+                evaluatedBets.push(item);
+            }
+            console.log(`[Instant Settle @ 0s] Mode ${mode} Period ${periodId} instant zero-latency flush executed. Winning number: ${roundRecord.number}`);
+        } else {
+            // Safe fallback: Compute on-the-fly if pre-computation wasn't cached
+            const outcomeResult = await this.getPreDecidedOutcome(mode, periodId);
+            const winningNumber = outcomeResult.number;
+            const isOverridden = outcomeResult.isOverridden;
+
+            const props = NUMBER_PROPERTIES[winningNumber] || NUMBER_PROPERTIES[0];
+            roundRecord = {
+                period: periodId,
+                number: winningNumber,
+                color: props.color,
+                size: props.size,
+                colorLabel: props.label,
+                settledAt: new Date().toISOString(),
+                isOverridden
+            };
+
+            let pendingBetsForRound;
+            try {
+                pendingBetsForRound = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+                pendingBetsForRound.forEach(b => {
+                    this.bets.set(b.id, b);
+                });
+            } catch (err) {
+                pendingBetsForRound = Array.from(this.bets.values()).filter(
+                    b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
+                );
+            }
+
+            for (const bet of pendingBetsForRound) {
+                const settlement = this._evaluateBet(bet, winningNumber);
+                bet.status = settlement.isWin ? 'WON' : 'LOST';
+                bet.resultNumber = winningNumber;
+                bet.resultColor = props.color;
+                bet.resultSize = props.size;
+                bet.payoutAmount = settlement.payoutAmount;
+                bet.settledAt = new Date().toISOString();
+
+                let balanceBefore = 0;
+                let balanceAfter = 0;
+                const user = this.users.get(bet.userId);
+                if (settlement.isWin && settlement.payoutAmount > 0) {
+                    if (user) {
+                        balanceBefore = user.balance;
+                        user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
+                        balanceAfter = user.balance;
+                    }
+                }
+
+                let ledgerEntry = null;
+                if (settlement.isWin && settlement.payoutAmount > 0) {
+                    ledgerEntry = {
+                        id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        userId: bet.userId,
+                        type: 'BET_WIN_CREDIT',
+                        amount: settlement.payoutAmount,
+                        balanceBefore,
+                        balanceAfter,
+                        referenceId: bet.id,
+                        timestamp: new Date().toISOString(),
+                        description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
+                    };
+                    this.ledger.unshift(ledgerEntry);
+                }
+
+                this.settledBetsHistory.set(bet.id, { ...bet });
+                this.bets.delete(bet.id);
+                evaluatedBets.push({ bet, settlement, user, ledgerEntry });
+            }
+        }
 
         // Prepend to mode history (strictly capped at max 50 rounds) - Synchronous in-memory update
         state.history = state.history.filter(h => String(h.period || h.periodId) !== String(periodId));
         state.history.unshift(roundRecord);
         if (state.history.length > 50) state.history.length = 50;
-
-        // 2. Fetch latest actual pending bets directly from Firestore to ensure zero-loss settlement
-        let pendingBetsForRound;
-        try {
-            pendingBetsForRound = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
-            // Sync to local memory to ensure consistency
-            pendingBetsForRound.forEach(b => {
-                this.bets.set(b.id, b);
-            });
-        } catch (err) {
-            console.warn(`[Engine] Settlement bets fetch fallback for ${mode} period ${periodId}:`, err.message);
-            pendingBetsForRound = Array.from(this.bets.values()).filter(
-                b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
-            );
-        }
-
-        const evaluatedBets = [];
-        for (const bet of pendingBetsForRound) {
-            const settlement = this._evaluateBet(bet, winningNumber);
-            bet.status = settlement.isWin ? 'WON' : 'LOST';
-            bet.resultNumber = winningNumber;
-            bet.resultColor = props.color;
-            bet.resultSize = props.size;
-            bet.payoutAmount = settlement.payoutAmount;
-            bet.settledAt = new Date().toISOString();
-
-            let balanceBefore = 0;
-            let balanceAfter = 0;
-            const user = this.users.get(bet.userId);
-            if (settlement.isWin && settlement.payoutAmount > 0) {
-                if (user) {
-                    balanceBefore = user.balance;
-                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
-                    balanceAfter = user.balance;
-                }
-            }
-
-            // Create ledger entry synchronously
-            let ledgerEntry = null;
-            if (settlement.isWin && settlement.payoutAmount > 0) {
-                ledgerEntry = {
-                    id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                    userId: bet.userId,
-                    type: 'BET_WIN_CREDIT',
-                    amount: settlement.payoutAmount,
-                    balanceBefore,
-                    balanceAfter,
-                    referenceId: bet.id,
-                    timestamp: new Date().toISOString(),
-                    description: `Won bet on ${mode} round ${periodId} (${bet.selectionLabel})`
-                };
-                this.ledger.unshift(ledgerEntry);
-            }
-
-            // Put in settled bets cache and remove from active bets Map IMMEDIATELY in-memory
-            this.settledBetsHistory.set(bet.id, { ...bet });
-            this.bets.delete(bet.id);
-
-            evaluatedBets.push({ bet, settlement, user, ledgerEntry });
-        }
 
         // Save users, bets, and ledger changes synchronously to local disk to ensure data integrity
         if (evaluatedBets.length > 0) {
@@ -1234,8 +1322,7 @@ class Smarty91ServerEngine {
             this._saveBetsToDisk();
         }
 
-        // 3. Asynchronously persist the settled round, bets, and user balances to Firestore database.
-        // Any concurrent API polling will run completely unaffected because the in-memory state has already transitioned!
+        // Asynchronously persist the settled round, bets, and user balances to Firestore database.
         try {
             await firebaseSync.saveSettledRound(mode, roundRecord);
         } catch (err) {
@@ -1249,7 +1336,6 @@ class Smarty91ServerEngine {
                     await firebaseSync.settleWinningBetTransaction(bet.userId, settlement.payoutAmount, bet, ledgerEntry);
                 } catch (err) {
                     console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
-                    // Safe fallback to separate Firestore writes
                     await firebaseSync.updateBetSettlement(bet).catch(() => {});
                     if (user) {
                         await firebaseSync.updateUserBalance(bet.userId, user.balance, 'Round win payout').catch(() => {});

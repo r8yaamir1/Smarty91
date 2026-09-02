@@ -328,9 +328,9 @@ export function renderGameHistory(modeInput = activeModeKey) {
 
     container.innerHTML = '';
 
-    items.forEach((item) => {
+    items.forEach((item, index) => {
         const row = document.createElement('div');
-        row.className = 'van-row';
+        row.className = index === 0 && state.historyPage === 1 ? 'van-row new-row' : 'van-row';
         row.setAttribute('data-v-481307ec', '');
 
         const num = Number(item.number);
