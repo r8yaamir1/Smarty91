@@ -131,8 +131,9 @@ export function evaluateModeBets(modeInput, result) {
     const evaluatedList = [];
 
     const rawNum = result.number !== undefined && result.number !== null ? result.number : (result.winningNumber !== undefined && result.winningNumber !== null ? result.winningNumber : 0);
-    const winNum = Number(rawNum);
-    const isBigRes = winNum >= 5;
+    const winNum = parseInt(rawNum, 10);
+    const isBigRes = (winNum >= 5 && winNum <= 9);
+    const isSmallRes = (winNum >= 0 && winNum <= 4);
 
     betsToEvaluate.forEach(bet => {
         totalBet += (Number(bet.betAmount) || 0);
@@ -161,7 +162,7 @@ export function evaluateModeBets(modeInput, result) {
         // 3. Size Bets (Big: 5-9, Small: 0-4) -> 2x
         else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
             if ((sel === 'big' || sel === 'b') && isBigRes) multiplier = 2.0;
-            else if ((sel === 'small' || sel === 's') && !isBigRes) multiplier = 2.0;
+            else if ((sel === 'small' || sel === 's') && isSmallRes) multiplier = 2.0;
         }
 
         const winAmount = multiplier > 0 ? Number((contractAmount * multiplier).toFixed(2)) : 0;
@@ -294,8 +295,6 @@ export async function placeBet(betData) {
 // ----------------- SUBTAB RENDERING (PER ACTIVE MODE) -----------------
 
 // 1. Render Game History Table for Active Mode
-let lastRenderedTopPeriod = {};
-
 export function renderGameHistory(modeInput = activeModeKey) {
     const mode = normalizeMode(modeInput);
     const state = gameModes[mode];
@@ -304,9 +303,9 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const prevBtn = document.querySelector('.GameRecord__C-foot-previous');
     const nextBtn = document.querySelector('.GameRecord__C-foot-next');
 
-    if (!container) return;
+    if (!container || !state) return;
 
-    const totalPages = Math.ceil(state.history.length / ITEMS_PER_PAGE) || 1;
+    const totalPages = Math.max(1, Math.ceil(state.history.length / ITEMS_PER_PAGE));
     if (state.historyPage > totalPages) state.historyPage = totalPages;
     if (state.historyPage < 1) state.historyPage = 1;
 
@@ -327,120 +326,18 @@ export function renderGameHistory(modeInput = activeModeKey) {
     const startIndex = (state.historyPage - 1) * ITEMS_PER_PAGE;
     const items = state.history.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const topItem = items[0];
-    const topPeriodId = topItem ? topItem.periodId : '';
-    const isNewTopPeriod = lastRenderedTopPeriod[mode] !== topPeriodId;
-    lastRenderedTopPeriod[mode] = topPeriodId;
-
-    const existingRows = Array.from(container.querySelectorAll('.van-row'));
-    const isFirstPage = state.historyPage === 1;
-
-    // Check if we can do an incremental smooth slide-down prepend instead of a full clear-and-rebuild
-    if (isFirstPage && existingRows.length > 0 && !isNewTopPeriod) {
-        // Already matching top period and on page 1. No need to clear and rebuild, avoiding any paint flicker completely!
-        if (existingRows.length === items.length) {
-            if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
-            if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
-            if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
-            return;
-        }
-    }
-
-    if (isFirstPage && existingRows.length > 0 && isNewTopPeriod) {
-        const firstExistingPeriod = existingRows[0].children[0].textContent.trim();
-        // If the new top period is indeed the next successive period
-        if (firstExistingPeriod && topPeriodId !== firstExistingPeriod) {
-            // Build the single new top row inside a perfect block-level overflow wrapper to prevent any flex layout squishing or overlapping!
-            const wrapper = document.createElement('div');
-            wrapper.style.maxHeight = '0px';
-            wrapper.style.opacity = '0';
-            wrapper.style.overflow = 'hidden';
-            // A super elegant, ultra-smooth cubic-bezier transition that moves with premium physical inertia
-            wrapper.style.transition = 'max-height 0.45s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease-out';
-
-            const newRow = document.createElement('div');
-            newRow.className = 'van-row'; // No 'fifo-new-item' class to avoid conflicting translate animations!
-            newRow.setAttribute('data-v-481307ec', '');
-
-            let numClass = 'greenColor';
-            if (topItem.number === 0) numClass = 'mixedColor0';
-            else if (topItem.number === 5) numClass = 'mixedColor5';
-            else if ([2, 4, 6, 8].includes(topItem.number)) numClass = 'defaultColor';
-
-            let colorBadges = '';
-            if (topItem.secondaryColor) {
-                colorBadges = `
-                    <div class="GameRecord__C-origin-I ${topItem.primaryColor}" data-v-481307ec></div>
-                    <div class="GameRecord__C-origin-I ${topItem.secondaryColor}" data-v-481307ec></div>
-                `;
-            } else {
-                colorBadges = `
-                    <div class="GameRecord__C-origin-I ${topItem.primaryColor}" data-v-481307ec></div>
-                `;
-            }
-
-            newRow.innerHTML = `
-                <div class="van-col van-col--9" data-v-481307ec>
-                    ${topItem.periodId}
-                </div>
-                <div class="van-col van-col--5 numcenter" data-v-481307ec>
-                    <div class="GameRecord__C-body-num ${numClass}" data-v-481307ec>
-                        ${topItem.number}
-                    </div>
-                </div>
-                <div class="van-col van-col--5" data-v-481307ec>
-                    <span data-v-481307ec>${topItem.isBig ? 'Big' : 'Small'}</span>
-                </div>
-                <div class="van-col van-col--5" data-v-481307ec>
-                    <div class="GameRecord__C-origin" data-v-481307ec>
-                        ${colorBadges}
-                    </div>
-                </div>
-            `;
-
-            wrapper.appendChild(newRow);
-
-            // Prepend new row wrapper smoothly
-            container.insertBefore(wrapper, container.firstChild);
-
-            // Trigger reflow & animate transition
-            wrapper.offsetHeight; // trigger reflow
-            requestAnimationFrame(() => {
-                wrapper.style.maxHeight = '1.06667rem'; // Normal exact row height
-                wrapper.style.opacity = '1';
-            });
-
-            // After animation completes, swap the wrapper out for the raw newRow cleanly to maintain the 100% native DOM structure!
-            setTimeout(() => {
-                if (wrapper.parentNode === container) {
-                    container.replaceChild(newRow, wrapper);
-                }
-            }, 500);
-
-            // Keep only exactly 10 rows on screen
-            while (container.children.length > ITEMS_PER_PAGE) {
-                container.removeChild(container.lastChild);
-            }
-
-            if (pageDisplay) pageDisplay.textContent = `${state.historyPage}/${totalPages}`;
-            if (prevBtn) prevBtn.classList.toggle('disabled', state.historyPage <= 1);
-            if (nextBtn) nextBtn.classList.toggle('disabled', state.historyPage >= totalPages);
-            return;
-        }
-    }
-
     container.innerHTML = '';
 
-    items.forEach((item, index) => {
+    items.forEach((item) => {
         const row = document.createElement('div');
-        const applyAnim = (index === 0 && state.historyPage === 1 && isNewTopPeriod);
-        row.className = `van-row ${applyAnim ? 'fifo-new-item' : ''}`;
+        row.className = 'van-row';
         row.setAttribute('data-v-481307ec', '');
 
+        const num = Number(item.number);
         let numClass = 'greenColor';
-        if (item.number === 0) numClass = 'mixedColor0';
-        else if (item.number === 5) numClass = 'mixedColor5';
-        else if ([2, 4, 6, 8].includes(item.number)) numClass = 'defaultColor';
+        if (num === 0) numClass = 'mixedColor0';
+        else if (num === 5) numClass = 'mixedColor5';
+        else if ([2, 4, 6, 8].includes(num)) numClass = 'defaultColor';
 
         let colorBadges = '';
         if (item.secondaryColor) {
@@ -454,17 +351,19 @@ export function renderGameHistory(modeInput = activeModeKey) {
             `;
         }
 
+        const isBig = (num >= 5 && num <= 9);
+
         row.innerHTML = `
             <div class="van-col van-col--9" data-v-481307ec>
                 ${item.periodId}
             </div>
             <div class="van-col van-col--5 numcenter" data-v-481307ec>
                 <div class="GameRecord__C-body-num ${numClass}" data-v-481307ec>
-                    ${item.number}
+                    ${num}
                 </div>
             </div>
             <div class="van-col van-col--5" data-v-481307ec>
-                <span data-v-481307ec>${item.isBig ? 'Big' : 'Small'}</span>
+                <span data-v-481307ec>${isBig ? 'Big' : 'Small'}</span>
             </div>
             <div class="van-col van-col--5" data-v-481307ec>
                 <div class="GameRecord__C-origin" data-v-481307ec>
@@ -717,6 +616,14 @@ export function renderMyHistory(modeInput = activeModeKey) {
         return;
     }
 
+    // Build fast lookup map from authoritative state.history
+    const historyLookup = new Map();
+    if (state.history && Array.isArray(state.history)) {
+        state.history.forEach(h => {
+            historyLookup.set(String(h.periodId).trim(), h);
+        });
+    }
+
     const totalPages = Math.ceil(state.userBets.length / ITEMS_PER_PAGE) || 1;
     if (state.myHistoryPage > totalPages) state.myHistoryPage = totalPages;
     if (state.myHistoryPage < 1) state.myHistoryPage = 1;
@@ -726,13 +633,53 @@ export function renderMyHistory(modeInput = activeModeKey) {
 
     let cardsHtml = '';
     items.forEach((bet) => {
-        const isWin = bet.status === 'win' || bet.status === 'WON' || (Number(bet.winAmount || bet.payoutAmount || 0) > 0);
-        const isPending = bet.status === 'pending' || bet.status === 'PENDING';
-        const isNumber = bet.type === 'number' || (!isNaN(Number(bet.selection)) && bet.type !== 'color' && bet.type !== 'size');
         const betAmt = Number(bet.betAmount !== undefined ? bet.betAmount : (bet.totalAmount || 0));
-        const winAmt = Number(bet.winAmount !== undefined ? bet.winAmount : (bet.payoutAmount || 0));
         const contractAmt = Number(bet.contractAmount !== undefined ? bet.contractAmount : (betAmt * 0.98));
         const feeAmt = Number(bet.fee !== undefined ? bet.fee : (betAmt * 0.02));
+
+        const targetPeriod = String(bet.periodId || '').trim();
+        const foundOutcome = historyLookup.get(targetPeriod);
+
+        // Auto-reconcile bet with authoritative round history if settled
+        if (foundOutcome) {
+            const winNum = parseInt(foundOutcome.number, 10);
+            const isBigOutcome = (winNum >= 5 && winNum <= 9);
+            const sel = String(bet.selection || '').toLowerCase().trim();
+            const betType = String(bet.type || '').toLowerCase().trim();
+            let multiplier = 0;
+
+            if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
+                if (parseInt(sel, 10) === winNum) multiplier = 9.0;
+            } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
+                if (sel === 'green') {
+                    if ([1, 3, 7, 9].includes(winNum)) multiplier = 2.0;
+                    else if (winNum === 5) multiplier = 1.5;
+                } else if (sel === 'red') {
+                    if ([2, 4, 6, 8].includes(winNum)) multiplier = 2.0;
+                    else if (winNum === 0) multiplier = 1.5;
+                } else if (sel === 'violet') {
+                    if (winNum === 0 || winNum === 5) multiplier = 4.5;
+                }
+            } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
+                if ((sel === 'big' || sel === 'b') && isBigOutcome) multiplier = 2.0;
+                else if ((sel === 'small' || sel === 's') && !isBigOutcome) multiplier = 2.0;
+            }
+
+            const isWinCalculated = multiplier > 0;
+            const payoutCalculated = isWinCalculated ? Number((contractAmt * multiplier).toFixed(2)) : 0;
+
+            bet.resultNumber = winNum;
+            bet.resultColor = NUMBER_PROPERTIES[winNum]?.colorName;
+            bet.resultSize = isBigOutcome ? 'Big' : 'Small';
+            bet.status = isWinCalculated ? 'win' : 'lose';
+            bet.winAmount = payoutCalculated;
+            bet.payoutAmount = payoutCalculated;
+        }
+
+        const isWin = bet.status === 'win' || bet.status === 'WON' || (Number(bet.winAmount || bet.payoutAmount || 0) > 0);
+        const isPending = (bet.status === 'pending' || bet.status === 'PENDING') && bet.resultNumber === undefined && !foundOutcome;
+        const isNumber = bet.type === 'number' || (!isNaN(Number(bet.selection)) && bet.type !== 'color' && bet.type !== 'size');
+        const winAmt = Number(bet.winAmount !== undefined ? bet.winAmount : (bet.payoutAmount || 0));
 
         let badgeClass = '';
         let badgeText = '';
@@ -755,7 +702,11 @@ export function renderMyHistory(modeInput = activeModeKey) {
         }
 
         const dateObj = new Date(bet.placedAt || Date.now());
-        const dateStr = `${dateObj.getUTCFullYear()}-${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}-${String(dateObj.getUTCDate()).padStart(2, '0')} ${String(dateObj.getUTCHours()).padStart(2, '0')}:${String(dateObj.getUTCMinutes()).padStart(2, '0')}:${String(dateObj.getUTCSeconds()).padStart(2, '0')}`;
+        const dateStr = `${dateObj.getUTCFullYear()}-${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}-${String(dateObj.getUTCDate()).padStart(2, '0')} ${String(dateObj.getUTCHours()).padStart(2, '0 Bray')}:${String(dateObj.getUTCMinutes()).padStart(2, '0')}:${String(dateObj.getUTCSeconds()).padStart(2, '0')}`.replace(' Bray', '');
+
+        const displayResult = bet.resultNumber !== undefined && bet.resultNumber !== null
+            ? `${bet.resultNumber} (${Number(bet.resultNumber) >= 5 ? 'Big' : 'Small'})`
+            : (isPending ? 'Pending' : '-');
 
         cardsHtml += `
             <div class="MyGameRecordList__C-item-wrapper" data-v-8bb41fd5="" style="background: var(--darkBg, var(--bg_color_L2)); border-radius: .13333rem; margin-bottom: .26667rem; padding: 0 .26667rem;">
@@ -794,7 +745,7 @@ export function renderMyHistory(modeInput = activeModeKey) {
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Result</span>
-                        <span data-v-8bb41fd5="">${bet.resultNumber !== undefined ? `${bet.resultNumber} (${bet.resultNumber >= 5 ? 'Big' : 'Small'})` : 'Pending'}</span>
+                        <span data-v-8bb41fd5="">${displayResult}</span>
                     </div>
                     <div class="MyGameRecordList__C-detail-line" data-v-8bb41fd5="">
                         <span data-v-8bb41fd5="">Select</span>
@@ -959,7 +910,7 @@ export function updateModeHistoryFromServer(modeInput, serverHistoryItems) {
             const prop = NUMBER_PROPERTIES[num] || NUMBER_PROPERTIES[0];
             const rawTime = item.timestamp || item.settledAt;
             const periodIdStr = String(item.period || item.periodId || '');
-            const isBig = num >= 5 || item.size === 'big' || item.isBig === true || prop.isBig === true;
+            const isBig = (num >= 5 && num <= 9);
             return {
                 mode,
                 periodId: periodIdStr,

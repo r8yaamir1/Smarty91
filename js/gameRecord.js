@@ -47,13 +47,32 @@ export function getRemainingSeconds() {
     return state ? state.remainingSeconds : 0;
 }
 
+// ----------------- MASTER UNIFIED VIEW SYNCHRONIZER -----------------
+export function syncAllActiveViews(modeInput = getActiveModeKey()) {
+    const mode = normalizeMode(modeInput);
+    if (mode === getActiveModeKey()) {
+        renderWinningTokensForActiveMode();
+        renderGameHistory(mode);
+        renderChartTrend(mode);
+        renderMyHistory(mode);
+    }
+}
+
 // Render top-right winning number tokens for active mode
 export function renderWinningTokensForActiveMode() {
     const tokenParent = document.querySelector('.TimeLeft__C-num');
     if (!tokenParent) return;
     const state = getActiveModeState();
     tokenParent.innerHTML = '';
-    const tokens = state.tokens && state.tokens.length > 0 ? state.tokens.slice(0, 5) : [];
+    
+    // Always extract latest 5 tokens directly from state.history (newest first)
+    let tokens = [];
+    if (state && state.history && state.history.length > 0) {
+        tokens = state.history.slice(0, 5).map(h => Number(h.number));
+    } else if (state && state.tokens && state.tokens.length > 0) {
+        tokens = state.tokens.slice(0, 5).map(n => Number(n));
+    }
+
     tokens.forEach(number => {
         const newDiv = document.createElement('div');
         newDiv.setAttribute("data-v-3e4c6499", "");
@@ -124,7 +143,7 @@ export async function syncServerGameState() {
                 }
             }
 
-            // 2. Continuous silent background sync for the active mode's history, chart and balance
+            // 2. Continuous silent background sync for the active mode's history, chart, balls, and my bets
             const activeState = gameModes[activeKey];
             if (activeState) {
                 // Fetch active mode's game history silently
@@ -132,8 +151,7 @@ export async function syncServerGameState() {
                     if (historyRes && historyRes.success && Array.isArray(historyRes.items)) {
                         const hasChanged = updateModeHistoryFromServer(activeKey, historyRes.items);
                         if (hasChanged) {
-                            renderGameHistory(activeKey);
-                            renderChartTrend(activeKey);
+                            syncAllActiveViews(activeKey);
                         }
                     }
                 }).catch(() => {});
@@ -186,15 +204,57 @@ async function handlePeriodSettledFromServer(mode, settledPeriodId, retryCount =
             );
 
             if (userSettledBets.length > 0) {
-                const totalBet = userSettledBets.reduce((sum, b) => sum + (Number(b.totalAmount || b.betAmount || 0)), 0);
-                const totalWon = userSettledBets.reduce((sum, b) => sum + (Number(b.winAmount || b.payoutAmount || 0)), 0);
-                const isWin = totalWon > 0;
-
                 const rawNum = foundSettledOutcome.number !== undefined && foundSettledOutcome.number !== null 
                     ? foundSettledOutcome.number 
                     : (foundSettledOutcome.winningNumber !== undefined ? foundSettledOutcome.winningNumber : 0);
-                const winNum = Number(rawNum);
-                const isBig = winNum >= 5;
+                const winNum = parseInt(rawNum, 10);
+                const isBig = (winNum >= 5 && winNum <= 9);
+
+                let totalBet = 0;
+                let totalWon = 0;
+
+                userSettledBets.forEach(b => {
+                    const betAmt = Number(b.totalAmount || b.betAmount || 0);
+                    totalBet += betAmt;
+                    const contractAmt = Number(b.contractAmount || (betAmt * 0.98));
+
+                    // Evaluate settlement based on the exact outcome
+                    const sel = String(b.selection || '').toLowerCase().trim();
+                    const betType = String(b.type || '').toLowerCase().trim();
+                    let multiplier = 0;
+
+                    if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
+                        if (parseInt(sel, 10) === winNum) multiplier = 9.0;
+                    } else if (betType === 'color' || ['green', 'red', 'violet'].includes(sel)) {
+                        if (sel === 'green') {
+                            if ([1, 3, 7, 9].includes(winNum)) multiplier = 2.0;
+                            else if (winNum === 5) multiplier = 1.5;
+                        } else if (sel === 'red') {
+                            if ([2, 4, 6, 8].includes(winNum)) multiplier = 2.0;
+                            else if (winNum === 0) multiplier = 1.5;
+                        } else if (sel === 'violet') {
+                            if (winNum === 0 || winNum === 5) multiplier = 4.5;
+                        }
+                    } else if (betType === 'size' || sel === 'big' || sel === 'small' || sel === 'b' || sel === 's') {
+                        if ((sel === 'big' || sel === 'b') && isBig) multiplier = 2.0;
+                        else if ((sel === 'small' || sel === 's') && !isBig) multiplier = 2.0;
+                    }
+
+                    const payout = multiplier > 0 ? Number((contractAmt * multiplier).toFixed(2)) : 0;
+                    const serverPayout = Number(b.winAmount || b.payoutAmount || 0);
+                    const actualPayout = (b.status === 'WON' || b.status === 'win') && serverPayout > 0 ? serverPayout : payout;
+                    
+                    b.resultNumber = winNum;
+                    b.resultColor = NUMBER_PROPERTIES[winNum]?.colorName;
+                    b.resultSize = isBig ? 'big' : 'small';
+                    b.payoutAmount = actualPayout;
+                    b.winAmount = actualPayout;
+                    b.status = actualPayout > 0 ? 'WON' : 'LOST';
+
+                    totalWon += actualPayout;
+                });
+
+                const isWin = totalWon > 0;
 
                 const summary = {
                     mode,
@@ -517,9 +577,7 @@ export async function initGameRecord() {
                 if (Array.isArray(historyItems) && historyItems.length > 0) {
                     const hasChanged = updateModeHistoryFromServer(mode, historyItems);
                     if (hasChanged && mode === getActiveModeKey()) {
-                        renderWinningTokensForActiveMode();
-                        renderGameHistory(mode);
-                        renderChartTrend(mode);
+                        syncAllActiveViews(mode);
                         fetchUserBetsFromServer(mode).catch(() => {});
                     }
                 }

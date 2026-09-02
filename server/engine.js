@@ -10,17 +10,19 @@ const BETS_FILE = path.join(DATA_DIR, 'bets_store.json');
 const TOKEN_SECRET = process.env.SESSION_SECRET || 'smarty91_vip_secure_master_session_secret_2026';
 
 // Number Properties mapping (0-9)
+// 0,1,2,3,4: Small | 5,6,7,8,9: Big
+// 2,4,6,8: Red | 1,3,7,9: Green | 0: Violet/Red | 5: Green/Violet
 export const NUMBER_PROPERTIES = {
-    0: { color: 'violet-red', number: 0, size: 'small', label: '0 (Red+Violet)' },
-    1: { color: 'green', number: 1, size: 'small', label: '1 (Green)' },
-    2: { color: 'red', number: 2, size: 'small', label: '2 (Red)' },
-    3: { color: 'green', number: 3, size: 'small', label: '3 (Green)' },
-    4: { color: 'red', number: 4, size: 'small', label: '4 (Red)' },
-    5: { color: 'violet-green', number: 5, size: 'big', label: '5 (Green+Violet)' },
-    6: { color: 'red', number: 6, size: 'big', label: '6 (Red)' },
-    7: { color: 'green', number: 7, size: 'big', label: '7 (Green)' },
-    8: { color: 'red', number: 8, size: 'big', label: '8 (Red)' },
-    9: { color: 'green', number: 9, size: 'big', label: '9 (Green)' }
+    0: { color: 'violet-red', number: 0, size: 'small', isBig: false, primaryColor: 'red', secondaryColor: 'violet', label: '0 (Red+Violet)' },
+    1: { color: 'green', number: 1, size: 'small', isBig: false, primaryColor: 'green', secondaryColor: null, label: '1 (Green)' },
+    2: { color: 'red', number: 2, size: 'small', isBig: false, primaryColor: 'red', secondaryColor: null, label: '2 (Red)' },
+    3: { color: 'green', number: 3, size: 'small', isBig: false, primaryColor: 'green', secondaryColor: null, label: '3 (Green)' },
+    4: { color: 'red', number: 4, size: 'small', isBig: false, primaryColor: 'red', secondaryColor: null, label: '4 (Red)' },
+    5: { color: 'violet-green', number: 5, size: 'big', isBig: true, primaryColor: 'green', secondaryColor: 'violet', label: '5 (Green+Violet)' },
+    6: { color: 'red', number: 6, size: 'big', isBig: true, primaryColor: 'red', secondaryColor: null, label: '6 (Red)' },
+    7: { color: 'green', number: 7, size: 'big', isBig: true, primaryColor: 'green', secondaryColor: null, label: '7 (Green)' },
+    8: { color: 'red', number: 8, size: 'big', isBig: true, primaryColor: 'red', secondaryColor: null, label: '8 (Red)' },
+    9: { color: 'green', number: 9, size: 'big', isBig: true, primaryColor: 'green', secondaryColor: null, label: '9 (Green)' }
 };
 
 // Mode Interval Definitions (ms)
@@ -1283,17 +1285,27 @@ class Smarty91ServerEngine {
     }
 
     _evaluateBet(bet, winningNumber) {
-        const winNum = Number(winningNumber);
+        const winNum = parseInt(winningNumber, 10);
+        if (isNaN(winNum) || winNum < 0 || winNum > 9) {
+            return { isWin: false, payoutMultiplier: 0, payoutAmount: 0 };
+        }
+
         const props = NUMBER_PROPERTIES[winNum] || NUMBER_PROPERTIES[0];
         const multConfig = this.config.multipliers || {};
-        const contractAmount = Number(bet.contractAmount || (bet.betAmount * 0.98));
+        const rawBetAmount = Number(bet.betAmount || bet.totalAmount || 0);
+        const contractAmount = Number(bet.contractAmount || (rawBetAmount * 0.98));
 
         let isWin = false;
         let payoutMultiplier = 0;
 
         const sel = String(bet.selection || '').toLowerCase().trim();
         const betType = String(bet.type || '').toLowerCase().trim();
-        const isBigWin = winNum >= 5;
+        
+        // Exact Rules:
+        // 0, 1, 2, 3, 4 is Small
+        // 5, 6, 7, 8, 9 is Big
+        const isBigWin = (winNum >= 5 && winNum <= 9);
+        const isSmallWin = (winNum >= 0 && winNum <= 4);
 
         // 1. Number Bets (0-9) -> 9x
         if (betType === 'number' || (!isNaN(parseInt(sel, 10)) && betType !== 'color' && betType !== 'size')) {
@@ -1303,8 +1315,9 @@ class Smarty91ServerEngine {
                 payoutMultiplier = multConfig.number || 9.0;
             }
         }
-        // 2. Color Bets (Green, Red, Violet)
-        else if (sel === 'green' || betType === 'color' && sel === 'green') {
+        // 2. Color Bets:
+        // Green: 1, 3, 7, 9 (Pure 2x), 5 (Half Green + Violet 1.5x)
+        else if (sel === 'green' || (betType === 'color' && sel === 'green')) {
             if ([1, 3, 7, 9].includes(winNum)) {
                 isWin = true;
                 payoutMultiplier = multConfig.pureColor || 2.0; // 2x Pure Green
@@ -1312,7 +1325,9 @@ class Smarty91ServerEngine {
                 isWin = true;
                 payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x Half Green on 5
             }
-        } else if (sel === 'red' || betType === 'color' && sel === 'red') {
+        }
+        // Red: 2, 4, 6, 8 (Pure 2x), 0 (Half Red + Violet 1.5x)
+        else if (sel === 'red' || (betType === 'color' && sel === 'red')) {
             if ([2, 4, 6, 8].includes(winNum)) {
                 isWin = true;
                 payoutMultiplier = multConfig.pureColor || 2.0; // 2x Pure Red
@@ -1320,22 +1335,30 @@ class Smarty91ServerEngine {
                 isWin = true;
                 payoutMultiplier = multConfig.halfColor || 1.5; // 1.5x Half Red on 0
             }
-        } else if (sel === 'violet' || betType === 'color' && sel === 'violet') {
+        }
+        // Violet: 0 or 5 (4.5x)
+        else if (sel === 'violet' || (betType === 'color' && sel === 'violet')) {
             if (winNum === 0 || winNum === 5) {
                 isWin = true;
                 payoutMultiplier = multConfig.violet || 4.5; // 4.5x Violet
             }
         }
-        // 3. Big / Small Bets (Big: 5-9, Small: 0-4) -> 2x
-        else if (sel === 'big' || sel === 'b' || betType === 'size' && (sel === 'big' || sel === 'b')) {
+        // 3. Big / Small Bets (Big: 5,6,7,8,9; Small: 0,1,2,3,4) -> 2x
+        else if (sel === 'big' || sel === 'b' || (betType === 'size' && (sel === 'big' || sel === 'b'))) {
             if (isBigWin) {
                 isWin = true;
                 payoutMultiplier = multConfig.bigSmall || 2.0; // 2x
+            } else {
+                isWin = false;
+                payoutMultiplier = 0;
             }
-        } else if (sel === 'small' || sel === 's' || betType === 'size' && (sel === 'small' || sel === 's')) {
-            if (!isBigWin) {
+        } else if (sel === 'small' || sel === 's' || (betType === 'size' && (sel === 'small' || sel === 's'))) {
+            if (isSmallWin) {
                 isWin = true;
                 payoutMultiplier = multConfig.bigSmall || 2.0; // 2x
+            } else {
+                isWin = false;
+                payoutMultiplier = 0;
             }
         }
 

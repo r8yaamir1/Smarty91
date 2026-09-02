@@ -40,14 +40,23 @@ export function showEvaluationDialog(summary) {
     if (winDetail) {
         winDetail.textContent = `Period: ${modeName} ${result.periodId}`;
     }
+    const winNum = parseInt(result.number, 10);
+    const isBig = (!isNaN(winNum) ? (winNum >= 5 && winNum <= 9) : Boolean(result.isBig));
+    
+    let colorName = 'Green';
+    if (winNum === 0) colorName = 'Red + Violet';
+    else if (winNum === 5) colorName = 'Green + Violet';
+    else if ([2, 4, 6, 8].includes(winNum)) colorName = 'Red';
+    else if ([1, 3, 7, 9].includes(winNum)) colorName = 'Green';
+
     if (winSmallBig) {
-        winSmallBig.textContent = result.isBig ? 'Big' : 'Small';
+        winSmallBig.textContent = isBig ? 'Big' : 'Small';
     }
     if (winningNum) {
-        winningNum.textContent = result.number;
+        winningNum.textContent = !isNaN(winNum) ? winNum : result.number;
     }
     if (winColor) {
-        winColor.textContent = result.colorName || (result.color ? result.color.toUpperCase() : 'Green');
+        winColor.textContent = colorName;
     }
     if (winBonus) {
         if (isWin) {
@@ -61,10 +70,10 @@ export function showEvaluationDialog(summary) {
     // Update color badge class
     if (colorType) {
         colorType.className = 'WinningTip__C-body-l2';
-        if (result.number === 0) colorType.classList.add('type0');
-        else if (result.number === 5) colorType.classList.add('type5');
-        else if ([1, 3, 7, 9].includes(result.number)) colorType.classList.add('type3'); // green
-        else colorType.classList.add('type4'); // red
+        if (winNum === 0) colorType.classList.add('type0');
+        else if (winNum === 5) colorType.classList.add('type5');
+        else if ([1, 3, 7, 9].includes(winNum)) colorType.classList.add('type3'); // green
+        else if ([2, 4, 6, 8].includes(winNum)) colorType.classList.add('type4'); // red
     }
 
     // Auto close setup
