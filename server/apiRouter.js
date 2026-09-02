@@ -278,7 +278,7 @@ apiRouter.get('/games/history/:mode', (req, res) => {
         return res.status(404).json({ success: false, message: 'Invalid mode' });
     }
 
-    if (!state.history || state.history.length < 50) {
+    if (!state.history || state.history.length === 0) {
         serverEngine.ensureFull50RoundsHistory(mode);
     }
 
@@ -305,7 +305,7 @@ apiRouter.get('/games/chart/:mode', (req, res) => {
         return res.status(404).json({ success: false, message: 'Invalid mode' });
     }
 
-    if (!state.history || state.history.length < 50) {
+    if (!state.history || state.history.length === 0) {
         serverEngine.ensureFull50RoundsHistory(mode);
     }
 

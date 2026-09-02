@@ -763,8 +763,9 @@ class Smarty91ServerEngine {
         const now = Date.now();
         const currentActivePeriod = this._calculatePeriodId(now, interval, mode);
         const existingPeriods = new Set(state.history.map(h => String(h.period || h.periodId || '')));
-        // Also ensure current active round is not treated as a past settled round
+        // Never generate or touch current active round or current period in state
         existingPeriods.add(String(currentActivePeriod));
+        if (state.currentPeriodId) existingPeriods.add(String(state.currentPeriodId));
 
         const newRounds = [];
         for (let i = 1; i <= 60; i++) {
@@ -773,7 +774,7 @@ class Smarty91ServerEngine {
             const pastPeriodId = this._calculatePeriodId(pastTime, interval, mode);
             const pastPeriodStr = String(pastPeriodId);
 
-            if (pastPeriodId !== currentActivePeriod && !existingPeriods.has(pastPeriodStr)) {
+            if (pastPeriodId !== currentActivePeriod && pastPeriodId !== state.currentPeriodId && !existingPeriods.has(pastPeriodStr)) {
                 existingPeriods.add(pastPeriodStr);
                 let num;
                 if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pastPeriodStr)) {
@@ -932,6 +933,19 @@ class Smarty91ServerEngine {
 
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
     selectSmartRiskOutcome(mode, periodId) {
+        const state = this.modes[mode];
+        const pidStr = String(periodId);
+
+        // Priority 0: Check if already decided and locked
+        if (state) {
+            if (state.settledOutcomesHistory && state.settledOutcomesHistory.has(pidStr)) {
+                return state.settledOutcomesHistory.get(pidStr);
+            }
+            if (state.preDecidedOutcomes && state.preDecidedOutcomes[pidStr]) {
+                return state.preDecidedOutcomes[pidStr];
+            }
+        }
+
         // Priority 1: Check Admin Force Override
         if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
             const winningNumber = Number(this.adminOverrides[mode]);
@@ -1148,7 +1162,8 @@ class Smarty91ServerEngine {
             }
 
             const isLockedTransition = (remainingSec <= (modeConfig.lockoutSeconds || 5)) && !state.isLocked;
-            const isPeriodIdTransition = (state.currentPeriodId !== currentPeriodId);
+            const isPeriodIdTransition = Boolean(state.currentPeriodId && state.currentPeriodId !== currentPeriodId);
+            const prevPeriodId = state.currentPeriodId;
 
             state.currentPeriodId = currentPeriodId;
             state.currentEndTimeMs = times.endTime;
@@ -1158,6 +1173,14 @@ class Smarty91ServerEngine {
             // Sync transitions to Firestore game_periods collection for zero-latency client subscription
             if (isPeriodIdTransition || isLockedTransition) {
                 firebaseSync.savePeriodState(mode, state).catch(() => {});
+            }
+
+            // Immediately settle finished previous period if not already settled
+            if (isPeriodIdTransition && prevPeriodId && !state.settledRounds.has(prevPeriodId)) {
+                state.settledRounds.add(prevPeriodId);
+                this._settleRound(mode, prevPeriodId).catch(err => {
+                    console.error(`[Period Transition Settle] Error settling finished round for mode ${mode} period ${prevPeriodId}:`, err);
+                });
             }
 
             // Pre-decide, evaluate risk and pre-compute full settlement in the background at exactly 4s remaining (T-4s lock buffer)
@@ -1174,8 +1197,8 @@ class Smarty91ServerEngine {
                 }
             }
 
-            // Settle and publish immediately if within last 150ms of the period (T-0s instant flush)
-            if (times.timeLeftMs <= 150 && !state.settledRounds.has(currentPeriodId)) {
+            // Settle and publish immediately if within last 250ms of the period (T-0s instant flush)
+            if (times.timeLeftMs <= 250 && !state.settledRounds.has(currentPeriodId)) {
                 state.settledRounds.add(currentPeriodId);
                 this._settleRound(mode, currentPeriodId).catch(err => {
                     console.error(`[Tick] Settle round error for mode ${mode} period ${currentPeriodId}:`, err);
