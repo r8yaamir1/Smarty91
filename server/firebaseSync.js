@@ -254,8 +254,8 @@ class FirebaseSyncManager {
                 if (data.usdtRate !== undefined) this.engine.config.usdtRate = data.usdtRate;
                 if (data.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...data.riskEngine };
                 if (data.referralStars) this.engine.config.referralStars = data.referralStars;
-                if (data.universalSync !== undefined) this.engine.config.universalSync = Boolean(data.universalSync);
-                if (data.syncApiUrl !== undefined) this.engine.config.syncApiUrl = String(data.syncApiUrl);
+                this.engine.config.universalSync = false;
+                this.engine.config.syncApiUrl = '';
             } else {
                 await setDoc(configRef, {
                     multipliers: this.engine.config.multipliers,
@@ -273,8 +273,8 @@ class FirebaseSyncManager {
                     usdtBep20QrImage: this.engine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
                     usdtBep20Url: this.engine.config.usdtBep20Url || '',
                     usdtRate: this.engine.config.usdtRate || 102,
-                    universalSync: Boolean(this.engine.config.universalSync || false),
-                    syncApiUrl: String(this.engine.config.syncApiUrl || ''),
+                    universalSync: false,
+                    syncApiUrl: '',
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -295,8 +295,8 @@ class FirebaseSyncManager {
                     if (d.usdtRate !== undefined) this.engine.config.usdtRate = d.usdtRate;
                     if (d.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...d.riskEngine };
                     if (d.referralStars) this.engine.config.referralStars = d.referralStars;
-                    if (d.universalSync !== undefined) this.engine.config.universalSync = Boolean(d.universalSync);
-                    if (d.syncApiUrl !== undefined) this.engine.config.syncApiUrl = String(d.syncApiUrl);
+                    this.engine.config.universalSync = false;
+                    this.engine.config.syncApiUrl = '';
                 }
             });
         } catch (e) {
@@ -996,8 +996,8 @@ class FirebaseSyncManager {
                 usdtBep20Url: config.usdtBep20Url || '',
                 usdtRate: config.usdtRate || 102,
                 referralStars: config.referralStars || null,
-                universalSync: Boolean(config.universalSync || false),
-                syncApiUrl: String(config.syncApiUrl || ''),
+                universalSync: false,
+                syncApiUrl: '',
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (e) {

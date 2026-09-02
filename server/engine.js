@@ -740,46 +740,23 @@ class Smarty91ServerEngine {
     }
 
     _calculatePeriodId(timestamp, interval, mode = '30s') {
-        if (this.config.universalSync) {
-            // Standard 17-Digit Mode matching Tiranga (UTC+5:30)
-            const istOffset = 5.5 * 60 * 60 * 1000;
-            const istTime = timestamp + istOffset;
-            const date = new Date(istTime);
-            
-            const y = date.getUTCFullYear();
-            const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const d = String(date.getUTCDate()).padStart(2, '0');
-            
-            const midnightIST = Date.UTC(y, date.getUTCMonth(), date.getUTCDate());
-            const elapsed = istTime - midnightIST;
-            const totalPeriods = Math.floor(elapsed / interval);
-            
-            let modeCode = '10030'; // Wingo 30s
-            if (mode === '1m') modeCode = '10001';
-            else if (mode === '3m') modeCode = '10003';
-            else if (mode === '5m') modeCode = '10005';
+        // Default Engine Period ID (UTC-based, short format)
+        const date = new Date(timestamp);
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        
+        const midnight = Date.UTC(y, date.getUTCMonth(), date.getUTCDate());
+        const elapsed = timestamp - midnight;
+        const totalPeriods = Math.floor(elapsed / interval);
+        
+        let modeCode = '30';
+        if (mode === '1m') modeCode = '01';
+        else if (mode === '3m') modeCode = '03';
+        else if (mode === '5m') modeCode = '05';
 
-            const periodOffset = String(totalPeriods + 1).padStart(4, '0');
-            return `${y}${m}${d}${modeCode}${periodOffset}`;
-        } else {
-            // Default Engine Period ID (UTC-based, short format)
-            const date = new Date(timestamp);
-            const y = date.getUTCFullYear();
-            const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const d = String(date.getUTCDate()).padStart(2, '0');
-            
-            const midnight = Date.UTC(y, date.getUTCMonth(), date.getUTCDate());
-            const elapsed = timestamp - midnight;
-            const totalPeriods = Math.floor(elapsed / interval);
-            
-            let modeCode = '30';
-            if (mode === '1m') modeCode = '01';
-            else if (mode === '3m') modeCode = '03';
-            else if (mode === '5m') modeCode = '05';
-
-            const periodOffset = String(totalPeriods + 1).padStart(4, '0');
-            return `${y}${m}${d}${modeCode}${periodOffset}`;
-        }
+        const periodOffset = String(totalPeriods + 1).padStart(4, '0');
+        return `${y}${m}${d}${modeCode}${periodOffset}`;
     }
 
     _calculateRoundTimes(timestamp, interval) {
@@ -820,98 +797,8 @@ class Smarty91ServerEngine {
         return num;
     }
 
-    async _fetchLiveExternalOutcomes() {
-        if (!this.config.universalSync || !this.config.syncApiUrl) {
-            return;
-        }
-
-        const now = Date.now();
-        if (this._lastExternalFetchTime && (now - this._lastExternalFetchTime < 4000)) {
-            return;
-        }
-        this._lastExternalFetchTime = now;
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-            const response = await fetch(this.config.syncApiUrl, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'Mozilla/5.0 Smarty91 Wingo Sync Client' }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) return;
-
-            const data = await response.json();
-            if (!data) return;
-
-            let payload = data;
-            if (data.data) {
-                if (Array.isArray(data.data)) {
-                    payload = data.data[0] || {};
-                } else {
-                    payload = data.data;
-                }
-            } else if (Array.isArray(data)) {
-                payload = data[0] || {};
-            }
-
-            const period = String(payload.period || payload.periodId || payload.issueCode || payload.issueNumber || '').trim();
-            let winningNumber = payload.number !== undefined ? payload.number : (payload.winningNumber !== undefined ? payload.winningNumber : payload.result);
-            if (winningNumber !== undefined && winningNumber !== null) {
-                winningNumber = parseInt(winningNumber, 10);
-            }
-
-            if (period && !isNaN(winningNumber) && winningNumber >= 0 && winningNumber <= 9) {
-                let mode = '5m';
-                if (period.includes('10030')) {
-                    mode = '30s';
-                } else if (period.includes('10001')) {
-                    mode = '1m';
-                } else if (period.includes('10003')) {
-                    mode = '3m';
-                } else if (period.includes('10005')) {
-                    mode = '5m';
-                } else {
-                    if (period.length === 14) {
-                        const code = period.slice(8, 10);
-                        if (code === '30') mode = '30s';
-                        else if (code === '01') mode = '1m';
-                        else if (code === '03') mode = '3m';
-                        else if (code === '05') mode = '5m';
-                    }
-                }
-
-                if (!this.fetchedExternalResults) {
-                    this.fetchedExternalResults = {};
-                }
-                this.fetchedExternalResults[mode] = {
-                    periodId: period,
-                    number: winningNumber,
-                    fetchedAt: now
-                };
-                console.log(`[Universal Sync Worker] Successfully fetched API outcome: Mode=${mode}, Period=${period}, ResultNumber=${winningNumber}`);
-            }
-        } catch (err) {
-            console.warn('[Universal Sync Worker] Sync fetch warning:', err.message);
-        }
-    }
-
     // Ultimate Smart Risk & House Profit Engine Outcome Selector
     selectSmartRiskOutcome(mode, periodId) {
-        // Priority 0: Universal Deterministic Hashing Sync (Auto-Matching)
-        if (this.config.universalSync) {
-            if (this.fetchedExternalResults && this.fetchedExternalResults[mode] && String(this.fetchedExternalResults[mode].periodId) === String(periodId)) {
-                const num = this.fetchedExternalResults[mode].number;
-                console.log(`[Universal Sync] Using live API outcome for mode ${mode} period ${periodId}: ${num}`);
-                return { number: num, isOverridden: false, reason: 'UNIVERSAL_SYNC_API' };
-            }
-            const num = this._calculateDeterministicOutcome(mode, periodId);
-            return { number: num, isOverridden: false, reason: 'UNIVERSAL_SYNC_DETERMINISTIC' };
-        }
-
         // Priority 1: Check Admin Force Override
         if (this.adminOverrides[mode] !== null && this.adminOverrides[mode] !== undefined) {
             const winningNumber = Number(this.adminOverrides[mode]);
@@ -1076,7 +963,6 @@ class Smarty91ServerEngine {
 
     _tick() {
         const now = Date.now();
-        this._fetchLiveExternalOutcomes();
 
         Object.keys(this.modes).forEach(mode => {
             const state = this.modes[mode];
@@ -1564,8 +1450,8 @@ class Smarty91ServerEngine {
         return {
             success: true,
             riskEngine: this.config.riskEngine,
-            universalSync: Boolean(this.config.universalSync),
-            syncApiUrl: String(this.config.syncApiUrl || ''),
+            universalSync: false,
+            syncApiUrl: '',
             overrides: this.adminOverrides
         };
     }
@@ -1591,14 +1477,10 @@ class Smarty91ServerEngine {
         if (enabled !== undefined) {
             this.config.riskEngine.enabled = Boolean(enabled);
         }
-        if (universalSync !== undefined) {
-            this.config.universalSync = Boolean(universalSync);
-        }
-        if (syncApiUrl !== undefined) {
-            this.config.syncApiUrl = String(syncApiUrl);
-        }
+        this.config.universalSync = false;
+        this.config.syncApiUrl = '';
 
-        const logMsg = `Smart Risk Engine Config updated: Mode=${this.config.riskEngine.strategyMode}, WinRate=${this.config.riskEngine.houseWinRatePercent}%, MaxCap=₹${this.config.riskEngine.maxPayoutCap}, UniversalSync=${this.config.universalSync}, SyncApiUrl=${this.config.syncApiUrl}`;
+        const logMsg = `Smart Risk Engine Config updated: Mode=${this.config.riskEngine.strategyMode}, WinRate=${this.config.riskEngine.houseWinRatePercent}%, MaxCap=₹${this.config.riskEngine.maxPayoutCap}, UniversalSync=false`;
         this.auditLogs.unshift({
             id: 'AUDIT_' + Date.now(),
             action: 'RISK_ENGINE_CONFIG_UPDATED',
@@ -1612,8 +1494,8 @@ class Smarty91ServerEngine {
             success: true,
             message: logMsg,
             riskEngine: this.config.riskEngine,
-            universalSync: Boolean(this.config.universalSync),
-            syncApiUrl: String(this.config.syncApiUrl || '')
+            universalSync: false,
+            syncApiUrl: ''
         };
     }
 

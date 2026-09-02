@@ -501,11 +501,6 @@ export async function initGameRecord() {
                 if (!state) return;
                 if (periodData.currentPeriodId) {
                     state.currentIssueNumber = periodData.currentPeriodId;
-                    if (String(periodData.currentPeriodId).length === 17) {
-                        localStorage.setItem('universal_sync_active', 'true');
-                    } else {
-                        localStorage.setItem('universal_sync_active', 'false');
-                    }
                 }
                 if (periodData.remainingSeconds !== undefined) state.remainingSeconds = periodData.remainingSeconds;
                 if (periodData.isLocked !== undefined) state.isLockoutActive = periodData.isLocked;

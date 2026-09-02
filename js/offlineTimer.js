@@ -29,49 +29,21 @@ export function getGameInterval(modeInput) {
     return MODE_INTERVALS[mode] || 30000;
 }
 
-export function calculateTotalPeriods(date, interval, useIST = false) {
-    if (useIST) {
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istTime = date.getTime() + istOffset;
-        const istDate = new Date(istTime);
-        const y = istDate.getUTCFullYear();
-        const m = istDate.getUTCMonth();
-        const d = istDate.getUTCDate();
-        const midnightIST = Date.UTC(y, m, d);
-        const elapsed = istTime - midnightIST;
-        return Math.floor(elapsed / interval);
-    } else {
-        const midnight = new Date(date).setUTCHours(0, 0, 0, 0);
-        const msSinceMidnight = date.getTime() - midnight;
-        return Math.floor(msSinceMidnight / interval);
-    }
+export function calculateTotalPeriods(date, interval) {
+    const midnight = new Date(date).setUTCHours(0, 0, 0, 0);
+    const msSinceMidnight = date.getTime() - midnight;
+    return Math.floor(msSinceMidnight / interval);
 }
 
-export function formatIssueNumber(date, totalPeriods, mode = "30s", useIST = false) {
+export function formatIssueNumber(date, totalPeriods, mode = "30s") {
     let year = date.getUTCFullYear();
     let month = String(date.getUTCMonth() + 1).padStart(2, '0');
     let day = String(date.getUTCDate()).padStart(2, '0');
 
-    if (useIST) {
-        const istOffset = 5.5 * 60 * 60 * 1000;
-        const istTime = date.getTime() + istOffset;
-        const istDate = new Date(istTime);
-        year = istDate.getUTCFullYear();
-        month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
-        day = String(istDate.getUTCDate()).padStart(2, '0');
-    }
-    
     let modeCode = '30';
-    if (useIST) {
-        modeCode = '10030';
-        if (mode === '1m') modeCode = '10001';
-        else if (mode === '3m') modeCode = '10003';
-        else if (mode === '5m') modeCode = '10005';
-    } else {
-        if (mode === '1m') modeCode = '01';
-        else if (mode === '3m') modeCode = '03';
-        else if (mode === '5m') modeCode = '05';
-    }
+    if (mode === '1m') modeCode = '01';
+    else if (mode === '3m') modeCode = '03';
+    else if (mode === '5m') modeCode = '05';
 
     const periodOffset = String(totalPeriods + 1).padStart(4, '0');
     return `${year}${month}${day}${modeCode}${periodOffset}`;
@@ -85,9 +57,8 @@ export function generateOfflinePeriodData(gameType, targetTime = new Date()) {
     const nextIntervalTime = nowMs + interval - (nowMs % interval);
     const endTime = new Date(nextIntervalTime);
 
-    const useIST = localStorage.getItem('universal_sync_active') === 'true';
-    const totalPeriods = calculateTotalPeriods(targetTime, interval, useIST);
-    const issueNumber = formatIssueNumber(targetTime, totalPeriods, mode, useIST);
+    const totalPeriods = calculateTotalPeriods(targetTime, interval);
+    const issueNumber = formatIssueNumber(targetTime, totalPeriods, mode);
 
     return {
         mode,
