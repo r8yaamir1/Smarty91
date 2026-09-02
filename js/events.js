@@ -206,6 +206,7 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
     if (bettingPopup) {
         bettingPopup.className = bettingPopup.className.replace(/Betting__Popup-\d+/, '');
         bettingPopup.classList.add(`Betting__Popup-${classSuffix}`);
+        bettingPopup.classList.remove('van-popup--closing');
         bettingPopup.style.display = 'block';
     }
 
@@ -213,7 +214,10 @@ export function openBettingForSelection({ type, selection, selectionLabel, class
     updateBetState({ balance: currentBetContext.baseBalance, quantity: currentBetContext.multiplier });
 
     playBetPopupOpenSound();
-    if (overlay) overlay.style.display = 'block';
+    if (overlay) {
+        overlay.classList.remove('van-overlay--closing');
+        overlay.style.display = 'block';
+    }
     document.body.classList.add('van-overflow-hidden');
 }
 
@@ -304,9 +308,28 @@ export function closeBettingPopup() {
     playModalCloseSound();
     const overlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
     const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
-    if (overlay) overlay.style.display = 'none';
-    if (dialogDiv) dialogDiv.style.display = 'none';
-    document.body.classList.remove('van-overflow-hidden');
+    
+    if (dialogDiv && dialogDiv.style.display !== 'none') {
+        dialogDiv.classList.add('van-popup--closing');
+        if (overlay) overlay.classList.add('van-overlay--closing');
+        
+        document.body.classList.remove('van-overflow-hidden');
+        
+        setTimeout(() => {
+            if (dialogDiv) {
+                dialogDiv.style.display = 'none';
+                dialogDiv.classList.remove('van-popup--closing');
+            }
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.classList.remove('van-overlay--closing');
+            }
+        }, 220); // 220ms matches the premium CSS animation curve
+    } else {
+        if (overlay) overlay.style.display = 'none';
+        if (dialogDiv) dialogDiv.style.display = 'none';
+        document.body.classList.remove('van-overflow-hidden');
+    }
 }
 
 export function handleBettingOverlay_clicks() {

@@ -3908,5 +3908,102 @@ body {
     filter: brightness(1.1);
 }
 
+/* ==========================================================
+   ULTRA-SMOOTH HARDWARE-ACCELERATED TRANSITIONS
+   ========================================================== */
+
+/* Core transitions and will-change optimization for low-end devices */
+.van-overlay {
+  will-change: opacity;
+  animation: fadeInOverlay 0.22s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+.van-overlay--closing {
+  animation: fadeOutOverlay 0.18s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
+}
+
+/* Base popup transition setup */
+.van-popup.van-popup--bottom {
+  will-change: transform;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+/* Animations for Mobile Viewports */
+@media (max-width: 500px) {
+  .van-popup.van-popup--bottom {
+    animation: slideUpMobile 0.24s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  }
+  .van-popup.van-popup--bottom.van-popup--closing {
+    animation: slideDownMobile 0.18s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
+  }
+}
+
+/* Animations for Desktop Viewports (respects translateX(-50%) override) */
+@media (min-width: 501px) {
+  .van-popup.van-popup--bottom {
+    animation: slideUpDesktop 0.24s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+  }
+  .van-popup.van-popup--bottom.van-popup--closing {
+    animation: slideDownDesktop 0.18s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important;
+  }
+}
+
+/* Keyframes definitions */
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDownMobile {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes slideUpDesktop {
+  from {
+    transform: translateX(-50%) translateY(100%);
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes slideDownDesktop {
+  from {
+    transform: translateX(-50%) translateY(0);
+  }
+  to {
+    transform: translateX(-50%) translateY(100%);
+  }
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
+
+@keyframes fadeOutOverlay {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+
 
 

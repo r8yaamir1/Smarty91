@@ -381,6 +381,11 @@ function updateUsdtBonusPreviewCard() {
     const inrValue = currentDepositAmountUsdt * activeUsdtRate;
     const bonusInr = inrValue; // 100% matching bonus
 
+    const liveTextEl = document.getElementById('usdt-to-inr-live-text');
+    if (liveTextEl) {
+        liveTextEl.innerText = `${currentDepositAmountUsdt} USDT = ₹${Math.round(inrValue).toLocaleString('en-IN')}`;
+    }
+
     if (currentDepositAmountUsdt >= 5) {
         if (titleEl) {
             titleEl.innerHTML = `<span>100% USDT Match Bonus</span> <span class="bonus-coupon-tag" style="background: #10b981;">COUPON APPLIED</span>`;
