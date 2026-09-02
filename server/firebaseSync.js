@@ -140,7 +140,10 @@ class FirebaseSyncManager {
                     if (snap.exists()) {
                         const data = snap.data();
                         if (data && Array.isArray(data.rounds) && data.rounds.length > 0) {
-                            this.engine.modes[mode].history = data.rounds;
+                            this.engine.modes[mode].history = data.rounds.filter(r => {
+                                const pId = String(r.period || r.periodId || '');
+                                return pId.length === 14;
+                            });
                         }
                     }
                 } catch (e) {

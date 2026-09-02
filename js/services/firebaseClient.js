@@ -74,7 +74,11 @@ export function subscribeToGameHistory(mode, callback) {
         if (snapshot.exists()) {
             const data = snapshot.data();
             if (data && Array.isArray(data.rounds)) {
-                callback(sortHistoryItems(data.rounds));
+                const cleanRounds = data.rounds.filter(r => {
+                    const pId = String(r.period || r.periodId || '');
+                    return pId.length === 14;
+                });
+                callback(sortHistoryItems(cleanRounds));
             }
         }
     }, (err) => {

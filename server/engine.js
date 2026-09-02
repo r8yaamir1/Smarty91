@@ -679,6 +679,11 @@ class Smarty91ServerEngine {
         const state = this.modes[mode];
         if (!state) return;
         if (!state.history) state.history = [];
+        // Filter out stale non-14-digit universal sync rounds
+        state.history = state.history.filter(h => {
+            const pId = String(h.period || h.periodId || '');
+            return pId.length === 14;
+        });
 
         const interval = MODE_INTERVALS[mode] || 30000;
         const now = Date.now();
