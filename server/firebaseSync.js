@@ -89,6 +89,9 @@ class FirebaseSyncManager {
             // 4. Hydrate game history from Firestore and fill deterministic rounds up to 50 for all modes
             await this._hydrateHistoryFromFirestore();
 
+            // 4.1 Hydrate active pending bets from Firestore into server memory to prevent pending status bugs on server restart
+            await this._hydratePendingBetsFromFirestore();
+
             // 5. Sync default user if not already existing
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
 
@@ -202,6 +205,27 @@ class FirebaseSyncManager {
             }
         } catch (err) {
             console.warn('[Firebase] User hydration warning:', err.message);
+        }
+    }
+
+    async _hydratePendingBetsFromFirestore() {
+        try {
+            console.log('[Firebase] Hydrating active pending bets from Firestore...');
+            const betsCol = collection(db, 'bets');
+            const q = query(betsCol, where('status', '==', 'PENDING'));
+            const querySnap = await getDocs(q);
+            let count = 0;
+            querySnap.forEach(docSnap => {
+                const bet = docSnap.data();
+                if (bet && bet.id) {
+                    this.engine.bets.set(bet.id, bet);
+                    count++;
+                }
+            });
+            console.log(`[Firebase] Successfully loaded ${count} active pending bets into server memory.`);
+        } catch (err) {
+            this._handleQuotaError(err);
+            console.warn('[Firebase] Active pending bets hydration warning:', err.message);
         }
     }
 

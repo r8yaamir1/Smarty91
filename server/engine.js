@@ -204,6 +204,9 @@ class Smarty91ServerEngine {
                     betsArr.forEach(b => {
                         if (b && b.id) {
                             this.settledBetsHistory.set(b.id, b);
+                            if (b.status === 'PENDING' || b.status === 'pending') {
+                                this.bets.set(b.id, b);
+                            }
                         }
                     });
                 }

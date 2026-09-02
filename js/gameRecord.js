@@ -24,6 +24,7 @@ import { subscribeToGamePeriod, subscribeToGameHistory } from "./services/fireba
 
 let masterTimerId = null;
 let serverSyncTimerId = null;
+let userBetsSyncTimerId = null;
 let serverClockOffset = 0;
 
 export function getCurrentGameType() {
@@ -337,6 +338,13 @@ export function startMasterScheduler() {
     if (serverSyncTimerId) clearInterval(serverSyncTimerId);
     // Poll server game state every 1000ms for continuous sync
     serverSyncTimerId = setInterval(syncServerGameState, 1000);
+
+    if (userBetsSyncTimerId) clearInterval(userBetsSyncTimerId);
+    // Continuous background sync of user bets every 5000ms to instantly update any pending/winning states
+    userBetsSyncTimerId = setInterval(() => {
+        const activeKey = getActiveModeKey();
+        fetchUserBetsFromServer(activeKey).catch(() => {});
+    }, 5000);
 }
 
 // Switch game mode (30s, 1Min, 3Min, 5Min)
@@ -485,4 +493,15 @@ export async function initGameRecord() {
 
     // Start local and server timers
     startMasterScheduler();
+
+    // Recover instantly from background sleep/minimizing
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            syncServerGameState().then(() => {
+                SUPPORTED_MODES.forEach(mode => {
+                    fetchUserBetsFromServer(mode, 1).catch(() => {});
+                });
+            }).catch(() => {});
+        }
+    });
 }

@@ -569,6 +569,71 @@ function initSocialProofEngine() {
 
     // 3. Start Floating Social Proof Toast Loop (every 5.2s)
     initFloatingToastLoop();
+
+    // 4. Start Live Online Players Counter for Colour Prediction Banner
+    initLivePlayerCounter();
+}
+
+function initLivePlayerCounter() {
+    const countEl = document.getElementById('cp-live-count-text');
+    if (!countEl) return;
+
+    // Minimum boundary: 20,000 | Maximum peak: ~105,000
+    const MIN_PLAYERS = 20850;
+    const MAX_PLAYERS = 104500;
+
+    // Time of day peak calculation (higher traffic during afternoon & evening/night)
+    const hour = new Date().getHours();
+    let baseTarget = 26500;
+    if (hour >= 18 && hour <= 23) {
+        baseTarget = 55000 + Math.floor(Math.random() * 35000); // 55k to 90k peak evening
+    } else if (hour >= 12 && hour < 18) {
+        baseTarget = 38000 + Math.floor(Math.random() * 25000); // 38k to 63k afternoon
+    } else {
+        baseTarget = 22000 + Math.floor(Math.random() * 12000); // 22k to 34k late night / morning
+    }
+
+    let saved = parseInt(sessionStorage.getItem('cp_live_players_count') || '0', 10);
+    if (!saved || saved < MIN_PLAYERS || saved > MAX_PLAYERS) {
+        saved = baseTarget;
+    }
+
+    let currentPlayers = saved;
+
+    function renderCount() {
+        if (countEl) {
+            countEl.textContent = `${currentPlayers.toLocaleString('en-IN')}`;
+        }
+        try {
+            sessionStorage.setItem('cp_live_players_count', String(currentPlayers));
+        } catch (e) {}
+    }
+
+    renderCount();
+
+    // Smooth organic drift every 3.2s to 4.5s
+    setInterval(() => {
+        if (document.hidden) return;
+
+        // Realistic small delta change (±12 to ±86 players)
+        const isUp = Math.random() > 0.46; // slight upward bias
+        const delta = Math.floor(Math.random() * 75) + 12;
+
+        if (isUp) {
+            currentPlayers += delta;
+        } else {
+            currentPlayers -= delta;
+        }
+
+        // Hard bounds: never below 20,000, never exceeding 1,05,000
+        if (currentPlayers < MIN_PLAYERS) {
+            currentPlayers = MIN_PLAYERS + Math.floor(Math.random() * 300);
+        } else if (currentPlayers > MAX_PLAYERS) {
+            currentPlayers = MAX_PLAYERS - Math.floor(Math.random() * 500);
+        }
+
+        renderCount();
+    }, 3500);
 }
 
 function createStreamItemHTML(ev) {
