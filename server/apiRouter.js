@@ -268,8 +268,12 @@ const asyncWrap = (fn) => (req, res, next) => {
 // 1. GAME STATUS & TIMERS
 // -------------------------------------------------------------
 
-// GET /api/games/status -> Live status for all 4 modes
+// GET /api/games/status -> Live status for all 4 modes (Zero-Allocation Fast Path)
 apiRouter.get('/games/status', (req, res) => {
+    if (serverEngine.cachedStatusJson) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(serverEngine.cachedStatusJson);
+    }
     const modesData = {};
     Object.keys(serverEngine.modes).forEach(mode => {
         const state = serverEngine.modes[mode];
@@ -436,6 +440,9 @@ apiRouter.post('/bets/place', async (req, res) => {
     }
 });
 
+// In-memory cache for historical user bets to shield Firebase Spark Plan reads (2-minute TTL per user/mode)
+const userHistoricalBetsCache = new Map();
+
 // GET /api/bets/my-history/:mode -> User's bet orders for a mode
 apiRouter.get('/bets/my-history/:mode', async (req, res) => {
     try {
@@ -447,8 +454,25 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
         const page = parseInt(req.query.page, 10) || 1;
         const limitAmount = parseInt(req.query.limit, 10) || 10;
 
-        // Fetch user bets from Firestore and merge with any active in-memory bets
-        const firestoreBets = await firebaseSync.getUserBets(authUser.id, mode);
+        // Fetch user bets from in-memory cache first, fallback to Firestore once every 2 minutes
+        const cacheKey = `${authUser.id}:${mode}`;
+        let firestoreBets = [];
+        const cached = userHistoricalBetsCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < 120000)) {
+            firestoreBets = cached.bets;
+        } else {
+            try {
+                firestoreBets = await firebaseSync.getUserBets(authUser.id, mode);
+                userHistoricalBetsCache.set(cacheKey, { timestamp: Date.now(), bets: firestoreBets || [] });
+                // Cap cache size
+                if (userHistoricalBetsCache.size > 2000) {
+                    const firstKey = userHistoricalBetsCache.keys().next().value;
+                    userHistoricalBetsCache.delete(firstKey);
+                }
+            } catch (e) {
+                firestoreBets = cached ? cached.bets : [];
+            }
+        }
         const betMap = new Map();
 
         // 1. Add Firestore historical bets

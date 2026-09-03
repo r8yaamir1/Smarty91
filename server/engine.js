@@ -1432,6 +1432,29 @@ class Smarty91ServerEngine {
                 });
             }
         });
+
+        // Pre-serialize live games status JSON once per tick for ultra-high throughput (0-CPU cost for 500+ users)
+        const modesData = {};
+        for (const mode of Object.keys(this.modes)) {
+            const state = this.modes[mode];
+            const config = this.config.modes[mode];
+            modesData[mode] = {
+                mode,
+                displayName: state.displayName,
+                periodId: state.currentPeriodId,
+                endTimeMs: state.currentEndTimeMs,
+                remainingSeconds: state.remainingSeconds,
+                isLocked: state.isLocked,
+                enabled: config ? config.enabled : true,
+                paused: config ? config.paused : false,
+                serverTime: now
+            };
+        }
+        this.cachedStatusJson = JSON.stringify({
+            success: true,
+            serverTime: now,
+            modes: modesData
+        });
     }
 
     async settleAllPastPendingBets() {

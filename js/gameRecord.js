@@ -429,15 +429,15 @@ export function startMasterScheduler() {
     masterTimerId = setInterval(processMasterTick, 250);
 
     if (serverSyncTimerId) clearInterval(serverSyncTimerId);
-    // Poll server game state every 1000ms for continuous sync
-    serverSyncTimerId = setInterval(syncServerGameState, 1000);
+    // Poll server game state every 2000ms (master tick computes clock mathematically every 250ms)
+    serverSyncTimerId = setInterval(syncServerGameState, 2000);
 
     if (userBetsSyncTimerId) clearInterval(userBetsSyncTimerId);
-    // Continuous background sync of user bets every 5000ms to instantly update any pending/winning states
+    // Background sync of user bets every 6000ms to update any winning states smoothly
     userBetsSyncTimerId = setInterval(() => {
         const activeKey = getActiveModeKey();
         fetchUserBetsFromServer(activeKey).catch(() => {});
-    }, 5000);
+    }, 6000);
 }
 
 // Switch game mode (30s, 1Min, 3Min, 5Min)
