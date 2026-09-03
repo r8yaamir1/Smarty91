@@ -309,27 +309,15 @@ export function closeBettingPopup() {
     const overlay = document.querySelector('.van-overlay[data-v-7f36fe93]');
     const dialogDiv = document.querySelector('div[role="dialog"][data-v-7f36fe93]');
     
-    if (dialogDiv && dialogDiv.style.display !== 'none') {
-        dialogDiv.classList.add('van-popup--closing');
-        if (overlay) overlay.classList.add('van-overlay--closing');
-        
-        document.body.classList.remove('van-overflow-hidden');
-        
-        setTimeout(() => {
-            if (dialogDiv) {
-                dialogDiv.style.display = 'none';
-                dialogDiv.classList.remove('van-popup--closing');
-            }
-            if (overlay) {
-                overlay.style.display = 'none';
-                overlay.classList.remove('van-overlay--closing');
-            }
-        }, 500); // 500ms matches the smooth CSS animation curve
-    } else {
-        if (overlay) overlay.style.display = 'none';
-        if (dialogDiv) dialogDiv.style.display = 'none';
-        document.body.classList.remove('van-overflow-hidden');
+    if (dialogDiv) {
+        dialogDiv.style.display = 'none';
+        dialogDiv.classList.remove('van-popup--closing');
     }
+    if (overlay) {
+        overlay.style.display = 'none';
+        overlay.classList.remove('van-overlay--closing');
+    }
+    document.body.classList.remove('van-overflow-hidden');
 }
 
 export function handleBettingOverlay_clicks() {

@@ -53,7 +53,7 @@ const normalizeMode = (modeInput) => {
 apiRouter.post('/auth/register', async (req, res) => {
     try {
         const { phone, password, inviteCode, securityPin } = req.body;
-        const result = serverEngine.registerUser({ phone, password, inviteCode, securityPin });
+        const result = await serverEngine.registerUser({ phone, password, inviteCode, securityPin });
         res.json(result);
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });

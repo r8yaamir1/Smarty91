@@ -201,7 +201,7 @@ window.handleRegisterSubmit = async function(e) {
         localStorage.setItem('smarty91_user_id', data.user.id);
         localStorage.setItem('smarty91_user_phone', data.user.phone);
         localStorage.setItem('smarty91_invite_code', data.user.inviteCode);
-        localStorage.setItem('smarty91_cached_balance', (data.user.balance || 0).toString());
+        localStorage.setItem('smarty91_cached_balance', '0.00'); // Clean zero balance for all new registrations
 
         showToast('Account Created! Welcome to Smarty91 VIP');
         setTimeout(() => {

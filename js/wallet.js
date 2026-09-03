@@ -100,7 +100,8 @@ export async function syncServerBalance(showLoader = false) {
     try {
         const res = await walletService.getBalance();
         if (res && res.success && typeof res.balance === 'number') {
-            currentBalance = res.balance;
+            currentBalance = Number(res.balance);
+            localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
             renderBalance();
         }
     } catch (e) {

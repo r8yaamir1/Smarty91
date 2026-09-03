@@ -962,7 +962,7 @@
                     localStorage.setItem('smarty91_user_id', data.user.id);
                     localStorage.setItem('smarty91_user_phone', data.user.phone);
                     localStorage.setItem('smarty91_invite_code', data.user.inviteCode || '');
-                    localStorage.setItem('smarty91_cached_balance', (data.user.balance || 0).toString());
+                    localStorage.setItem('smarty91_cached_balance', '0.00'); // Clean zero balance for all new registrations
 
                     showToast('Registration Successful! Welcome to Smarty91!');
                     setTimeout(() => {

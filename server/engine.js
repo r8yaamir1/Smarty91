@@ -374,7 +374,7 @@ class Smarty91ServerEngine {
         return token;
     }
 
-    registerUser({ phone, password, inviteCode, securityPin }) {
+    async registerUser({ phone, password, inviteCode, securityPin }) {
         const cleanPhone = String(phone).trim();
         if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
             throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
@@ -389,6 +389,17 @@ class Smarty91ServerEngine {
             if (u.phone === cleanPhone) {
                 throw new Error('An account with this mobile number already exists. Please log in');
             }
+        }
+
+        // Also verify with cloud Firestore to prevent duplicate phone registration
+        try {
+            const existingFs = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
+            if (existingFs) {
+                this.users.set(existingFs.id, existingFs);
+                throw new Error('An account with this mobile number already exists. Please log in');
+            }
+        } catch (e) {
+            if (e.message && e.message.includes('already exists')) throw e;
         }
 
         const userId = 'usr_' + cleanPhone;
@@ -415,13 +426,16 @@ class Smarty91ServerEngine {
         // Optional 4-6 digit security PIN for self password reset
         const cleanPin = securityPin ? String(securityPin).trim() : cleanPhone.slice(-4);
 
+        // All new accounts ALWAYS start with 0.00 balance, whether registered directly or via referral link/code
         const newUser = {
             id: userId,
             username: `usr_${cleanPhone}`,
             phone: cleanPhone,
             passwordHash: this._hashPassword(password),
             securityPin: cleanPin,
-            balance: 0.00, // Starts at 0.00 until first deposit
+            balance: 0.00,
+            bonus: 0.00,
+            bonusBalance: 0.00,
             requiredTurnover: 0.00,
             inviteCode: userInviteCode,
             referredBy: referrerId,

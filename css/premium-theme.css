@@ -3917,40 +3917,58 @@ html, body, #app, * {
    ULTRA-SMOOTH HARDWARE-ACCELERATED TRANSITIONS
    ========================================================== */
 
-/* Core transitions and will-change optimization for low-end devices */
+/* Base popup transition setup - instant snappy response without 500ms lag */
 .van-overlay {
   will-change: opacity;
-  animation: fadeInOverlay 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  opacity: 0.7;
 }
 
-.van-overlay--closing {
-  animation: fadeOutOverlay 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+.van-overlay[data-v-7f36fe93] {
+  animation: none !important;
+  transition: none !important;
+  opacity: 0.7 !important;
 }
 
-/* Base popup transition setup */
 .van-popup.van-popup--bottom {
   will-change: transform;
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
 
+/* Instant display for Betting Popup (No 500ms animation delay) */
+div[role="dialog"][data-v-7f36fe93],
+.van-popup.van-popup--bottom.Betting__Popup-10,
+.van-popup.van-popup--bottom[data-v-7f36fe93] {
+  animation: none !important;
+  transition: none !important;
+  -webkit-transition: none !important;
+}
+
+div[role="dialog"][data-v-7f36fe93].van-popup--closing,
+.van-popup.van-popup--bottom.van-popup--closing[data-v-7f36fe93] {
+  animation: none !important;
+  transition: none !important;
+  -webkit-transition: none !important;
+  display: none !important;
+}
+
 /* Animations for Mobile Viewports */
 @media (max-width: 500px) {
-  .van-popup.van-popup--bottom {
-    animation: slideUpMobile 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-  }
-  .van-popup.van-popup--bottom.van-popup--closing {
-    animation: slideDownMobile 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  .van-popup.van-popup--bottom:not([data-v-7f36fe93]) {
+    animation: slideUpMobile 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   }
 }
 
 /* Animations for Desktop Viewports (respects translateX(-50%) override) */
 @media (min-width: 501px) {
-  .van-popup.van-popup--bottom {
-    animation: slideUpDesktop 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  .van-popup.van-popup--bottom:not([data-v-7f36fe93]) {
+    animation: slideUpDesktop 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   }
-  .van-popup.van-popup--bottom.van-popup--closing {
-    animation: slideDownDesktop 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  div[role="dialog"][data-v-7f36fe93],
+  .van-popup.van-popup--bottom[data-v-7f36fe93] {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    -webkit-transform: translateX(-50%) !important;
   }
 }
 
