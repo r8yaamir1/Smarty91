@@ -6,6 +6,11 @@ let autoCloseTimer = null;
 let isAutoCloseEnabled = true;
 
 export function showEvaluationDialog(summary) {
+    // If prediction game updating mode is active and user is not whitelisted, suppress winning dialog popup
+    if (window.isGameMaintenanceActive && !window.isGameMaintenanceCanEnter) {
+        return;
+    }
+
     const winDialog = document.querySelector(".WinningTip__C");
     if (!summary || !winDialog) return;
 

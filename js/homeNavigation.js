@@ -591,21 +591,17 @@ export function initHomeNavigation() {
         openReferralModal();
     }
 
-    // Check maintenance status on startup to update game card badge if updating
+    // Check maintenance status on startup and setup real-time polling
     checkGameMaintenance().then(maint => {
-        if (maint && maint.enabled && !maint.canEnter) {
-            const liveTag = document.getElementById('cp-live-count-text');
-            const liveDot = document.querySelector('.cp-live-pulse-dot');
-            if (liveTag) {
-                liveTag.textContent = 'UPDATING (2 DAYS)';
-                liveTag.style.color = '#fef08a';
-            }
-            if (liveDot) {
-                liveDot.style.background = '#f59e0b';
-                liveDot.style.boxShadow = '0 0 8px #f59e0b';
-            }
-        }
+        applyMaintenanceStateToUI(maint);
     });
+
+    // Real-time maintenance status sync (every 5 seconds)
+    setInterval(async () => {
+        if (document.hidden) return;
+        const maint = await checkGameMaintenance();
+        applyMaintenanceStateToUI(maint);
+    }, 5000);
 
     // Attach direct click and touch handlers for Colour Prediction game card
     const cpCard = document.getElementById('game-card-colour-prediction');
@@ -763,50 +759,140 @@ function generateRandomEvent() {
     };
 }
 
-function initSocialProofEngine() {
-    // 1. Populate Top Marquee Ticker
+// Global Game Maintenance State
+window.isGameMaintenanceActive = false;
+window.isGameMaintenanceCanEnter = true;
+
+export function applyMaintenanceStateToUI(maint) {
+    const wasActive = window.isGameMaintenanceActive;
+    const isNowActive = !!(maint && maint.enabled);
+    const canEnter = maint ? (maint.canEnter !== undefined ? !!maint.canEnter : !isNowActive) : true;
+
+    window.isGameMaintenanceActive = isNowActive;
+    window.isGameMaintenanceCanEnter = canEnter;
+
     const marqueeTrack = document.getElementById('home-live-marquee');
-    if (marqueeTrack) {
-        let marqueeHTML = '';
-        for (let i = 0; i < 20; i++) {
-            const ev = generateRandomEvent();
-            if (ev.outcome.isWithdrawal) {
-                marqueeHTML += `<span>⚡ User ${ev.user} withdrew ₹${ev.amount.toLocaleString('en-IN')} via ${ev.outcome.label.split(' ')[0]}</span>`;
-            } else {
-                marqueeHTML += `<span>${ev.outcome.icon} User ${ev.user} won ₹${ev.amount.toLocaleString('en-IN')} on ${ev.outcome.label}</span>`;
-            }
-        }
-        marqueeTrack.innerHTML = marqueeHTML;
-    }
-
-    // 2. Populate Initial Live Stream Feed
+    const toastEl = document.getElementById('home-floating-toast');
     const streamContainer = document.getElementById('home-live-stream-list');
-    if (streamContainer) {
-        let streamHTML = '';
-        const initialTimes = ['Just now', '14s ago', '32s ago', '55s ago', '1m ago', '2m ago', '3m ago'];
-        for (let i = 0; i < initialTimes.length; i++) {
-            const ev = generateRandomEvent();
-            ev.time = initialTimes[i];
-            streamHTML += createStreamItemHTML(ev);
-        }
-        streamContainer.innerHTML = streamHTML;
+    const countEl = document.getElementById('cp-live-count-text');
+    const liveDot = document.querySelector('.cp-live-pulse-dot');
 
-        // Start Auto-Prepend Loop (every 3.6s)
-        setInterval(() => {
-            if (document.hidden) return;
-            const newEv = generateRandomEvent();
-            const newItemNode = document.createElement('div');
-            newItemNode.innerHTML = createStreamItemHTML(newEv);
-            const firstChild = newItemNode.firstElementChild;
-            if (firstChild && streamContainer) {
-                streamContainer.insertBefore(firstChild, streamContainer.firstChild);
-                // Keep stream size bounded to 8 items
-                while (streamContainer.children.length > 8) {
-                    streamContainer.removeChild(streamContainer.lastChild);
-                }
-            }
-        }, 3600);
+    if (isNowActive) {
+        // 1. Pause random winning news ticker -> show official maintenance / 2-day upgrade notice
+        if (marqueeTrack) {
+            marqueeTrack.innerHTML = `
+                <span style="color:#fbbf24; font-weight:800;">🛠️ SYSTEM UPGRADE NOTICE: Colour Prediction server enhancements in progress (2 Days). Live bets &amp; payouts temporarily paused. Big surprises &amp; rewards launching soon! 🎁</span>
+                <span style="color:#fef08a; font-weight:700;">⚡ Upgrading to ultra-fast settlement &amp; provably fair RNG algorithms...</span>
+                <span style="color:#fbbf24; font-weight:800;">🛠️ SYSTEM UPGRADE NOTICE: Colour Prediction server enhancements in progress (2 Days). Live bets &amp; payouts temporarily paused. Big surprises &amp; rewards launching soon! 🎁</span>
+                <span style="color:#fef08a; font-weight:700;">⚡ Upgrading to ultra-fast settlement &amp; provably fair RNG algorithms...</span>
+            `;
+        }
+
+        // 2. Hide & suppress floating winning toast popup immediately
+        if (toastEl) {
+            toastEl.classList.remove('show');
+        }
+
+        // 3. Pause live stream feed -> show clean maintenance notice card
+        if (streamContainer && (wasActive !== isNowActive || streamContainer.children.length === 0)) {
+            streamContainer.innerHTML = `
+                <div style="text-align:center; padding:18px 12px; background:rgba(245,158,11,0.06); border:1px dashed rgba(245,158,11,0.25); border-radius:8px; margin:4px 0;">
+                    <div style="font-size:20px; margin-bottom:5px;">🛠️</div>
+                    <div style="font-size:12px; font-weight:800; color:#fbbf24; margin-bottom:4px;">Live Stream Paused for Scheduled Upgrade</div>
+                    <div style="font-size:10.5px; color:#cbd5e1; line-height:1.45;">Game servers are undergoing 2-day maintenance. Live winning feeds and bets will resume automatically once completed.</div>
+                </div>
+            `;
+        }
+
+        // 4. Update Game Card Live Badge to "UPDATING (2 DAYS)" with amber dot
+        if (countEl) {
+            countEl.textContent = 'UPDATING (2 DAYS)';
+            countEl.style.color = '#fef08a';
+        }
+        if (liveDot) {
+            liveDot.style.background = '#f59e0b';
+            liveDot.style.boxShadow = '0 0 8px #f59e0b';
+        }
+    } else {
+        // Mode is DISABLED (Game is live for all players)
+        // If it was previously active, restore normal live elements
+        if (wasActive !== isNowActive) {
+            populateNormalMarquee();
+            populateNormalStream();
+        }
+
+        if (liveDot) {
+            liveDot.style.background = '#10b981';
+            liveDot.style.boxShadow = '0 0 8px #10b981';
+        }
+        if (countEl && countEl.textContent.includes('UPDATING')) {
+            const saved = parseInt(sessionStorage.getItem('cp_live_players_count') || '36450', 10);
+            countEl.textContent = `${saved.toLocaleString('en-IN')}`;
+            countEl.style.color = '#fff';
+        }
     }
+}
+
+function populateNormalMarquee() {
+    const marqueeTrack = document.getElementById('home-live-marquee');
+    if (!marqueeTrack) return;
+    let marqueeHTML = '';
+    for (let i = 0; i < 20; i++) {
+        const ev = generateRandomEvent();
+        if (ev.outcome.isWithdrawal) {
+            marqueeHTML += `<span>⚡ User ${ev.user} withdrew ₹${ev.amount.toLocaleString('en-IN')} via ${ev.outcome.label.split(' ')[0]}</span>`;
+        } else {
+            marqueeHTML += `<span>${ev.outcome.icon} User ${ev.user} won ₹${ev.amount.toLocaleString('en-IN')} on ${ev.outcome.label}</span>`;
+        }
+    }
+    marqueeTrack.innerHTML = marqueeHTML;
+}
+
+function populateNormalStream() {
+    const streamContainer = document.getElementById('home-live-stream-list');
+    if (!streamContainer) return;
+    let streamHTML = '';
+    const initialTimes = ['Just now', '14s ago', '32s ago', '55s ago', '1m ago', '2m ago', '3m ago'];
+    for (let i = 0; i < initialTimes.length; i++) {
+        const ev = generateRandomEvent();
+        ev.time = initialTimes[i];
+        streamHTML += createStreamItemHTML(ev);
+    }
+    streamContainer.innerHTML = streamHTML;
+}
+
+function initSocialProofEngine() {
+    // 1. Populate Top Marquee Ticker if not updating
+    if (!window.isGameMaintenanceActive) {
+        populateNormalMarquee();
+    }
+
+    // 2. Populate Initial Live Stream Feed if not updating
+    const streamContainer = document.getElementById('home-live-stream-list');
+    if (streamContainer && !window.isGameMaintenanceActive) {
+        populateNormalStream();
+    }
+
+    // Start Auto-Prepend Loop (every 3.6s) - automatically paused when updating mode is active
+    setInterval(() => {
+        if (document.hidden) return;
+        if (window.isGameMaintenanceActive) return; // RUK JAAYE (PAUSED) JAB UPDATING MODE ENABLE HO
+
+        const streamList = document.getElementById('home-live-stream-list');
+        if (!streamList) return;
+
+        const newEv = generateRandomEvent();
+        const newItemNode = document.createElement('div');
+        newItemNode.innerHTML = createStreamItemHTML(newEv);
+        const firstChild = newItemNode.firstElementChild;
+        if (firstChild) {
+            streamList.insertBefore(firstChild, streamList.firstChild);
+            // Keep stream size bounded to 8 items
+            while (streamList.children.length > 8) {
+                streamList.removeChild(streamList.lastChild);
+            }
+        }
+    }, 3600);
 
     // 3. Start Floating Social Proof Toast Loop (every 5.2s)
     initFloatingToastLoop();
@@ -842,8 +928,10 @@ function initLivePlayerCounter() {
     let currentPlayers = saved;
 
     function renderCount() {
+        if (window.isGameMaintenanceActive) return; // Keep "UPDATING (2 DAYS)" displayed
         if (countEl) {
             countEl.textContent = `${currentPlayers.toLocaleString('en-IN')}`;
+            countEl.style.color = '#fff';
         }
         try {
             sessionStorage.setItem('cp_live_players_count', String(currentPlayers));
@@ -852,9 +940,10 @@ function initLivePlayerCounter() {
 
     renderCount();
 
-    // Smooth organic drift every 3.2s to 4.5s
+    // Smooth organic drift every 3.2s to 4.5s (only when game is live)
     setInterval(() => {
         if (document.hidden) return;
+        if (window.isGameMaintenanceActive) return; // RUK JAAYE (PAUSED) JAB UPDATING MODE ENABLE HO
 
         // Realistic small delta change (±12 to ±86 players)
         const isUp = Math.random() > 0.46; // slight upward bias
@@ -914,6 +1003,12 @@ function initFloatingToastLoop() {
 
     function triggerToast() {
         if (document.hidden) return;
+
+        // 🛑 RUK JAAYE: If Game Updating Mode is ENABLED, NEVER show winning popup toast!
+        if (window.isGameMaintenanceActive) {
+            toastEl.classList.remove('show');
+            return;
+        }
 
         // ONLY trigger popup toast if the user is strictly on the HOME tab (not in game view, modals, or other tabs)
         const homeView = document.getElementById('home-dashboard-view');
