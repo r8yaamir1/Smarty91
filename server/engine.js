@@ -201,7 +201,16 @@ class Smarty91ServerEngine {
                 if (Array.isArray(usersArr)) {
                     usersArr.forEach(u => {
                         if (u && u.id) {
-                            this.users.set(u.id, u);
+                            if (!this.users.has(u.id)) {
+                                this.users.set(u.id, u);
+                            } else {
+                                const live = this.users.get(u.id);
+                                this.users.set(u.id, {
+                                    ...u,
+                                    ...live,
+                                    balance: live.balance !== undefined ? live.balance : u.balance
+                                });
+                            }
                             if (u.inviteCode) {
                                 this.referralCodes.set(u.inviteCode, u.id);
                             }
@@ -726,6 +735,67 @@ class Smarty91ServerEngine {
         } catch (err) {
             console.warn(`[Engine] Auto-fetch user ${userId} error:`, err.message);
         }
+    }
+
+    async findUserFlexible(query) {
+        if (!query) return null;
+        const str = String(query).trim();
+        const cleanDigits = str.replace(/\D/g, '');
+        const cleanPhone = (cleanDigits.length === 12 && cleanDigits.startsWith('91')) ? cleanDigits.slice(2) : cleanDigits;
+
+        // 1. Direct memory map lookup
+        let user = this.users.get(str) || this.users.get(str.toLowerCase());
+        if (user) return user;
+
+        if (cleanPhone && cleanPhone.length >= 10) {
+            user = this.users.get('usr_' + cleanPhone) || this.users.get(cleanPhone);
+            if (user) return user;
+        }
+
+        // 2. Refresh from local disk and recheck
+        this._loadUsersFromDisk();
+        user = this.users.get(str) || this.users.get(str.toLowerCase());
+        if (user) return user;
+
+        if (cleanPhone && cleanPhone.length >= 10) {
+            user = this.users.get('usr_' + cleanPhone) || this.users.get(cleanPhone);
+            if (user) return user;
+        }
+
+        // 3. Search all in-memory users
+        for (const u of this.users.values()) {
+            if (u.id === str || (u.id && u.id.toLowerCase() === str.toLowerCase())) return u;
+            if (cleanPhone && (u.phone === cleanPhone || (u.id && u.id.endsWith(cleanPhone)))) return u;
+            if (u.phone === str) return u;
+            if (u.username && u.username.toLowerCase() === str.toLowerCase()) return u;
+            if (u.inviteCode && u.inviteCode.toUpperCase() === str.toUpperCase()) return u;
+        }
+
+        // 4. Query Firestore
+        try {
+            let fsUser = null;
+            if (cleanPhone && cleanPhone.length >= 10) {
+                fsUser = await firebaseSync.fetchUserByPhoneFromFirestore(cleanPhone);
+                if (!fsUser) {
+                    fsUser = await firebaseSync.fetchUserFromFirestore('usr_' + cleanPhone);
+                }
+            }
+            if (!fsUser) {
+                fsUser = await firebaseSync.fetchUserFromFirestore(str);
+            }
+            if (!fsUser && str !== str.toLowerCase()) {
+                fsUser = await firebaseSync.fetchUserFromFirestore(str.toLowerCase());
+            }
+            if (fsUser) {
+                this.users.set(fsUser.id, fsUser);
+                this._saveUsersToDisk();
+                return fsUser;
+            }
+        } catch (e) {
+            console.warn('[Engine] findUserFlexible Firestore fetch note:', e.message);
+        }
+
+        return null;
     }
 
     ensureFull50RoundsHistory(mode) {

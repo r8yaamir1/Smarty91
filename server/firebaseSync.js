@@ -383,12 +383,8 @@ class FirebaseSyncManager {
                         const u = change.doc.data();
                         if (u && u.id && u.id !== 'default_user') {
                             const existing = this.engine.users.get(u.id);
-                            // Live engine memory balance is authoritative for in-session gameplay
-                            // Ensure stale or lagged Firestore snapshots never silently downgrade live user balance
-                            let resolvedBalance = Number(u.balance !== undefined ? u.balance : 0);
-                            if (existing && existing.balance !== undefined) {
-                                resolvedBalance = Math.max(Number(existing.balance || 0), resolvedBalance);
-                            }
+                            // Live balance from Firestore is authoritative when user documents are modified
+                            const resolvedBalance = Number(u.balance !== undefined ? u.balance : (existing ? existing.balance : 0));
 
                             this.engine.users.set(u.id, {
                                 id: u.id,
@@ -408,7 +404,8 @@ class FirebaseSyncManager {
                                 totalReferralCommission: Number(u.totalReferralCommission || 0),
                                 betCommissionEarned: Number(u.betCommissionEarned || 0),
                                 awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
-                                createdAt: u.createdAt || new Date().toISOString()
+                                bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (existing ? existing.bonusBalance : 0)),
+                                createdAt: u.createdAt || (existing ? existing.createdAt : new Date().toISOString())
                             });
                             if (u.inviteCode) {
                                 this.engine.referralCodes.set(u.inviteCode, u.id);

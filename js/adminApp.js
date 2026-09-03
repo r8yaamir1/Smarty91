@@ -1724,11 +1724,12 @@ function renderUsersView(container, force = false) {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
                         <div>
                             <label class="form-label">Amount (₹)</label>
-                            <input type="number" id="user-adj-amount" class="form-input" placeholder="e.g. 500" min="1" />
+                            <input type="number" id="user-adj-amount" class="form-input" placeholder="e.g. 500 (or 0 to reset)" min="0" step="any" />
                         </div>
                         <div>
                             <label class="form-label">Action Type</label>
                             <select id="user-adj-action" class="form-select">
+                                <option value="SET">🎯 Set Exact Balance (Direct Overwrite)</option>
                                 <option value="ADD">➕ Add Balance (Credit / Deposit)</option>
                                 <option value="DEDUCT">➖ Deduct Balance (Debit / Penalty)</option>
                             </select>
@@ -1737,7 +1738,7 @@ function renderUsersView(container, force = false) {
 
                     <div class="form-group">
                         <label class="form-label">Reason / Remarks (Recorded in Audit Ledger)</label>
-                        <input type="text" id="user-adj-remarks" class="form-input" placeholder="e.g. Admin direct topup / Welcome gift" />
+                        <input type="text" id="user-adj-remarks" class="form-input" placeholder="e.g. Admin direct balance update / Welcome gift" />
                     </div>
 
                     <button id="btn-submit-wallet-adj" class="btn-primary" style="height: 40px; font-weight: 800;">APPLY WALLET UPDATE</button>
@@ -1775,28 +1776,37 @@ function renderUsersView(container, force = false) {
         if (btn) {
             btn.addEventListener('click', async () => {
                 const userId = container.querySelector('#user-adj-id').value.trim();
-                const amount = Number(container.querySelector('#user-adj-amount').value);
+                const amountVal = container.querySelector('#user-adj-amount').value;
                 const action = container.querySelector('#user-adj-action').value;
                 const remarks = container.querySelector('#user-adj-remarks').value.trim() || 'Admin manual balance adjustment';
 
                 if (!userId) {
-                    alert('Please enter or select a Player Account ID');
+                    alert('Please enter or select a Player Account ID or Mobile Number');
                     return;
                 }
-                if (!amount || amount <= 0) {
-                    alert('Please enter a valid amount');
+                if (amountVal === '' || isNaN(Number(amountVal)) || Number(amountVal) < 0) {
+                    alert('Please enter a valid amount (0 or greater)');
                     return;
                 }
+                const amount = Number(amountVal);
 
                 try {
-                    btn.textContent = 'Processing...';
+                    btn.textContent = 'Updating...';
                     btn.disabled = true;
-                    await adminService.adjustUserBalance(userId, amount, action, remarks);
-                    alert(`Balance updated successfully for ${userId}`);
+                    const res = await adminService.adjustUserBalance(userId, amount, action, remarks);
+                    
+                    // Immediately update in local cache if found
+                    const matched = cachedAdminUsers.find(u => u.id === userId || u.phone === userId || (res && res.userId === u.id));
+                    if (matched && res && typeof res.newBalance === 'number') {
+                        matched.balance = res.newBalance;
+                        renderUsersTableContent(container);
+                    }
+
+                    alert(res.message || `✓ Balance updated successfully for ${userId}! New balance: ₹${res.newBalance !== undefined ? res.newBalance : amount}`);
                     container.querySelector('#user-adj-amount').value = '';
                     await refreshUsersData(container);
                 } catch (err) {
-                    alert(err.message || 'Action failed');
+                    alert(err.message || 'Balance update failed. Check user ID / mobile number.');
                 } finally {
                     btn.textContent = 'APPLY WALLET UPDATE';
                     btn.disabled = false;
@@ -1880,15 +1890,54 @@ function renderUsersTableContent(container) {
                             </span>
                         </td>
                         <td>
-                            <button class="btn-select-user" data-uid="${u.id}" style="background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">
-                                ⚡ Select
-                            </button>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <button class="btn-quick-bal-set" data-uid="${u.id}" data-phone="${u.phone || u.username}" data-bal="${u.balance || 0}" style="background: rgba(16,185,129,0.18); border: 1px solid #10b981; color: #10b981; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Directly set balance">
+                                    ✏️ Set
+                                </button>
+                                <button class="btn-select-user" data-uid="${u.id}" data-phone="${u.phone || u.username}" data-bal="${u.balance || 0}" style="background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                                    ⚡ Select
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `).join('')}
             </tbody>
         </table>
     `;
+
+    // Bind Quick Bal Set buttons
+    tableEl.querySelectorAll('.btn-quick-bal-set').forEach(b => {
+        b.addEventListener('click', async () => {
+            const uid = b.dataset.uid;
+            const phone = b.dataset.phone;
+            const currentBal = Number(b.dataset.bal || 0);
+
+            const input = prompt(`Set exact new balance (₹) for ${phone}:\n(Current Balance: ₹${currentBal.toFixed(2)})`, currentBal);
+            if (input === null) return;
+            const newBal = Number(input.trim());
+            if (isNaN(newBal) || newBal < 0) {
+                alert('Please enter a valid amount (0 or greater)');
+                return;
+            }
+
+            b.disabled = true;
+            b.textContent = '...';
+            try {
+                const res = await adminService.adjustUserBalance(uid, newBal, 'SET', 'Quick table balance update');
+                const matched = cachedAdminUsers.find(u => u.id === uid);
+                if (matched) {
+                    matched.balance = (res && typeof res.newBalance === 'number') ? res.newBalance : newBal;
+                    renderUsersTableContent(container);
+                }
+                alert(`✓ Balance updated for ${phone}: ₹${newBal.toFixed(2)}`);
+                await refreshUsersData(container);
+            } catch (err) {
+                alert(err.message || 'Balance update failed');
+                b.disabled = false;
+                b.textContent = '✏️ Set';
+            }
+        });
+    });
 
     // Bind Quick Select buttons
     tableEl.querySelectorAll('.btn-select-user').forEach(b => {

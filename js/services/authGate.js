@@ -69,7 +69,9 @@
                     // Keep device storage updated
                     localStorage.setItem('smarty91_user_id', data.user.id);
                     localStorage.setItem('smarty91_user_phone', data.user.phone);
-                    localStorage.setItem('smarty91_cached_balance', (data.user.balance || 0).toString());
+                    const freshBal = Number(data.user.balance !== undefined ? data.user.balance : 0);
+                    localStorage.setItem('smarty91_cached_balance', freshBal.toString());
+                    window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: freshBal } }));
                 }
             }
         })

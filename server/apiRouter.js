@@ -1276,60 +1276,106 @@ apiRouter.post('/admin/payout-rules', checkAdminAuth, (req, res) => {
 
 // GET /api/admin/users -> List all users
 apiRouter.get('/admin/users', checkAdminAuth, (req, res) => {
-    const usersList = Array.from(serverEngine.users.values());
+    serverEngine._loadUsersFromDisk();
+    const usersList = Array.from(serverEngine.users.values()).map(u => ({
+        id: u.id,
+        username: u.username,
+        phone: u.phone,
+        balance: Number(u.balance !== undefined ? u.balance : 0),
+        inviteCode: u.inviteCode,
+        referredBy: u.referredBy,
+        hasDeposited: !!u.hasDeposited,
+        isBlocked: !!u.isBlocked,
+        createdAt: u.createdAt
+    }));
     res.json({ success: true, users: usersList });
 });
 
-// POST /api/admin/users/adjust-balance -> Manual Balance Credit/Debit with remarks
-apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, (req, res) => {
-    const { userId = 'default_user', amount, action = 'ADD', remarks = 'Admin manual adjustment' } = req.body;
-    const user = serverEngine.users.get(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid amount' });
-    }
-
-    const balanceBefore = user.balance;
-    if (action === 'ADD') {
-        user.balance = Number((user.balance + numAmount).toFixed(2));
-    } else {
-        if (user.balance < numAmount) {
-            return res.status(400).json({ success: false, message: 'Cannot deduct more than current balance' });
+// POST /api/admin/users/adjust-balance -> Manual Balance Credit/Debit/Set with remarks
+apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) => {
+    try {
+        const { userId, amount, action = 'ADD', remarks = 'Admin manual adjustment' } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'Player Account ID or Mobile number is required' });
         }
-        user.balance = Number((user.balance - numAmount).toFixed(2));
+
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: `User not found for query "${userId}". Please verify mobile number or ID.`
+            });
+        }
+
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 0) {
+            return res.status(400).json({ success: false, message: 'Invalid amount. Must be 0 or greater.' });
+        }
+
+        const balanceBefore = Number(user.balance || 0);
+        let balanceAfter = balanceBefore;
+        const normAction = String(action || 'ADD').toUpperCase();
+
+        if (normAction === 'ADD' || normAction === 'CREDIT') {
+            balanceAfter = Number((balanceBefore + numAmount).toFixed(2));
+        } else if (normAction === 'SET') {
+            balanceAfter = Number(numAmount.toFixed(2));
+        } else if (normAction === 'DEDUCT' || normAction === 'DEBIT') {
+            balanceAfter = Number(Math.max(0, balanceBefore - numAmount).toFixed(2));
+        } else {
+            return res.status(400).json({ success: false, message: 'Invalid action. Choose ADD, DEDUCT, or SET.' });
+        }
+
+        user.balance = balanceAfter;
+        serverEngine.users.set(user.id, user);
+
+        const delta = Number((balanceAfter - balanceBefore).toFixed(2));
+        const ledgerEntry = {
+            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            userId: user.id,
+            type: normAction === 'SET' ? 'ADMIN_SET' : (normAction === 'ADD' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT'),
+            amount: delta,
+            balanceBefore,
+            balanceAfter,
+            referenceId: 'ADMIN_ADJ_' + Date.now(),
+            timestamp: new Date().toISOString(),
+            description: `Admin balance adjustment (${normAction}): ${remarks}`
+        };
+        serverEngine.ledger.unshift(ledgerEntry);
+
+        const auditDetail = `${normAction} ₹${numAmount} for user ${user.id} (${user.phone || user.username}). Old: ₹${balanceBefore.toFixed(2)} -> New: ₹${balanceAfter.toFixed(2)}. Reason: ${remarks}`;
+        serverEngine.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'ADMIN_ADJUST_BALANCE',
+            details: auditDetail,
+            timestamp: new Date().toISOString()
+        });
+
+        // 1. Immediately save to persistent disk
+        serverEngine._saveUsersToDisk();
+
+        // 2. Realtime sync to Cloud Firestore
+        try {
+            await firebaseSync.updateUserBalance(user.id, user.balance, auditDetail, user.bonusBalance);
+            await firebaseSync.saveUser(user);
+            await firebaseSync.saveTransaction(ledgerEntry);
+            firebaseSync.logAdminAction('ADMIN_ADJUST_BALANCE', auditDetail);
+        } catch (fsErr) {
+            console.warn('[Admin] Firestore balance adjust sync warning:', fsErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `✓ Balance updated for ${user.phone ? '+91 ' + user.phone : user.username}: ₹${user.balance.toFixed(2)}`,
+            userId: user.id,
+            phone: user.phone,
+            oldBalance: balanceBefore,
+            newBalance: user.balance
+        });
+    } catch (err) {
+        console.error('[Admin] Balance adjustment error:', err);
+        res.status(500).json({ success: false, message: err.message });
     }
-    const balanceAfter = user.balance;
-
-    serverEngine.ledger.unshift({
-        id: 'LEDGER_' + Date.now(),
-        userId,
-        type: action === 'ADD' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
-        amount: action === 'ADD' ? numAmount : -numAmount,
-        balanceBefore,
-        balanceAfter,
-        referenceId: 'ADMIN_ADJ_' + Date.now(),
-        timestamp: new Date().toISOString(),
-        description: `Admin adjustment (${action}): ${remarks}`
-    });
-
-    const auditDetail = `${action} ₹${numAmount} for user ${userId}. Reason: ${remarks}`;
-    serverEngine.auditLogs.unshift({
-        id: 'AUDIT_' + Date.now(),
-        action: 'ADMIN_ADJUST_BALANCE',
-        details: auditDetail,
-        timestamp: new Date().toISOString()
-    });
-
-    firebaseSync.updateUserBalance(userId, user.balance, auditDetail);
-    firebaseSync.logAdminAction('ADMIN_ADJUST_BALANCE', auditDetail);
-
-    res.json({
-        success: true,
-        message: `Balance updated for ${user.username}`,
-        newBalance: user.balance
-    });
 });
 
 // -------------------------------------------------------------
@@ -1504,128 +1550,155 @@ apiRouter.post('/developer/user/search', async (req, res) => {
 
 // 2. Adjust Balance
 apiRouter.post('/developer/user/adjust-balance', async (req, res) => {
-    const { secretKey, userId, amount } = req.body;
-    if (!validateDevKey(secretKey)) {
-        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
-    }
-    const user = serverEngine.users.get(userId);
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found in memory' });
-    }
-    const numAmount = Number(amount);
-    if (isNaN(numAmount)) {
-        return res.status(400).json({ success: false, message: 'Invalid amount' });
-    }
+    try {
+        const { secretKey, userId, amount } = req.body;
+        if (!validateDevKey(secretKey)) {
+            return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+        }
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: `User not found for "${userId}"` });
+        }
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount < 0) {
+            return res.status(400).json({ success: false, message: 'Invalid amount. Must be 0 or greater.' });
+        }
 
-    user.balance = numAmount;
-    serverEngine._saveUsersToDisk();
-    await firebaseSync.saveUser(user);
-    firebaseSync.logAdminAction('DEVELOPER_ADJUST_BALANCE', `Adjusted balance of user ${user.phone} to ₹${numAmount}`);
+        const balanceBefore = Number(user.balance || 0);
+        user.balance = Number(numAmount.toFixed(2));
+        serverEngine.users.set(user.id, user);
+        serverEngine._saveUsersToDisk();
 
-    res.json({
-        success: true,
-        message: `Successfully adjusted balance of ${user.phone} to ₹${numAmount}`,
-        newBalance: user.balance
-    });
+        const auditDetail = `Developer adjusted balance of user ${user.phone || user.id} from ₹${balanceBefore} to ₹${user.balance}`;
+        try {
+            await firebaseSync.updateUserBalance(user.id, user.balance, auditDetail, user.bonusBalance);
+            await firebaseSync.saveUser(user);
+            firebaseSync.logAdminAction('DEVELOPER_ADJUST_BALANCE', auditDetail);
+        } catch (e) {
+            console.warn('[Developer] Firestore adjust sync warning:', e.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully set balance of ${user.phone || user.id} to ₹${user.balance}`,
+            userId: user.id,
+            newBalance: user.balance
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // 3. Toggle Block Status
 apiRouter.post('/developer/user/toggle-block', async (req, res) => {
-    const { secretKey, userId, isBlocked } = req.body;
-    if (!validateDevKey(secretKey)) {
-        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
-    }
-    const user = serverEngine.users.get(userId);
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found in memory' });
-    }
+    try {
+        const { secretKey, userId, isBlocked } = req.body;
+        if (!validateDevKey(secretKey)) {
+            return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+        }
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: `User not found for "${userId}"` });
+        }
 
-    user.isBlocked = !!isBlocked;
-    serverEngine._saveUsersToDisk();
-    await firebaseSync.saveUser(user);
-    firebaseSync.logAdminAction('DEVELOPER_TOGGLE_BLOCK', `Set block state of user ${user.phone} to ${user.isBlocked}`);
+        user.isBlocked = !!isBlocked;
+        serverEngine.users.set(user.id, user);
+        serverEngine._saveUsersToDisk();
 
-    res.json({
-        success: true,
-        message: `Successfully ${user.isBlocked ? 'Blocked' : 'Unblocked'} user ${user.phone}`,
-        isBlocked: user.isBlocked
-    });
+        try {
+            await firebaseSync.saveUser(user);
+            firebaseSync.logAdminAction('DEVELOPER_TOGGLE_BLOCK', `${user.isBlocked ? 'Blocked' : 'Unblocked'} user ${user.phone || user.id}`);
+        } catch (e) {}
+
+        res.json({
+            success: true,
+            message: `User ${user.phone || user.id} is now ${user.isBlocked ? 'BLOCKED' : 'ACTIVE'}`,
+            isBlocked: user.isBlocked
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // 4. Permanent Delete User
 apiRouter.post('/developer/user/delete', async (req, res) => {
-    const { secretKey, userId } = req.body;
-    if (!validateDevKey(secretKey)) {
-        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
-    }
-    const user = serverEngine.users.get(userId);
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found in memory' });
-    }
-
-    const phone = user.phone;
-    const inviteCode = user.inviteCode;
-
-    // 1. Delete user from memory Map
-    serverEngine.users.delete(userId);
-
-    // 2. Delete referral mapping
-    if (inviteCode) {
-        serverEngine.referralCodes.delete(inviteCode);
-    }
-
-    // 3. Invalidate/remove all user session tokens
-    for (const [token, uid] of serverEngine.userTokens.entries()) {
-        if (uid === userId) {
-            serverEngine.userTokens.delete(token);
-        }
-    }
-
-    // 4. Remove all active bets from serverEngine.bets
-    if (serverEngine.bets && serverEngine.bets.size > 0) {
-        for (const [bId, b] of serverEngine.bets.entries()) {
-            if (b && b.userId === userId) {
-                serverEngine.bets.delete(bId);
-            }
-        }
-    }
-
-    // 5. Remove all historical settled bets from serverEngine.settledBetsHistory
-    if (serverEngine.settledBetsHistory && serverEngine.settledBetsHistory.size > 0) {
-        for (const [bId, b] of serverEngine.settledBetsHistory.entries()) {
-            if (b && b.userId === userId) {
-                serverEngine.settledBetsHistory.delete(bId);
-            }
-        }
-        serverEngine._saveBetsToDisk();
-    }
-
-    // 6. Remove all transactions from serverEngine.transactions
-    if (Array.isArray(serverEngine.transactions)) {
-        serverEngine.transactions = serverEngine.transactions.filter(t => t.userId !== userId);
-    }
-
-    // 7. Remove all ledger entries from serverEngine.ledger
-    if (Array.isArray(serverEngine.ledger)) {
-        serverEngine.ledger = serverEngine.ledger.filter(l => l.userId !== userId);
-    }
-
-    // 8. Save updated users list to disk
-    serverEngine._saveUsersToDisk();
-
-    // 9. Delete from Firestore Cloud permanently (user profile, all bets, all transactions)
     try {
-        await firebaseSync.deleteUserFromFirestore(userId);
+        const { secretKey, userId } = req.body;
+        if (!validateDevKey(secretKey)) {
+            return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+        }
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: `User not found for "${userId}"` });
+        }
+
+        const phone = user.phone;
+        const inviteCode = user.inviteCode;
+        const targetId = user.id;
+
+        // 1. Delete user from memory Map
+        serverEngine.users.delete(targetId);
+
+        // 2. Delete referral mapping
+        if (inviteCode) {
+            serverEngine.referralCodes.delete(inviteCode);
+        }
+
+        // 3. Invalidate/remove all user session tokens
+        for (const [token, uid] of serverEngine.userTokens.entries()) {
+            if (uid === targetId) {
+                serverEngine.userTokens.delete(token);
+            }
+        }
+
+        // 4. Remove all active bets from serverEngine.bets
+        if (serverEngine.bets && serverEngine.bets.size > 0) {
+            for (const [bId, b] of serverEngine.bets.entries()) {
+                if (b && b.userId === targetId) {
+                    serverEngine.bets.delete(bId);
+                }
+            }
+        }
+
+        // 5. Remove all historical settled bets from serverEngine.settledBetsHistory
+        if (serverEngine.settledBetsHistory && serverEngine.settledBetsHistory.size > 0) {
+            for (const [bId, b] of serverEngine.settledBetsHistory.entries()) {
+                if (b && b.userId === targetId) {
+                    serverEngine.settledBetsHistory.delete(bId);
+                }
+            }
+            serverEngine._saveBetsToDisk();
+        }
+
+        // 6. Remove all transactions from serverEngine.transactions
+        if (Array.isArray(serverEngine.transactions)) {
+            serverEngine.transactions = serverEngine.transactions.filter(t => t.userId !== targetId);
+        }
+
+        // 7. Remove all ledger entries from serverEngine.ledger
+        if (Array.isArray(serverEngine.ledger)) {
+            serverEngine.ledger = serverEngine.ledger.filter(l => l.userId !== targetId);
+        }
+
+        // 8. Save updated users list to disk
+        serverEngine._saveUsersToDisk();
+
+        // 9. Delete from Firestore Cloud permanently (user profile, all bets, all transactions)
+        try {
+            await firebaseSync.deleteUserFromFirestore(targetId);
+        } catch (err) {
+            console.warn('[Dev API] Firestore delete user error:', err.message);
+        }
+
+        firebaseSync.logAdminAction('DEVELOPER_DELETE_USER', `Permanently deleted user account ${phone} and all associated histories`);
+
+        res.json({
+            success: true,
+            message: `Permanently deleted user account ${phone} and all bet/transaction histories successfully.`
+        });
     } catch (err) {
-        console.warn('[Dev API] Firestore delete user error:', err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
-
-    firebaseSync.logAdminAction('DEVELOPER_DELETE_USER', `Permanently deleted user account ${phone} and all associated histories`);
-
-    res.json({
-        success: true,
-        message: `Permanently deleted user account ${phone} and all bet/transaction histories successfully.`
-    });
 });
 
 // 5. Permanent Delete ALL Users & Wipe Data

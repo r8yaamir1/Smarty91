@@ -39,15 +39,12 @@ export function setupBalanceListener() {
     try {
         activeBalanceListener = subscribeToUserBalance(currentUserId, (userData) => {
             if (userData && (typeof userData.balance === 'number' || !isNaN(Number(userData.balance)))) {
-                const fsBal = Number(userData.balance) || 0.00;
-                // Never let a lagged or stale Firestore snapshot silently reduce live server balance!
-                if (currentBalance <= 0 || fsBal >= currentBalance) {
+                const fsBal = Number(userData.balance);
+                if (!isNaN(fsBal)) {
                     currentBalance = fsBal;
                     localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
                     renderBalance();
-                } else {
-                    // Silently verify with authoritative server before accepting a lower balance
-                    syncServerBalance(false).catch(() => {});
+                    window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: currentBalance } }));
                 }
             }
         });
@@ -58,6 +55,23 @@ export function setupBalanceListener() {
 
 // Initial listener setup
 setupBalanceListener();
+
+// Auto-sync balance on tab focus or visibility change
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        syncServerBalance(false).catch(() => {});
+    }
+});
+window.addEventListener('focus', () => {
+    syncServerBalance(false).catch(() => {});
+});
+
+// Periodic lightweight balance poll every 10s for active users
+setInterval(() => {
+    if (document.visibilityState === 'visible' && localStorage.getItem('smarty91_auth_token')) {
+        syncServerBalance(false).catch(() => {});
+    }
+}, 10000);
 
 // Listen for balance changes across other tabs or local storage updates
 window.addEventListener('storage', (e) => {
@@ -71,6 +85,14 @@ window.addEventListener('storage', (e) => {
     if (e.key === 'smarty91_user_id') {
         setupBalanceListener();
         syncServerBalance();
+    }
+});
+
+// Listen for direct balanceUpdated custom events in the current window
+window.addEventListener('balanceUpdated', (e) => {
+    if (e && e.detail && typeof e.detail.balance === 'number') {
+        currentBalance = Number(e.detail.balance);
+        renderBalance();
     }
 });
 
@@ -140,7 +162,9 @@ export function formatCurrency(amount) {
 }
 
 export function renderBalance() {
-    const moneyElements = document.querySelectorAll('.Wallet__C-balance-l1 > div, #wallet-display-balance, .current-wallet-val');
+    const moneyElements = document.querySelectorAll(
+        '.Wallet__C-balance-l1 > div, #wallet-display-balance, .current-wallet-val, #header-user-balance, #user-balance-val, .user-balance-text, #wallet-balance-val, .user-balance-num, [data-user-balance]'
+    );
     moneyElements.forEach(el => {
         if (el) el.textContent = formatCurrency(currentBalance);
     });
