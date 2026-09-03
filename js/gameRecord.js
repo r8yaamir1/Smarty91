@@ -162,7 +162,9 @@ export async function syncServerGameState() {
                     });
                     if (hasStalePendingBets) {
                         console.log(`[Self-Healing Sync] Found stale pending bet(s) in mode ${mode} older than current period ${state.currentIssueNumber}. Instantly updating...`);
-                        fetchUserBetsFromServer(mode, 1).catch(() => {});
+                        fetchUserBetsFromServer(mode, 1).then(() => {
+                            syncServerBalance(false).catch(() => {});
+                        }).catch(() => {});
                     }
                 }
             }
@@ -590,11 +592,14 @@ export async function initGameRecord() {
     // Recover instantly from background sleep/minimizing
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
+            syncServerBalance(false).catch(() => {});
             syncServerGameState().then(() => {
                 SUPPORTED_MODES.forEach(mode => {
                     fetchUserBetsFromServer(mode, 1).catch(() => {});
                 });
+                syncServerBalance(false).catch(() => {});
             }).catch(() => {});
+            setTimeout(() => syncServerBalance(false).catch(() => {}), 1000);
         }
     });
 }

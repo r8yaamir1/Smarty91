@@ -650,6 +650,12 @@ export async function fetchUserBetsFromServer(modeInput = activeModeKey, page = 
             if (hasChanged || forceRender) {
                 renderMyHistory(mode);
             }
+
+            // If any bets were settled as WON, guarantee the client wallet balance is in sync
+            const hasWonBets = mappedBets.some(b => b.status === 'WON' || b.status === 'win');
+            if (hasWonBets) {
+                syncServerBalance(false).catch(() => {});
+            }
         }
     } catch (e) {
         console.warn('[GameEngine] fetchUserBetsFromServer note:', e.message);

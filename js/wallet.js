@@ -101,10 +101,13 @@ setupBalanceListener();
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         syncServerBalance(false).catch(() => {});
+        setTimeout(() => syncServerBalance(false).catch(() => {}), 500);
+        setTimeout(() => syncServerBalance(false).catch(() => {}), 1500);
     }
 });
 window.addEventListener('focus', () => {
     syncServerBalance(false).catch(() => {});
+    setTimeout(() => syncServerBalance(false).catch(() => {}), 500);
 });
 
 // Periodic lightweight balance poll every 10s for active users
@@ -166,6 +169,7 @@ export async function syncServerBalance(showLoader = false) {
             currentBalance = Number(res.balance);
             saveBalanceCache(currentBalance);
             renderBalance();
+            window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: currentBalance } }));
         }
     } catch (e) {
         // Fallback to memory balance

@@ -51,8 +51,14 @@ class FirebaseSyncManager {
     markUserDirty(userId) {
         if (!userId || userId === 'default_user') return;
         this.dirtyUsers.add(userId);
-        // If accumulated more than 25 dirty users, trigger batch flush quickly
-        if (this.dirtyUsers.size >= 25) {
+        if (!this._quickFlushTimer) {
+            this._quickFlushTimer = setTimeout(() => {
+                this._quickFlushTimer = null;
+                this.flushDirtyUsers().catch(() => {});
+            }, 1000);
+        }
+        // If accumulated more than 10 dirty users, trigger batch flush quickly
+        if (this.dirtyUsers.size >= 10) {
             this.flushDirtyUsers().catch(() => {});
         }
     }

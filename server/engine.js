@@ -460,6 +460,28 @@ class Smarty91ServerEngine {
         return this.users.get(userId);
     }
 
+    getUser(userId) {
+        if (!userId) return null;
+        let user = this.users.get(userId);
+        if (user) return user;
+        const str = String(userId).trim();
+        user = this.users.get(str) || this.users.get(str.toLowerCase());
+        if (user) return user;
+        const cleanDigits = str.replace(/\D/g, '');
+        const cleanPhone = (cleanDigits.length === 12 && cleanDigits.startsWith('91')) ? cleanDigits.slice(2) : cleanDigits;
+        if (cleanPhone && cleanPhone.length >= 10) {
+            user = this.users.get('usr_' + cleanPhone) || this.users.get(cleanPhone);
+            if (user) return user;
+        }
+        for (const u of this.users.values()) {
+            if (u.id === str || u.id === 'usr_' + str || (cleanPhone && (u.phone === cleanPhone || (u.id && u.id.endsWith(cleanPhone))))) {
+                this.users.set(userId, u);
+                return u;
+            }
+        }
+        return null;
+    }
+
     _hashPassword(password) {
         return crypto.createHash('sha256').update(password + '_smarty91_salt_secure').digest('hex');
     }
@@ -803,22 +825,27 @@ class Smarty91ServerEngine {
                         const data = JSON.parse(payloadJson);
                         if (data && data.uid) {
                             // 1. Fast in-memory resolution (sub-millisecond)
-                            let user = this.users.get(data.uid);
+                            let user = this.getUser(data.uid);
                             if (!user) {
                                 this._loadUsersFromDisk();
-                                user = this.users.get(data.uid);
+                                user = this.getUser(data.uid);
                             }
 
                             // 2. Fallback to Firestore if not in memory
                             if (!user) {
                                 try {
                                     user = await firebaseSync.fetchUserFromFirestore(data.uid);
+                                    if (user) {
+                                        this.users.set(user.id, user);
+                                        if (data.uid !== user.id) this.users.set(data.uid, user);
+                                    }
                                 } catch (e) {
                                     console.warn('[Server] Firestore fetch failed during token resolution:', e.message);
                                 }
                             }
 
                             if (user) {
+                                this.users.set(user.id, user);
                                 this.userTokens.set(cleanToken, user.id);
                                 return user;
                             }
@@ -1545,7 +1572,7 @@ class Smarty91ServerEngine {
 
                 let balanceBefore = 0;
                 let balanceAfter = 0;
-                const user = this.users.get(bet.userId);
+                const user = this.getUser(bet.userId) || this.users.get(bet.userId);
                 if (settlement.isWin && settlement.payoutAmount > 0 && user) {
                     balanceBefore = user.balance;
                     balanceAfter = Number((user.balance + settlement.payoutAmount).toFixed(2));
@@ -1672,12 +1699,13 @@ class Smarty91ServerEngine {
             
             for (const item of preComputed.evaluatedBets) {
                 const { bet, originalBetId, settlement, user, ledgerEntry } = item;
-                if (settlement.isWin && settlement.payoutAmount > 0 && user) {
-                    const balBefore = user.balance;
-                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
+                const liveUser = user || this.getUser(bet.userId) || this.users.get(bet.userId);
+                if (settlement.isWin && settlement.payoutAmount > 0 && liveUser) {
+                    const balBefore = liveUser.balance;
+                    liveUser.balance = Number((liveUser.balance + settlement.payoutAmount).toFixed(2));
                     if (ledgerEntry) {
                         ledgerEntry.balanceBefore = balBefore;
-                        ledgerEntry.balanceAfter = user.balance;
+                        ledgerEntry.balanceAfter = liveUser.balance;
                     }
                 }
                 if (ledgerEntry) {
@@ -1685,6 +1713,7 @@ class Smarty91ServerEngine {
                 }
                 this.settledBetsHistory.set(bet.id, { ...bet });
                 this.bets.delete(originalBetId);
+                item.user = liveUser;
                 evaluatedBets.push(item);
             }
             console.log(`[Instant Settle @ 0s] Mode ${mode} Period ${periodId} instant zero-latency flush executed. Winning number: ${roundRecord.number}`);
@@ -1738,7 +1767,7 @@ class Smarty91ServerEngine {
 
                 let balanceBefore = 0;
                 let balanceAfter = 0;
-                const user = this.users.get(bet.userId);
+                const user = this.getUser(bet.userId) || this.users.get(bet.userId);
                 if (settlement.isWin && settlement.payoutAmount > 0) {
                     if (user) {
                         balanceBefore = user.balance;
@@ -1805,18 +1834,25 @@ class Smarty91ServerEngine {
             });
         }
 
-        // Fast In-Memory Batch Settlement: mark winning users dirty and trigger immediate sync only for major wins (>= ₹500)
+        // Immediate settlement sync: Credit and sync every winning user immediately
         for (const item of evaluatedBets) {
             const { bet, settlement, user } = item;
-            if (settlement.isWin && settlement.payoutAmount > 0 && user) {
-                user._localVersion = (user._localVersion || 1) + 1;
-                user._lastLocalUpdate = Date.now();
-                firebaseSync.markUserDirty(user.id);
+            const targetUser = user || this.getUser(bet.userId) || this.users.get(bet.userId);
+            if (settlement.isWin && settlement.payoutAmount > 0 && targetUser) {
+                targetUser._localVersion = (targetUser._localVersion || 1) + 1;
+                targetUser._lastLocalUpdate = Date.now();
+                firebaseSync.markUserDirty(targetUser.id);
 
-                // For high-roller wins (>= ₹500), fire single detached balance update to Firestore immediately
-                if (settlement.payoutAmount >= 500) {
-                    firebaseSync.updateUserBalance(user.id, user.balance, 'Major win payout').catch(() => {});
-                }
+                // Instantly sync balance to Firestore for ALL winning bets (no minimum amount threshold!)
+                firebaseSync.updateUserBalance(
+                    targetUser.id,
+                    targetUser.balance,
+                    `Bet Win Payout: ${mode} ${periodId} (+₹${settlement.payoutAmount})`,
+                    targetUser.bonusBalance,
+                    targetUser.requiredTurnover
+                ).catch(err => {
+                    console.warn(`[Server] Immediate win balance sync note for user ${targetUser.id}:`, err.message);
+                });
             }
         }
 

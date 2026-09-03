@@ -589,7 +589,7 @@ apiRouter.get('/wallet/balance', async (req, res) => {
         }
         
         // Priority 1: Live in-memory engine user (guaranteed instant reflection on bet settle/win)
-        const liveUser = serverEngine.users.get(authUser.id);
+        const liveUser = serverEngine.getUser(authUser.id) || serverEngine.users.get(authUser.id);
         
         let balance = liveUser ? liveUser.balance : authUser.balance;
         let bonusBalance = liveUser ? (liveUser.bonusBalance !== undefined ? liveUser.bonusBalance : (liveUser.bonus || 0)) : (authUser.bonusBalance !== undefined ? authUser.bonusBalance : (authUser.bonus || 0));
@@ -598,6 +598,7 @@ apiRouter.get('/wallet/balance', async (req, res) => {
             try {
                 const freshUser = await firebaseSync.fetchUserFromFirestore(authUser.id);
                 if (freshUser) {
+                    serverEngine.users.set(authUser.id, freshUser);
                     balance = freshUser.balance;
                     bonusBalance = freshUser.bonusBalance !== undefined ? freshUser.bonusBalance : (freshUser.bonus || 0);
                 }
