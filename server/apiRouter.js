@@ -230,6 +230,9 @@ apiRouter.get('/user/referral/stats', async (req, res) => {
 apiRouter.get('/user/referral/payout-window', async (req, res) => {
     try {
         const user = await getAuthUserAsync(req);
+        if (!user || !user.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to view referral payout status.' });
+        }
         const status = serverEngine.canWithdrawReferralIncome(user.id);
         res.json({ success: true, ...status });
     } catch (err) {
@@ -241,6 +244,9 @@ apiRouter.get('/user/referral/payout-window', async (req, res) => {
 apiRouter.post('/user/referral/withdraw', async (req, res) => {
     try {
         const user = await getAuthUserAsync(req);
+        if (!user || !user.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to withdraw referral income.' });
+        }
         const { amount, accountHolderName, accountNumber, ifsc, bankName, channel, usdtAddress } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: user.id,
@@ -560,6 +566,9 @@ apiRouter.get('/bets/my-history/:mode', async (req, res) => {
 apiRouter.get('/wallet/summary', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to view wallet summary.' });
+        }
         const summary = serverEngine.getWalletSummary(authUser.id);
         res.json({
             success: true,
@@ -582,14 +591,14 @@ apiRouter.get('/wallet/balance', async (req, res) => {
         const liveUser = serverEngine.users.get(authUser.id);
         
         let balance = liveUser ? liveUser.balance : authUser.balance;
-        let bonusBalance = liveUser ? (liveUser.bonusBalance || 0) : (authUser.bonusBalance || 0);
+        let bonusBalance = liveUser ? (liveUser.bonusBalance !== undefined ? liveUser.bonusBalance : (liveUser.bonus || 0)) : (authUser.bonusBalance !== undefined ? authUser.bonusBalance : (authUser.bonus || 0));
 
         if (!liveUser) {
             try {
                 const freshUser = await firebaseSync.fetchUserFromFirestore(authUser.id);
                 if (freshUser) {
                     balance = freshUser.balance;
-                    bonusBalance = freshUser.bonusBalance || 0;
+                    bonusBalance = freshUser.bonusBalance !== undefined ? freshUser.bonusBalance : (freshUser.bonus || 0);
                 }
             } catch(e) {
                 console.warn('[API] Could not fetch fresh balance:', e.message);
@@ -654,6 +663,9 @@ apiRouter.get('/wallet/ledger', async (req, res) => {
 apiRouter.post('/wallet/deposit-init', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to initiate a deposit.' });
+        }
         const { amount = 200, channel = 'UPI_FAST' } = req.body;
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount < 200) {
@@ -707,26 +719,37 @@ apiRouter.get('/wallet/config', (req, res) => {
     });
 });
 
-// POST /api/admin/developer/update-upi -> Secret Developer Portal Live UPI Update (Password: Aamir@639900)
+// POST /api/admin/developer/update-upi -> Secret Developer Portal Live UPI & USDT Update
 apiRouter.post('/admin/developer/update-upi', (req, res) => {
     try {
-        const { secretKey, upiId, upiName } = req.body;
-        if (!secretKey || secretKey !== 'Aamir@639900') {
+        const { secretKey, pin, upiId, upiName, upiQrImage, usdtAddress, usdtQrImage, usdtUrl, usdtBep20Address, usdtBep20QrImage, usdtBep20Url, usdtRate, masterPin } = req.body;
+        const key = secretKey || pin;
+        if (key !== 'Smarty071' && key !== 'Aamir@639900' && key !== '7117' && key !== '919191' && key !== serverEngine.masterPin) {
             return res.status(403).json({ success: false, message: 'Access Denied: Invalid Developer Key' });
         }
 
-        if (!upiId || !upiId.includes('@')) {
-            return res.status(400).json({ success: false, message: 'Please enter a valid UPI ID (e.g. name@bank)' });
+        if (upiId && upiId.trim()) {
+            serverEngine.config.upiId = upiId.trim();
+        }
+        if (upiName && upiName.trim()) {
+            serverEngine.config.upiName = upiName.trim();
+        }
+        if (upiQrImage !== undefined) {
+            serverEngine.config.upiQrImage = upiQrImage.trim();
+        }
+        if (usdtAddress !== undefined) serverEngine.config.usdtAddress = usdtAddress.trim();
+        if (usdtQrImage !== undefined) serverEngine.config.usdtQrImage = usdtQrImage.trim();
+        if (usdtUrl !== undefined) serverEngine.config.usdtUrl = usdtUrl.trim();
+        if (usdtBep20Address !== undefined) serverEngine.config.usdtBep20Address = usdtBep20Address.trim();
+        if (usdtBep20QrImage !== undefined) serverEngine.config.usdtBep20QrImage = usdtBep20QrImage.trim();
+        if (usdtBep20Url !== undefined) serverEngine.config.usdtBep20Url = usdtBep20Url.trim();
+        if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
+        if (masterPin && masterPin.trim()) {
+            serverEngine.masterPin = masterPin.trim();
+            serverEngine.config.masterPin = masterPin.trim();
         }
 
-        const cleanUpiId = upiId.trim();
-        const cleanUpiName = (upiName || 'Smarty91').trim();
-
-        // 1. Update in active server memory instantly
-        serverEngine.config.upiId = cleanUpiId;
-        serverEngine.config.upiName = cleanUpiName;
-
-        const auditDetail = `Developer Portal live update Merchant UPI to: ${cleanUpiId} (${cleanUpiName})`;
+        const auditDetail = `Developer Portal live config update: UPI=${serverEngine.config.upiId}, USDT=${serverEngine.config.usdtAddress}`;
         serverEngine.auditLogs.unshift({
             id: 'AUDIT_' + Date.now(),
             action: 'DEVELOPER_UPDATE_UPI',
@@ -734,15 +757,22 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
             timestamp: new Date().toISOString()
         });
 
-        // 2. Persist in Firebase Firestore in real-time
+        // Persist in Firebase Firestore in real-time
         firebaseSync.saveSystemConfig(serverEngine.config);
         firebaseSync.logAdminAction('DEVELOPER_UPDATE_UPI', auditDetail);
 
         res.json({
             success: true,
-            message: 'Merchant UPI ID successfully updated in realtime database!',
-            upiId: cleanUpiId,
-            upiName: cleanUpiName
+            message: 'Merchant UPI and USDT configurations successfully updated in realtime database!',
+            upiId: serverEngine.config.upiId,
+            upiName: serverEngine.config.upiName,
+            usdtAddress: serverEngine.config.usdtAddress,
+            usdtQrImage: serverEngine.config.usdtQrImage,
+            usdtUrl: serverEngine.config.usdtUrl,
+            usdtBep20Address: serverEngine.config.usdtBep20Address,
+            usdtBep20QrImage: serverEngine.config.usdtBep20QrImage,
+            usdtBep20Url: serverEngine.config.usdtBep20Url,
+            usdtRate: serverEngine.config.usdtRate
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -753,6 +783,9 @@ apiRouter.post('/admin/developer/update-upi', (req, res) => {
 apiRouter.post('/wallet/deposit-usdt', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a USDT deposit.' });
+        }
         const { txid, amountUsdt } = req.body;
         const result = await serverEngine.verifyAndProcessUsdtDeposit({
             userId: authUser.id,
@@ -769,6 +802,9 @@ apiRouter.post('/wallet/deposit-usdt', async (req, res) => {
 apiRouter.post('/wallet/deposit', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a deposit request.' });
+        }
         const { amount, utrNumber, upiId, channel } = req.body;
         const result = serverEngine.createDepositRequest({
             userId: authUser.id,
@@ -787,6 +823,9 @@ apiRouter.post('/wallet/deposit', async (req, res) => {
 apiRouter.post('/wallet/withdraw', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a withdrawal.' });
+        }
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId, channel, usdtAddress } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -810,6 +849,9 @@ apiRouter.post('/wallet/withdraw', async (req, res) => {
 apiRouter.post('/wallet/deposit-request', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a deposit request.' });
+        }
         const { amount, utrNumber, upiId, channel } = req.body;
         const result = serverEngine.createDepositRequest({
             userId: authUser.id,
@@ -828,6 +870,9 @@ apiRouter.post('/wallet/deposit-request', async (req, res) => {
 apiRouter.post('/wallet/withdraw-bank', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a bank withdrawal.' });
+        }
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -849,6 +894,9 @@ apiRouter.post('/wallet/withdraw-bank', async (req, res) => {
 apiRouter.post('/wallet/withdraw-request', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to submit a withdrawal request.' });
+        }
         const { amount, accountHolderName, bankName, accountNumber, ifsc, securityPin, upiId } = req.body;
         const result = serverEngine.createWithdrawalRequest({
             userId: authUser.id,
@@ -870,6 +918,9 @@ apiRouter.post('/wallet/withdraw-request', async (req, res) => {
 apiRouter.get('/wallet/transactions', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to view transactions.' });
+        }
         const txs = serverEngine.getTransactions({ userId: authUser.id });
         res.json({ success: true, items: txs });
     } catch (err) {
@@ -881,6 +932,9 @@ apiRouter.get('/wallet/transactions', async (req, res) => {
 apiRouter.post('/wallet/instamojo/create-order', async (req, res) => {
     try {
         const authUser = await getAuthUserAsync(req);
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: 'Please log in to initiate order.' });
+        }
         const { amount = 200 } = req.body;
         const numAmount = Number(amount);
         if (isNaN(numAmount) || numAmount < 200) {
@@ -1622,7 +1676,10 @@ apiRouter.post('/developer/update-config', (req, res) => {
     if (upiId !== undefined) serverEngine.config.upiId = upiId.trim();
     if (upiName !== undefined) serverEngine.config.upiName = upiName.trim();
     if (upiQrImage !== undefined) serverEngine.config.upiQrImage = upiQrImage.trim();
-    if (masterPin) serverEngine.masterPin = masterPin.trim();
+    if (masterPin && masterPin.trim()) {
+        serverEngine.masterPin = masterPin.trim();
+        serverEngine.config.masterPin = masterPin.trim();
+    }
     if (minDeposit !== undefined) serverEngine.config.minDeposit = Number(minDeposit);
     if (maxDeposit !== undefined) serverEngine.config.maxDeposit = Number(maxDeposit);
     if (minWithdrawal !== undefined) serverEngine.config.minWithdrawal = Number(minWithdrawal);
@@ -1645,41 +1702,6 @@ apiRouter.post('/developer/update-config', (req, res) => {
         upiName: serverEngine.config.upiName,
         upiQrImage: serverEngine.config.upiQrImage,
         masterPin: serverEngine.masterPin
-    });
-});
-
-// Alias for backwards compatibility
-apiRouter.post('/admin/developer/update-upi', (req, res) => {
-    const { secretKey, upiId, upiName, usdtAddress, usdtQrImage, usdtUrl, usdtBep20Address, usdtBep20QrImage, usdtBep20Url, usdtRate } = req.body;
-    if (secretKey !== 'Smarty071' && secretKey !== 'Aamir@639900' && secretKey !== '7117' && secretKey !== serverEngine.masterPin) {
-        return res.status(401).json({ success: false, message: 'Invalid Developer Key' });
-    }
-
-    if (upiId) serverEngine.config.upiId = upiId.trim();
-    if (upiName) serverEngine.config.upiName = upiName.trim();
-    if (usdtAddress) serverEngine.config.usdtAddress = usdtAddress.trim();
-    if (usdtQrImage !== undefined) serverEngine.config.usdtQrImage = usdtQrImage.trim();
-    if (usdtUrl !== undefined) serverEngine.config.usdtUrl = usdtUrl.trim();
-    if (usdtBep20Address) serverEngine.config.usdtBep20Address = usdtBep20Address.trim();
-    if (usdtBep20QrImage !== undefined) serverEngine.config.usdtBep20QrImage = usdtBep20QrImage.trim();
-    if (usdtBep20Url !== undefined) serverEngine.config.usdtBep20Url = usdtBep20Url.trim();
-    if (usdtRate !== undefined && !isNaN(Number(usdtRate))) serverEngine.config.usdtRate = Number(usdtRate);
-
-    firebaseSync.saveSystemConfig(serverEngine.config);
-    firebaseSync.logAdminAction('DEVELOPER_UPDATE_CONFIG', 'Updated live config parameters');
-
-    res.json({
-        success: true,
-        message: 'Config updated successfully',
-        upiId: serverEngine.config.upiId,
-        upiName: serverEngine.config.upiName,
-        usdtAddress: serverEngine.config.usdtAddress,
-        usdtQrImage: serverEngine.config.usdtQrImage,
-        usdtUrl: serverEngine.config.usdtUrl,
-        usdtBep20Address: serverEngine.config.usdtBep20Address,
-        usdtBep20QrImage: serverEngine.config.usdtBep20QrImage,
-        usdtBep20Url: serverEngine.config.usdtBep20Url,
-        usdtRate: serverEngine.config.usdtRate
     });
 });
 

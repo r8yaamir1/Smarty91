@@ -2499,7 +2499,8 @@ class Smarty91ServerEngine {
 
             const balanceBefore = userObj.balance;
             userObj.balance = Number((userObj.balance + numAmount).toFixed(2));
-            userObj.bonus = Number(((userObj.bonus || 0) + bonusAmount).toFixed(2));
+            userObj.bonusBalance = Number(((userObj.bonusBalance || 0) + bonusAmount).toFixed(2));
+            userObj.bonus = userObj.bonusBalance;
             // 2x Mandatory Deposit Turnover Rule
             userObj.requiredTurnover = Number(((userObj.requiredTurnover || 0) + (numAmount * 2.0)).toFixed(2));
             const balanceAfter = userObj.balance;
@@ -2762,7 +2763,8 @@ class Smarty91ServerEngine {
             userId: user.id,
             phone: user.phone || '9876543210',
             balance: Number((user.balance || 0).toFixed(2)),
-            bonusBalance: Number((user.bonusBalance || 0).toFixed(2)),
+            bonusBalance: Number(((user.bonusBalance !== undefined ? user.bonusBalance : (user.bonus || 0))).toFixed(2)),
+            bonus: Number(((user.bonusBalance !== undefined ? user.bonusBalance : (user.bonus || 0))).toFixed(2)),
             requiredTurnover: Number((user.requiredTurnover || 0).toFixed(2)),
             totalDeposited: Number(totalDeposited.toFixed(2)),
             totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
@@ -2793,17 +2795,18 @@ class Smarty91ServerEngine {
             tx.adminRemarks = adminRemarks || 'Approved by Admin';
 
             if (tx.type === 'DEPOSIT') {
-                const balanceBefore = user.balance;
-                user.balance += tx.amount;
+                const numAmount = Number(tx.amount);
+                const balanceBefore = Number(user.balance || 0);
+                user.balance = Number((balanceBefore + numAmount).toFixed(2));
                 // 2x Mandatory Deposit Turnover Rule
-                user.requiredTurnover = Number(((user.requiredTurnover || 0) + (tx.amount * 2.0)).toFixed(2));
+                user.requiredTurnover = Number(((user.requiredTurnover || 0) + (numAmount * 2.0)).toFixed(2));
                 const balanceAfter = user.balance;
 
                 this.ledger.unshift({
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: tx.userId,
                     type: 'DEPOSIT_CREDIT',
-                    amount: tx.amount,
+                    amount: numAmount,
                     balanceBefore,
                     balanceAfter,
                     referenceId: tx.id,
@@ -2833,34 +2836,37 @@ class Smarty91ServerEngine {
                     });
                 }
 
-                this._processReferralDepositCommission(user, tx.amount, tx.id);
+                this._processReferralDepositCommission(user, numAmount, tx.id);
                 // Also check if this user is a referrer and now unlocks their milestone rewards
                 this._checkAndAwardReferralMilestones(user.id);
 
                 // Credit VIP bonus balance if eligible
                 if (tx.bonusAmount && tx.bonusAmount > 0) {
-                    user.bonusBalance = (user.bonusBalance || 0) + Number(tx.bonusAmount);
+                    const bonusNum = Number(tx.bonusAmount);
+                    user.bonusBalance = Number(((user.bonusBalance || 0) + bonusNum).toFixed(2));
+                    user.bonus = user.bonusBalance;
                     this.ledger.unshift({
                         id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                         userId: tx.userId,
                         type: 'BONUS_CREDIT',
-                        amount: Number(tx.bonusAmount),
+                        amount: bonusNum,
                         balanceBefore: balanceBefore,
                         balanceAfter: user.balance,
                         referenceId: tx.id,
                         timestamp: new Date().toISOString(),
-                        description: `VIP Deposit Match Bonus of ₹${tx.bonusAmount} Credited`
+                        description: `VIP Deposit Match Bonus of ₹${bonusNum} Credited`
                     });
                 }
 
+                this._saveUsersToDisk();
                 firebaseSync.saveUser(user).catch(e => console.warn('[User Save Sync]', e.message));
-                firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin');
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Deposit approved by admin', user.bonusBalance);
             } else if (tx.type === 'WITHDRAWAL') {
                 const ledgerEntry = {
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: tx.userId,
                     type: 'WITHDRAWAL_PAID',
-                    amount: -Math.abs(tx.amount),
+                    amount: -Math.abs(Number(tx.amount)),
                     balanceBefore: user.balance,
                     balanceAfter: user.balance,
                     referenceId: tx.id,
@@ -2869,7 +2875,7 @@ class Smarty91ServerEngine {
                 };
                 this.ledger.unshift(ledgerEntry);
                 firebaseSync.saveLedgerEntry(ledgerEntry);
-                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal approved by admin');
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal approved by admin', user.bonusBalance);
             }
 
             const logMsg = `Approved ${tx.type} #${tx.id} for user ${tx.userId} amount ₹${tx.amount}`;
@@ -2890,15 +2896,16 @@ class Smarty91ServerEngine {
 
             // If withdrawal rejected, refund held amount back to user's wallet
             if (tx.type === 'WITHDRAWAL') {
-                const balanceBefore = user.balance;
-                user.balance += tx.amount;
+                const numAmount = Number(tx.amount);
+                const balanceBefore = Number(user.balance || 0);
+                user.balance = Number((balanceBefore + numAmount).toFixed(2));
                 const balanceAfter = user.balance;
 
                 this.ledger.unshift({
                     id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                     userId: tx.userId,
                     type: 'WITHDRAWAL_REFUND',
-                    amount: tx.amount,
+                    amount: numAmount,
                     balanceBefore,
                     balanceAfter,
                     referenceId: tx.id,
@@ -2906,7 +2913,9 @@ class Smarty91ServerEngine {
                     description: `Refund for rejected withdrawal #${tx.id}`
                 });
 
-                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal rejected - balance refunded');
+                this._saveUsersToDisk();
+                firebaseSync.saveUser(user).catch(e => console.warn('[User Save Sync]', e.message));
+                firebaseSync.updateUserBalance(user.id, user.balance, 'Withdrawal rejected - balance refunded', user.bonusBalance);
             }
 
             const logMsg = `Rejected ${tx.type} #${tx.id} for user ${tx.userId} amount ₹${tx.amount}. Remarks: ${tx.adminRemarks}`;

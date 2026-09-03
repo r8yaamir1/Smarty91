@@ -268,7 +268,8 @@ class FirebaseSyncManager {
                         totalReferralCommission: Number(u.totalReferralCommission || 0),
                         betCommissionEarned: Number(u.betCommissionEarned || 0),
                         awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
-                        bonusBalance: Number(u.bonusBalance || 0),
+                        bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
+                        bonus: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
                         createdAt: u.createdAt || new Date().toISOString(),
                         updatedAt: u.updatedAt || new Date().toISOString()
                     };
@@ -340,6 +341,11 @@ class FirebaseSyncManager {
                         whitelistedUsers: Array.isArray(data.gameMaintenance.whitelistedUsers) ? data.gameMaintenance.whitelistedUsers : []
                     };
                 }
+                if (data.masterPin) {
+                    this.engine.masterPin = data.masterPin;
+                    this.engine.config.masterPin = data.masterPin;
+                }
+                if (data.modes) this.engine.config.modes = { ...this.engine.config.modes, ...data.modes };
                 this.engine.config.universalSync = false;
                 this.engine.config.syncApiUrl = '';
             } else {
@@ -349,6 +355,7 @@ class FirebaseSyncManager {
                     minBetAmount: this.engine.config.minBetAmount,
                     maxBetAmount: this.engine.config.maxBetAmount,
                     riskEngine: this.engine.config.riskEngine,
+                    masterPin: this.engine.masterPin || 'Smarty071',
                     upiId: this.engine.config.upiId || '6289140468@axl',
                     upiName: this.engine.config.upiName || 'Smarty91',
                     upiQrImage: this.engine.config.upiQrImage || '',
@@ -375,6 +382,11 @@ class FirebaseSyncManager {
             onSnapshot(configRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const d = docSnap.data();
+                    if (d.masterPin) {
+                        this.engine.masterPin = d.masterPin;
+                        this.engine.config.masterPin = d.masterPin;
+                    }
+                    if (d.modes) this.engine.config.modes = { ...this.engine.config.modes, ...d.modes };
                     if (d.upiId) this.engine.config.upiId = d.upiId;
                     if (d.upiName) this.engine.config.upiName = d.upiName;
                     if (d.upiQrImage !== undefined) this.engine.config.upiQrImage = d.upiQrImage;
@@ -513,7 +525,8 @@ class FirebaseSyncManager {
                                 totalReferralCommission: Number(u.totalReferralCommission !== undefined ? u.totalReferralCommission : (existing ? existing.totalReferralCommission : 0)),
                                 betCommissionEarned: Number(u.betCommissionEarned !== undefined ? u.betCommissionEarned : (existing ? existing.betCommissionEarned : 0)),
                                 awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : (existing && Array.isArray(existing.awardedMilestones) ? existing.awardedMilestones : []),
-                                bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (existing ? existing.bonusBalance : 0)),
+                                bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (existing ? (existing.bonusBalance || existing.bonus || 0) : 0)),
+                                bonus: Number(u.bonusBalance !== undefined ? u.bonusBalance : (existing ? (existing.bonusBalance || existing.bonus || 0) : 0)),
                                 createdAt: u.createdAt || (existing ? existing.createdAt : new Date().toISOString()),
                                 updatedAt: u.updatedAt || new Date().toISOString()
                             };
@@ -562,6 +575,8 @@ class FirebaseSyncManager {
                     totalReferralCommission: Number(u.totalReferralCommission || 0),
                     betCommissionEarned: Number(u.betCommissionEarned || 0),
                     awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
+                    bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
+                    bonus: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
                     createdAt: u.createdAt || new Date().toISOString()
                 };
                 this.engine.users.set(userData.id, userData);
@@ -607,6 +622,8 @@ class FirebaseSyncManager {
                     totalReferralCommission: Number(u.totalReferralCommission || 0),
                     betCommissionEarned: Number(u.betCommissionEarned || 0),
                     awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
+                    bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
+                    bonus: Number(u.bonusBalance !== undefined ? u.bonusBalance : (u.bonus || 0)),
                     createdAt: u.createdAt || new Date().toISOString()
                 };
                 this.engine.users.set(userData.id, userData);
@@ -1177,6 +1194,7 @@ class FirebaseSyncManager {
                 probabilities: config.probabilities,
                 modes: config.modes,
                 upiId: config.upiId || '6289140468@axl',
+                masterPin: config.masterPin || (this.engine ? this.engine.masterPin : 'Smarty071'),
                 upiName: config.upiName || 'Smarty91',
                 upiQrImage: config.upiQrImage || '',
                 usdtAddress: config.usdtAddress || '0xce0b6eecaf9Ff7Cb6c58092cD4b1C5Feb945fF8c',
