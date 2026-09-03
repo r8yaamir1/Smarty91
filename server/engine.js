@@ -1656,11 +1656,7 @@ class Smarty91ServerEngine {
                 } catch (err) {
                     console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
                     await firebaseSync.updateBetSettlement(bet).catch(() => {});
-                    if (user) {
-                        await firebaseSync.updateUserBalance(bet.userId, user.balance, 'Round win payout').catch(() => {});
-                    } else {
-                        await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout').catch(() => {});
-                    }
+                    await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout').catch(() => {});
                 }
             } else {
                 try {
@@ -3059,7 +3055,7 @@ class Smarty91ServerEngine {
             this.ledger.unshift(ledgerEntry);
             this._saveUsersToDisk();
 
-            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `${commRate}% Deposit Referral Bonus ₹${commission}`);
+            firebaseSync.incrementUserBalance(referrer.id, commission, `${commRate}% Deposit Referral Bonus ₹${commission}`);
             firebaseSync.saveTransaction(ledgerEntry);
 
             this.auditLogs.unshift({
@@ -3117,7 +3113,7 @@ class Smarty91ServerEngine {
             this.ledger.unshift(ledgerEntry);
             this._saveUsersToDisk();
 
-            firebaseSync.updateUserBalance(referrer.id, referrer.balance, `1% Bet Referral Commission ₹${commission}`);
+            firebaseSync.incrementUserBalance(referrer.id, commission, `1% Bet Referral Commission ₹${commission}`);
             firebaseSync.saveTransaction(ledgerEntry);
         } catch (e) {
             console.warn('[Referral Bet Commission Error]', e.message);
@@ -3180,7 +3176,7 @@ class Smarty91ServerEngine {
                     this.ledger.unshift(ledgerEntry);
                     this._saveUsersToDisk();
 
-                    firebaseSync.updateUserBalance(referrer.id, referrer.balance, `Referral Milestone ${ms.count} Bonus ₹${ms.bonus}`);
+                    firebaseSync.incrementUserBalance(referrer.id, ms.bonus, `Referral Milestone ${ms.count} Bonus ₹${ms.bonus}`);
                     firebaseSync.saveTransaction(ledgerEntry);
 
                     this.auditLogs.unshift({

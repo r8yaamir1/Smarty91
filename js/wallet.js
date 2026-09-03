@@ -2,7 +2,39 @@
 import { walletService } from './services/walletService.js';
 import { subscribeToUserBalance } from './services/firebaseClient.js';
 
-let currentBalance = Number(localStorage.getItem('smarty91_cached_balance')) || 0.00;
+function getInitialBalance() {
+    try {
+        const userId = localStorage.getItem('smarty91_user_id');
+        if (userId) {
+            const userCached = localStorage.getItem(`smarty91_cached_balance_${userId}`);
+            if (userCached !== null) {
+                const val = Number(userCached);
+                if (!isNaN(val)) return val;
+            }
+        }
+        const genericCached = localStorage.getItem('smarty91_cached_balance');
+        if (genericCached !== null) {
+            const val = Number(genericCached);
+            if (!isNaN(val)) return val;
+        }
+    } catch (e) {}
+    return 0.00;
+}
+
+function saveBalanceCache(bal, userId = null) {
+    try {
+        const num = Number(bal);
+        if (!isNaN(num)) {
+            localStorage.setItem('smarty91_cached_balance', num.toString());
+            const uid = userId || localStorage.getItem('smarty91_user_id');
+            if (uid) {
+                localStorage.setItem(`smarty91_cached_balance_${uid}`, num.toString());
+            }
+        }
+    } catch (e) {}
+}
+
+let currentBalance = getInitialBalance();
 
 let activeBalanceListener = null;
 let activeUserId = null;
@@ -20,6 +52,15 @@ export function setupBalanceListener() {
         }
         activeUserId = null;
         return;
+    }
+
+    const userCached = localStorage.getItem(`smarty91_cached_balance_${currentUserId}`);
+    if (userCached !== null) {
+        const parsed = Number(userCached);
+        if (!isNaN(parsed) && parsed !== currentBalance) {
+            currentBalance = parsed;
+            renderBalance();
+        }
     }
 
     // If listener is already active for this exact user, don't duplicate unless forced
@@ -42,7 +83,7 @@ export function setupBalanceListener() {
                 const fsBal = Number(userData.balance);
                 if (!isNaN(fsBal)) {
                     currentBalance = fsBal;
-                    localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+                    saveBalanceCache(currentBalance, currentUserId);
                     renderBalance();
                     window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: currentBalance } }));
                 }
@@ -123,7 +164,7 @@ export async function syncServerBalance(showLoader = false) {
         const res = await walletService.getBalance();
         if (res && res.success && typeof res.balance === 'number') {
             currentBalance = Number(res.balance);
-            localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+            saveBalanceCache(currentBalance);
             renderBalance();
         }
     } catch (e) {
@@ -138,20 +179,20 @@ export function getBalance() {
 
 export function setBalanceLocally(newBal) {
     currentBalance = Number(newBal);
-    localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+    saveBalanceCache(currentBalance);
     renderBalance();
 }
 
 export function addBalance(amount) {
     currentBalance = Number((currentBalance + Number(amount)).toFixed(2));
-    localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+    saveBalanceCache(currentBalance);
     renderBalance();
     return currentBalance;
 }
 
 export function deductBalance(amount) {
     currentBalance = Number(Math.max(0, currentBalance - Number(amount)).toFixed(2));
-    localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+    saveBalanceCache(currentBalance);
     renderBalance();
     return currentBalance;
 }

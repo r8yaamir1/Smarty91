@@ -71,6 +71,7 @@
                     localStorage.setItem('smarty91_user_phone', data.user.phone);
                     const freshBal = Number(data.user.balance !== undefined ? data.user.balance : 0);
                     localStorage.setItem('smarty91_cached_balance', freshBal.toString());
+                    localStorage.setItem(`smarty91_cached_balance_${data.user.id}`, freshBal.toString());
                     window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: freshBal } }));
                 }
             }

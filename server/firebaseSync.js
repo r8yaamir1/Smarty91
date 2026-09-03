@@ -196,14 +196,18 @@ class FirebaseSyncManager {
             let count = 0;
             querySnap.forEach(docSnap => {
                 const u = docSnap.data();
-                if (u && u.id && u.id !== 'default_user') {
-                    this.engine.users.set(u.id, {
-                        id: u.id,
-                        username: u.username || `usr_${u.phone || 'VIP'}`,
-                        phone: u.phone || '',
+                const docId = docSnap.id;
+                const uid = (u && u.id) ? u.id : docId;
+                if (uid && uid !== 'default_user') {
+                    const phoneVal = u.phone || (uid.startsWith('usr_') ? uid.replace('usr_', '') : '');
+                    const userData = {
+                        id: uid,
+                        username: u.username || `usr_${phoneVal || 'VIP'}`,
+                        phone: phoneVal,
                         passwordHash: u.passwordHash || '',
-                        securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                        securityPin: u.securityPin || (phoneVal ? phoneVal.slice(-4) : '1234'),
                         balance: Number(u.balance !== undefined ? u.balance : 0),
+                        requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
                         inviteCode: u.inviteCode || '',
                         referredBy: u.referredBy || null,
                         hasDeposited: !!u.hasDeposited,
@@ -214,10 +218,18 @@ class FirebaseSyncManager {
                         totalReferralCommission: Number(u.totalReferralCommission || 0),
                         betCommissionEarned: Number(u.betCommissionEarned || 0),
                         awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
-                        createdAt: u.createdAt || new Date().toISOString()
-                    });
-                    if (u.inviteCode) {
-                        this.engine.referralCodes.set(u.inviteCode, u.id);
+                        bonusBalance: Number(u.bonusBalance || 0),
+                        createdAt: u.createdAt || new Date().toISOString(),
+                        updatedAt: u.updatedAt || new Date().toISOString()
+                    };
+
+                    this.engine.users.set(uid, userData);
+                    if (phoneVal) {
+                        this.engine.users.set(phoneVal, userData);
+                        this.engine.users.set('usr_' + phoneVal, userData);
+                    }
+                    if (userData.inviteCode) {
+                        this.engine.referralCodes.set(userData.inviteCode.toUpperCase(), uid);
                     }
                     count++;
                 }
@@ -381,34 +393,45 @@ class FirebaseSyncManager {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added' || change.type === 'modified') {
                         const u = change.doc.data();
-                        if (u && u.id && u.id !== 'default_user') {
-                            const existing = this.engine.users.get(u.id);
+                        const docId = change.doc.id;
+                        const uid = (u && u.id) ? u.id : docId;
+                        if (uid && uid !== 'default_user') {
+                            const existing = this.engine.users.get(uid);
                             // Live balance from Firestore is authoritative when user documents are modified
                             const resolvedBalance = Number(u.balance !== undefined ? u.balance : (existing ? existing.balance : 0));
 
-                            this.engine.users.set(u.id, {
-                                id: u.id,
-                                username: u.username || `usr_${u.phone || 'VIP'}`,
-                                phone: u.phone || '',
+                            const updatedUser = {
+                                ...(existing || {}),
+                                ...u,
+                                id: uid,
+                                username: u.username || (existing ? existing.username : `usr_${u.phone || 'VIP'}`),
+                                phone: u.phone || (existing ? existing.phone : (uid.startsWith('usr_') ? uid.replace('usr_', '') : '')),
                                 passwordHash: u.passwordHash || (existing ? existing.passwordHash : ''),
-                                securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
+                                securityPin: u.securityPin || (existing ? existing.securityPin : (u.phone ? u.phone.slice(-4) : '1234')),
                                 balance: resolvedBalance,
-                                requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
-                                inviteCode: u.inviteCode || '',
-                                referredBy: u.referredBy || null,
-                                hasDeposited: !!u.hasDeposited,
+                                requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : (existing ? existing.requiredTurnover : 0)),
+                                inviteCode: u.inviteCode || (existing ? existing.inviteCode : ''),
+                                referredBy: u.referredBy !== undefined ? u.referredBy : (existing ? existing.referredBy : null),
+                                hasDeposited: u.hasDeposited !== undefined ? !!u.hasDeposited : (existing ? existing.hasDeposited : false),
                                 isBlocked: !!u.isBlocked,
-                                lastCheckInDate: u.lastCheckInDate || null,
-                                checkInStreak: Number(u.checkInStreak || 0),
-                                checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : [],
-                                totalReferralCommission: Number(u.totalReferralCommission || 0),
-                                betCommissionEarned: Number(u.betCommissionEarned || 0),
-                                awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : [],
+                                lastCheckInDate: u.lastCheckInDate || (existing ? existing.lastCheckInDate : null),
+                                checkInStreak: Number(u.checkInStreak !== undefined ? u.checkInStreak : (existing ? existing.checkInStreak : 0)),
+                                checkInHistory: Array.isArray(u.checkInHistory) ? u.checkInHistory : (existing && Array.isArray(existing.checkInHistory) ? existing.checkInHistory : []),
+                                totalReferralCommission: Number(u.totalReferralCommission !== undefined ? u.totalReferralCommission : (existing ? existing.totalReferralCommission : 0)),
+                                betCommissionEarned: Number(u.betCommissionEarned !== undefined ? u.betCommissionEarned : (existing ? existing.betCommissionEarned : 0)),
+                                awardedMilestones: Array.isArray(u.awardedMilestones) ? u.awardedMilestones : (existing && Array.isArray(existing.awardedMilestones) ? existing.awardedMilestones : []),
                                 bonusBalance: Number(u.bonusBalance !== undefined ? u.bonusBalance : (existing ? existing.bonusBalance : 0)),
-                                createdAt: u.createdAt || (existing ? existing.createdAt : new Date().toISOString())
-                            });
-                            if (u.inviteCode) {
-                                this.engine.referralCodes.set(u.inviteCode, u.id);
+                                createdAt: u.createdAt || (existing ? existing.createdAt : new Date().toISOString()),
+                                updatedAt: u.updatedAt || new Date().toISOString()
+                            };
+
+                            this.engine.users.set(uid, updatedUser);
+                            if (updatedUser.phone) {
+                                this.engine.users.set(updatedUser.phone, updatedUser);
+                                this.engine.users.set('usr_' + updatedUser.phone, updatedUser);
+                            }
+                            if (updatedUser.inviteCode) {
+                                this.engine.referralCodes.set(updatedUser.inviteCode.toUpperCase(), uid);
                             }
                             updatedCount++;
                         }
@@ -841,11 +864,12 @@ class FirebaseSyncManager {
     async saveUser(user) {
         if (!user || !this._checkQuota()) return;
         try {
-            const userRef = doc(db, 'users', user.id);
+            const canonicalId = (user.id && !user.id.startsWith('usr_') && !isNaN(Number(user.id)) && user.id !== 'default_user') ? 'usr_' + user.id : user.id;
+            const userRef = doc(db, 'users', canonicalId);
             await setDoc(userRef, {
-                id: user.id,
+                id: canonicalId,
                 username: user.username,
-                phone: user.phone || '',
+                phone: user.phone || (canonicalId.startsWith('usr_') ? canonicalId.replace('usr_', '') : ''),
                 passwordHash: user.passwordHash || '',
                 securityPin: user.securityPin || '',
                 balance: Number(user.balance !== undefined ? user.balance : 0),
@@ -860,6 +884,7 @@ class FirebaseSyncManager {
                 totalReferralCommission: Number(user.totalReferralCommission || 0),
                 betCommissionEarned: Number(user.betCommissionEarned || 0),
                 awardedMilestones: Array.isArray(user.awardedMilestones) ? user.awardedMilestones : [],
+                bonusBalance: Number(user.bonusBalance || 0),
                 createdAt: user.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             }, { merge: true });
@@ -911,37 +936,46 @@ class FirebaseSyncManager {
         return this.saveUser(user);
     }
 
-    async updateUserBalance(userId, newBalance, reason = '') {
-        if (!this._checkQuota()) return;
+    async updateUserBalance(userId, newBalance, reason = '', bonusBalance = undefined) {
+        if (!this._checkQuota() || !userId) return;
         try {
-            const userRef = doc(db, 'users', userId);
-            await setDoc(userRef, {
-                id: userId,
+            const canonicalId = (typeof userId === 'string' && !userId.startsWith('usr_') && !isNaN(Number(userId)) && userId !== 'default_user') ? 'usr_' + userId : userId;
+            const userRef = doc(db, 'users', canonicalId);
+            const updatePayload = {
+                id: canonicalId,
                 balance: Number(newBalance),
                 lastUpdatedReason: reason,
                 updatedAt: new Date().toISOString()
-            }, { merge: true });
+            };
+            if (bonusBalance !== undefined) {
+                updatePayload.bonusBalance = Number(bonusBalance);
+            }
+            await setDoc(userRef, updatePayload, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
         }
     }
 
     async incrementUserBalance(userId, amount, reason = '') {
-        if (!this._checkQuota()) return;
+        if (!this._checkQuota() || !userId) return;
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount === 0) return;
         try {
-            const userRef = doc(db, 'users', userId);
+            const canonicalId = (typeof userId === 'string' && !userId.startsWith('usr_') && !isNaN(Number(userId)) && userId !== 'default_user') ? 'usr_' + userId : userId;
+            const userRef = doc(db, 'users', canonicalId);
             await updateDoc(userRef, {
-                balance: increment(Number(amount)),
+                balance: increment(numAmount),
                 lastUpdatedReason: reason,
                 updatedAt: new Date().toISOString()
             });
         } catch (e) {
             console.warn('[Firebase] incrementUserBalance error, attempting setDoc fallback:', e.message);
             try {
-                const userRef = doc(db, 'users', userId);
+                const canonicalId = (typeof userId === 'string' && !userId.startsWith('usr_') && !isNaN(Number(userId)) && userId !== 'default_user') ? 'usr_' + userId : userId;
+                const userRef = doc(db, 'users', canonicalId);
                 await setDoc(userRef, {
-                    id: userId,
-                    balance: increment(Number(amount)),
+                    id: canonicalId,
+                    balance: increment(numAmount),
                     lastUpdatedReason: reason,
                     updatedAt: new Date().toISOString()
                 }, { merge: true });

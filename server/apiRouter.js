@@ -1328,6 +1328,10 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
 
         user.balance = balanceAfter;
         serverEngine.users.set(user.id, user);
+        if (user.phone) {
+            serverEngine.users.set(user.phone, user);
+            serverEngine.users.set('usr_' + user.phone, user);
+        }
 
         const delta = Number((balanceAfter - balanceBefore).toFixed(2));
         const ledgerEntry = {
@@ -1567,6 +1571,10 @@ apiRouter.post('/developer/user/adjust-balance', async (req, res) => {
         const balanceBefore = Number(user.balance || 0);
         user.balance = Number(numAmount.toFixed(2));
         serverEngine.users.set(user.id, user);
+        if (user.phone) {
+            serverEngine.users.set(user.phone, user);
+            serverEngine.users.set('usr_' + user.phone, user);
+        }
         serverEngine._saveUsersToDisk();
 
         const auditDetail = `Developer adjusted balance of user ${user.phone || user.id} from ₹${balanceBefore} to ₹${user.balance}`;
