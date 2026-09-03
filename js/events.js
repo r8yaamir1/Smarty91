@@ -324,7 +324,7 @@ export function closeBettingPopup() {
                 overlay.style.display = 'none';
                 overlay.classList.remove('van-overlay--closing');
             }
-        }, 220); // 220ms matches the premium CSS animation curve
+        }, 500); // 500ms matches the smooth CSS animation curve
     } else {
         if (overlay) overlay.style.display = 'none';
         if (dialogDiv) dialogDiv.style.display = 'none';
@@ -455,8 +455,10 @@ export function handleBettingOverlay_clicks() {
     });
 
     // Submit Bet Button
+    let isSubmittingBet = false;
     const totalAmountDiv = document.querySelector(".Betting__Popup-foot-s");
     totalAmountDiv?.addEventListener("click", async function () {
+        if (isSubmittingBet) return;
         if (isBettingLocked()) {
             showToast('Betting is locked for the draw', 'error');
             return;
@@ -468,65 +470,79 @@ export function handleBettingOverlay_clicks() {
             return;
         }
 
-        const bal = currentBetContext.baseBalance || 1;
-        let qty = currentBetContext.multiplier || 1;
-        
-        // Ensure manual input quantity is accurately read even if blur hasn't fired
-        if (inputField && inputField.value.trim() !== '') {
-            const parsed = parseInt(inputField.value.trim().replace(/\D/g, ''), 10);
-            if (!isNaN(parsed) && parsed >= 1) {
-                qty = Math.min(parsed, 100000);
-            }
+        isSubmittingBet = true;
+        if (totalAmountDiv) {
+            totalAmountDiv.style.pointerEvents = 'none';
+            totalAmountDiv.style.opacity = '0.6';
         }
-        currentBetContext.multiplier = qty;
 
-        const total = bal * qty;
-        const gameType = getCurrentGameType();
-        const periodId = getCurrentIssueNumber();
+        try {
+            const bal = currentBetContext.baseBalance || 1;
+            let qty = currentBetContext.multiplier || 1;
+            
+            // Ensure manual input quantity is accurately read even if blur hasn't fired
+            if (inputField && inputField.value.trim() !== '') {
+                const parsed = parseInt(inputField.value.trim().replace(/\D/g, ''), 10);
+                if (!isNaN(parsed) && parsed >= 1) {
+                    qty = Math.min(parsed, 100000);
+                }
+            }
+            currentBetContext.multiplier = qty;
 
-        const result = await placeBet({
-            periodId,
-            gameType,
-            type: currentBetContext.type,
-            selection: currentBetContext.selection,
-            selectionLabel: currentBetContext.selectionLabel,
-            betAmount: total,
-            quantity: qty,
-            balanceUnit: bal
-        });
+            const total = bal * qty;
+            const gameType = getCurrentGameType();
+            const periodId = getCurrentIssueNumber();
 
-        if (!result.success) {
-            const errorMsg = result.message || 'Failed to place bet. Please try again.';
-            const InsufficientBalance = document.querySelector(".van-toast--fail");
-            if (InsufficientBalance) {
-                const toastText = InsufficientBalance.querySelector('.van-toast__text');
-                if (toastText) toastText.textContent = errorMsg;
-                InsufficientBalance.style.display = "";
-                InsufficientBalance.style.opacity = "1";
+            const result = await placeBet({
+                periodId,
+                gameType,
+                type: currentBetContext.type,
+                selection: currentBetContext.selection,
+                selectionLabel: currentBetContext.selectionLabel,
+                betAmount: total,
+                quantity: qty,
+                balanceUnit: bal
+            });
+
+            if (!result.success) {
+                const errorMsg = result.message || 'Failed to place bet. Please try again.';
+                const InsufficientBalance = document.querySelector(".van-toast--fail");
+                if (InsufficientBalance) {
+                    const toastText = InsufficientBalance.querySelector('.van-toast__text');
+                    if (toastText) toastText.textContent = errorMsg;
+                    InsufficientBalance.style.display = "";
+                    InsufficientBalance.style.opacity = "1";
+                    setTimeout(() => {
+                        InsufficientBalance.style.opacity = "0";
+                        InsufficientBalance.style.display = "none";
+                    }, 2500);
+                } else {
+                    showToast(errorMsg, 'error');
+                }
+                return;
+            }
+
+            // Success toast & audio
+            playBetPlacedSound();
+            const betTextToast = document.querySelector(".van-toast--text");
+            if (betTextToast) {
+                betTextToast.style.display = "";
                 setTimeout(() => {
-                    InsufficientBalance.style.opacity = "0";
-                    InsufficientBalance.style.display = "none";
-                }, 2500);
+                    betTextToast.style.display = "none";
+                }, 2000);
             } else {
-                showToast(errorMsg, 'error');
+                showToast('Bet placed successfully!', 'success');
             }
-            return;
-        }
 
-        // Success toast & audio
-        playBetPlacedSound();
-        const betTextToast = document.querySelector(".van-toast--text");
-        if (betTextToast) {
-            betTextToast.style.display = "";
-            setTimeout(() => {
-                betTextToast.style.display = "none";
-            }, 2000);
-        } else {
-            showToast('Bet placed successfully!', 'success');
+            renderMyHistory();
+            closeBettingPopup();
+        } finally {
+            isSubmittingBet = false;
+            if (totalAmountDiv) {
+                totalAmountDiv.style.pointerEvents = '';
+                totalAmountDiv.style.opacity = '';
+            }
         }
-
-        renderMyHistory();
-        closeBettingPopup();
     });
 }
 

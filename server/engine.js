@@ -139,25 +139,16 @@ class Smarty91ServerEngine {
         this.users = new Map();
         this.userTokens = new Map(); // token -> userId
         this.referralCodes = new Map(); // inviteCode -> userId
+        this.bets = new Map();
+        this.settledBetsHistory = new Map();
+        this.ledger = [];
+        this.transactions = [];
+        this.auditLogs = [];
         
         // Ensure disk directory exists and load persistent users and history immediately
         this._ensureDataDir();
         this._loadUsersFromDisk();
         this._loadHistoryFromDisk();
-
-        // Transaction Ledger: Array of { id, userId, type, amount, balanceBefore, balanceAfter, referenceId, timestamp, description }
-        this.ledger = [];
-
-        // Realtime User Deposit & Withdrawal Requests: Array of { id, userId, type, amount, details, status: 'PENDING'|'APPROVED'|'REJECTED', createdAt, processedAt, adminRemarks }
-        this.transactions = [];
-
-        // All Bet Orders: Map<id, BetOrder>
-        this.bets = new Map();
-        // Historical and settled bets cache: Map<id, BetOrder>
-        this.settledBetsHistory = new Map();
-
-        // Admin Audit Logs: Array of { id, action, details, timestamp, adminIp }
-        this.auditLogs = [];
 
         // Seed default guest user with 0 balance
         this._ensureDefaultUser('default_user', 0.00);
@@ -1270,18 +1261,26 @@ class Smarty91ServerEngine {
         if (!state) return;
 
         try {
-            // 1. Fetch actual pending bets directly from Firestore to ensure 100% accuracy across scale boundaries
-            let pendingBets = [];
+            // 1. Fetch actual pending bets: Combine in-memory bets with any from Firestore to ensure zero missed bets
+            const memoryPendingBets = Array.from(this.bets.values()).filter(
+                b => b.mode === mode && String(b.periodId) === String(periodId) && (b.status === 'PENDING' || b.status === 'pending')
+            );
+            const pendingBetsMap = new Map();
+            memoryPendingBets.forEach(b => pendingBetsMap.set(b.id, b));
             try {
-                pendingBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
-                pendingBets.forEach(bet => {
-                    this.bets.set(bet.id, bet);
-                });
+                const fsBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+                if (Array.isArray(fsBets)) {
+                    fsBets.forEach(fb => {
+                        if (!pendingBetsMap.has(fb.id)) {
+                            pendingBetsMap.set(fb.id, fb);
+                            this.bets.set(fb.id, fb);
+                        }
+                    });
+                }
             } catch (err) {
-                pendingBets = Array.from(this.bets.values()).filter(
-                    b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
-                );
+                console.warn('[Engine] fetchPendingBetsForPeriod fallback note:', err.message);
             }
+            const pendingBets = Array.from(pendingBetsMap.values());
 
             // 2. Determine Winning Number & Evaluate Smart House Risk / Admin Force Override
             const outcomeResult = this.selectSmartRiskOutcome(mode, periodId, pendingBets);
@@ -1439,9 +1438,14 @@ class Smarty91ServerEngine {
             roundRecord = preComputed.roundRecord;
             
             for (const item of preComputed.evaluatedBets) {
-                const { bet, originalBetId, settlement, user, balanceAfter, ledgerEntry } = item;
+                const { bet, originalBetId, settlement, user, ledgerEntry } = item;
                 if (settlement.isWin && settlement.payoutAmount > 0 && user) {
-                    user.balance = balanceAfter;
+                    const balBefore = user.balance;
+                    user.balance = Number((user.balance + settlement.payoutAmount).toFixed(2));
+                    if (ledgerEntry) {
+                        ledgerEntry.balanceBefore = balBefore;
+                        ledgerEntry.balanceAfter = user.balance;
+                    }
                 }
                 if (ledgerEntry) {
                     this.ledger.unshift(ledgerEntry);
@@ -1470,17 +1474,25 @@ class Smarty91ServerEngine {
                 isOverridden
             };
 
-            let pendingBetsForRound;
+            const memoryPendingBets = Array.from(this.bets.values()).filter(
+                b => b.mode === mode && String(b.periodId) === String(periodId) && (b.status === 'PENDING' || b.status === 'pending')
+            );
+            const pendingBetsMap = new Map();
+            memoryPendingBets.forEach(b => pendingBetsMap.set(b.id, b));
             try {
-                pendingBetsForRound = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
-                pendingBetsForRound.forEach(b => {
-                    this.bets.set(b.id, b);
-                });
+                const fsBets = await firebaseSync.fetchPendingBetsForPeriod(mode, periodId);
+                if (Array.isArray(fsBets)) {
+                    fsBets.forEach(fb => {
+                        if (!pendingBetsMap.has(fb.id)) {
+                            pendingBetsMap.set(fb.id, fb);
+                            this.bets.set(fb.id, fb);
+                        }
+                    });
+                }
             } catch (err) {
-                pendingBetsForRound = Array.from(this.bets.values()).filter(
-                    b => b.mode === mode && b.periodId === periodId && (b.status === 'PENDING' || b.status === 'pending')
-                );
+                console.warn('[Engine] fallback fetchPendingBetsForPeriod note:', err.message);
             }
+            const pendingBetsForRound = Array.from(pendingBetsMap.values());
 
             for (const bet of pendingBetsForRound) {
                 const settlement = this._evaluateBet(bet, winningNumber);

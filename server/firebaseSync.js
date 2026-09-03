@@ -382,13 +382,21 @@ class FirebaseSyncManager {
                     if (change.type === 'added' || change.type === 'modified') {
                         const u = change.doc.data();
                         if (u && u.id && u.id !== 'default_user') {
+                            const existing = this.engine.users.get(u.id);
+                            // Live engine memory balance is authoritative for in-session gameplay
+                            // Ensure stale or lagged Firestore snapshots never silently downgrade live user balance
+                            let resolvedBalance = Number(u.balance !== undefined ? u.balance : 0);
+                            if (existing && existing.balance !== undefined) {
+                                resolvedBalance = Math.max(Number(existing.balance || 0), resolvedBalance);
+                            }
+
                             this.engine.users.set(u.id, {
                                 id: u.id,
                                 username: u.username || `usr_${u.phone || 'VIP'}`,
                                 phone: u.phone || '',
-                                passwordHash: u.passwordHash || '',
+                                passwordHash: u.passwordHash || (existing ? existing.passwordHash : ''),
                                 securityPin: u.securityPin || (u.phone ? u.phone.slice(-4) : '1234'),
-                                balance: Number(u.balance !== undefined ? u.balance : 0),
+                                balance: resolvedBalance,
                                 requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
                                 inviteCode: u.inviteCode || '',
                                 referredBy: u.referredBy || null,
@@ -711,7 +719,9 @@ class FirebaseSyncManager {
         if (!this._checkQuota()) return;
         try {
             const betRef = doc(db, 'bets', betOrder.id);
-            await updateDoc(betRef, {
+            await setDoc(betRef, {
+                id: betOrder.id,
+                ...betOrder,
                 status: betOrder.status,
                 payoutAmount: betOrder.payoutAmount,
                 resultNumber: betOrder.resultNumber,
@@ -719,7 +729,7 @@ class FirebaseSyncManager {
                 resultSize: betOrder.resultSize,
                 settledAt: betOrder.settledAt,
                 updatedAt: new Date().toISOString()
-            });
+            }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
         }
@@ -775,49 +785,60 @@ class FirebaseSyncManager {
 
     async settleWinningBetTransaction(userId, payoutAmount, betOrder, ledgerEntry) {
         if (!this._checkQuota()) return;
-        return await runTransaction(db, async (transaction) => {
-            const userRef = doc(db, 'users', userId);
-            const userSnap = await transaction.get(userRef);
-            
-            let currentBalance = 0;
-            if (userSnap.exists()) {
-                currentBalance = Number(userSnap.data().balance || 0);
-            } else {
-                // If the user somehow doesn't exist, we must recreate their profile securely
-                // However, they placed a bet, so they must exist. 
-                throw new Error("User account not found for settlement");
-            }
+        try {
+            return await runTransaction(db, async (transaction) => {
+                const userRef = doc(db, 'users', userId);
+                const userSnap = await transaction.get(userRef);
+                
+                let currentBalance = 0;
+                if (userSnap.exists()) {
+                    currentBalance = Number(userSnap.data().balance || 0);
+                } else {
+                    const engineUser = this.engine.users.get(userId);
+                    currentBalance = engineUser ? Number(engineUser.balance || 0) : 0;
+                }
 
-            const newBalance = Number((currentBalance + payoutAmount).toFixed(2));
-            
-            transaction.update(userRef, {
-                balance: newBalance,
-                lastUpdatedReason: 'Round win payout',
-                updatedAt: new Date().toISOString()
-            });
-
-            const betRef = doc(db, 'bets', betOrder.id);
-            transaction.update(betRef, {
-                status: betOrder.status,
-                payoutAmount: betOrder.payoutAmount,
-                resultNumber: betOrder.resultNumber,
-                resultColor: betOrder.resultColor,
-                resultSize: betOrder.resultSize,
-                settledAt: betOrder.settledAt,
-                updatedAt: new Date().toISOString()
-            });
-
-            if (ledgerEntry) {
-                const ledgerRef = doc(db, 'transactions', ledgerEntry.id);
-                transaction.set(ledgerRef, {
-                    ...ledgerEntry,
-                    balanceBefore: currentBalance,
-                    balanceAfter: newBalance,
-                    timestamp: Date.now(),
+                const newBalance = Number((currentBalance + payoutAmount).toFixed(2));
+                
+                transaction.set(userRef, {
+                    id: userId,
+                    balance: newBalance,
+                    lastBalanceUpdate: new Date().toISOString(),
+                    lastUpdatedReason: 'Round win payout',
                     updatedAt: new Date().toISOString()
-                });
-            }
-        });
+                }, { merge: true });
+
+                const betRef = doc(db, 'bets', betOrder.id);
+                transaction.set(betRef, {
+                    id: betOrder.id,
+                    ...betOrder,
+                    status: betOrder.status,
+                    payoutAmount: betOrder.payoutAmount,
+                    resultNumber: betOrder.resultNumber,
+                    resultColor: betOrder.resultColor,
+                    resultSize: betOrder.resultSize,
+                    settledAt: betOrder.settledAt,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+
+                if (ledgerEntry) {
+                    const ledgerRef = doc(db, 'transactions', ledgerEntry.id);
+                    transaction.set(ledgerRef, {
+                        ...ledgerEntry,
+                        balanceBefore: currentBalance,
+                        balanceAfter: newBalance,
+                        timestamp: Date.now(),
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                }
+            });
+        } catch (err) {
+            console.warn(`[Firebase] Settle win fallback for user ${userId}:`, err.message);
+            const engineUser = this.engine.users.get(userId);
+            const fallbackBal = engineUser ? engineUser.balance : 0;
+            await this.updateUserBalance(userId, fallbackBal, 'Round win payout fallback');
+            await this.updateBetSettlement(betOrder);
+        }
     }
 
     async saveUser(user) {

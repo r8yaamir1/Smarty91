@@ -165,6 +165,11 @@ export async function openGameWithLoader(targetView = 'game') {
     const overlay = document.getElementById('game-sync-overlay');
     const meterBar = document.getElementById('game-sync-meter-bar');
     const statusText = document.getElementById('game-sync-status-text');
+    const syncTitle = overlay ? overlay.querySelector('.game-sync-title') : null;
+    const syncSub = overlay ? overlay.querySelector('.game-sync-subtitle') : null;
+
+    if (syncTitle) syncTitle.textContent = 'COLOUR PREDICTION';
+    if (syncSub) syncSub.textContent = 'Smarty91 VIP Live Arena';
 
     // Immediate switch without waiting
     switchView(targetView);
@@ -176,22 +181,81 @@ export async function openGameWithLoader(targetView = 'game') {
 
     if (!overlay) return;
 
-    overlay.style.display = 'flex';
-    if (meterBar) meterBar.style.width = '35%';
+    if (meterBar) {
+        meterBar.style.transition = 'width 0.25s cubic-bezier(0.25, 1, 0.5, 1)';
+        meterBar.style.width = '35%';
+    }
     if (statusText) statusText.textContent = 'Connecting to VIP Arena...';
-    overlay.classList.add('active');
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => {
+        overlay.classList.add('active');
+    });
 
-    // Quick subtle transition
     setTimeout(() => {
         if (meterBar) meterBar.style.width = '100%';
         if (statusText) statusText.textContent = 'Entering Live Game...';
-    }, 120);
+    }, 180);
 
     setTimeout(() => {
         overlay.classList.remove('active');
-        overlay.style.display = 'none';
-        if (meterBar) meterBar.style.width = '0%';
-    }, 280);
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            if (meterBar) {
+                meterBar.style.transition = '';
+                meterBar.style.width = '0%';
+            }
+        }, 250);
+    }, 450);
+}
+
+// VIP Return to Home Dashboard with Smooth Fullscreen Sync Loader
+export function switchHomeWithLoader() {
+    const overlay = document.getElementById('game-sync-overlay');
+    const meterBar = document.getElementById('game-sync-meter-bar');
+    const statusText = document.getElementById('game-sync-status-text');
+    const syncTitle = overlay ? overlay.querySelector('.game-sync-title') : null;
+    const syncSub = overlay ? overlay.querySelector('.game-sync-subtitle') : null;
+
+    if (overlay) {
+        if (syncTitle) syncTitle.textContent = 'SMARTY91 HOME';
+        if (syncSub) syncSub.textContent = 'VIP Dashboard Sync';
+        if (statusText) statusText.textContent = 'Loading Home Dashboard...';
+
+        if (meterBar) {
+            meterBar.style.transition = 'width 0.35s cubic-bezier(0.25, 1, 0.5, 1)';
+            meterBar.style.width = '25%';
+        }
+
+        // Display full screen loader overlay
+        overlay.style.display = 'flex';
+        requestAnimationFrame(() => {
+            overlay.classList.add('active');
+            if (meterBar) meterBar.style.width = '75%';
+        });
+
+        setTimeout(() => {
+            if (meterBar) meterBar.style.width = '100%';
+            // Switch underlying view to Home
+            switchView('home');
+        }, 220);
+
+        setTimeout(() => {
+            // Smoothly fade out full screen loader
+            overlay.classList.remove('active');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                if (meterBar) {
+                    meterBar.style.transition = '';
+                    meterBar.style.width = '0%';
+                }
+                // Reset loader text back for game opening
+                if (syncTitle) syncTitle.textContent = 'COLOUR PREDICTION';
+                if (syncSub) syncSub.textContent = 'Smarty91 VIP Live Arena';
+            }, 300);
+        }, 550);
+    } else {
+        switchView('home');
+    }
 }
 
 // Fetch Daily Sign-in status
@@ -490,6 +554,7 @@ export function initHomeNavigation() {
 
     // Attach global hooks
     window.switchAppView = switchView;
+    window.switchHomeWithLoader = switchHomeWithLoader;
     window.openGameWithLoader = openGameWithLoader;
     window.openDailyCheckInModal = openDailyCheckInModal;
     window.closeDailyCheckInModal = closeDailyCheckInModal;

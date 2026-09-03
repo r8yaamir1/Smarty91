@@ -9,8 +9,19 @@ let activeUserId = null;
 
 // Dynamic listener setup that can be re-run whenever login state changes
 export function setupBalanceListener() {
-    const currentUserId = localStorage.getItem('smarty91_user_id') || 'default_user';
+    const currentUserId = localStorage.getItem('smarty91_user_id');
+    const token = localStorage.getItem('smarty91_auth_token');
     
+    // Only subscribe if real user is authenticated; never subscribe default_user to prevent 0 balance resets
+    if (!currentUserId || !token) {
+        if (activeBalanceListener) {
+            try { activeBalanceListener(); } catch (e) {}
+            activeBalanceListener = null;
+        }
+        activeUserId = null;
+        return;
+    }
+
     // If listener is already active for this exact user, don't duplicate unless forced
     if (activeBalanceListener && activeUserId === currentUserId) {
         return;
@@ -28,9 +39,16 @@ export function setupBalanceListener() {
     try {
         activeBalanceListener = subscribeToUserBalance(currentUserId, (userData) => {
             if (userData && (typeof userData.balance === 'number' || !isNaN(Number(userData.balance)))) {
-                currentBalance = Number(userData.balance) || 0.00;
-                localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
-                renderBalance();
+                const fsBal = Number(userData.balance) || 0.00;
+                // Never let a lagged or stale Firestore snapshot silently reduce live server balance!
+                if (currentBalance <= 0 || fsBal >= currentBalance) {
+                    currentBalance = fsBal;
+                    localStorage.setItem('smarty91_cached_balance', currentBalance.toString());
+                    renderBalance();
+                } else {
+                    // Silently verify with authoritative server before accepting a lower balance
+                    syncServerBalance(false).catch(() => {});
+                }
             }
         });
     } catch (e) {
