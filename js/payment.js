@@ -868,16 +868,55 @@ window.showCongratsModal = function(amountInr, amountUsdt) {
     if (usdtEl) usdtEl.innerText = `$${Number(amountUsdt).toFixed(2)} USDT`;
     
     const modal = document.getElementById('congrats-modal');
-    if (modal) modal.style.display = 'flex';
+    if (!modal) return;
+
+    // Reset styles and display flex
+    modal.style.display = 'flex';
+
+    // Play triumphant celebration sound if available
+    try {
+        if (typeof window.playCongratulationSound === 'function') {
+            window.playCongratulationSound();
+        }
+    } catch (e) {}
+
+    // Animate smoothly
+    requestAnimationFrame(() => {
+        modal.classList.add('active');
+    });
+
+    // Close on backdrop overlay click
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            window.closeCongratsModal(false);
+        }
+    };
 };
 
-window.closeCongratsModal = function() {
+window.closeCongratsModal = function(goToHistory = true) {
     const modal = document.getElementById('congrats-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 260);
+    }
     
     // Switch to history tab to track transaction
-    window.switchCashierTab('history');
+    if (goToHistory && typeof window.switchCashierTab === 'function') {
+        window.switchCashierTab('history');
+    }
 };
+
+// Global Escape key handler to close modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('congrats-modal');
+        if (modal && modal.style.display !== 'none') {
+            window.closeCongratsModal(false);
+        }
+    }
+});
 
 // Withdraw All helper
 window.withdrawAllBalance = function() {
