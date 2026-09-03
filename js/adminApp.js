@@ -1823,7 +1823,18 @@ async function refreshUsersData(container) {
     try {
         const res = await adminService.getUsers();
         if (res && res.users) {
-            cachedAdminUsers = res.users;
+            const seenIds = new Set();
+            const seenPhones = new Set();
+            const deduped = [];
+            for (const u of res.users) {
+                if (!u || !u.id) continue;
+                if (seenIds.has(u.id)) continue;
+                if (u.phone && seenPhones.has(u.phone)) continue;
+                seenIds.add(u.id);
+                if (u.phone) seenPhones.add(u.phone);
+                deduped.push(u);
+            }
+            cachedAdminUsers = deduped;
             renderUsersTableContent(container);
         }
     } catch (e) {

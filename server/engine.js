@@ -195,6 +195,13 @@ class Smarty91ServerEngine {
 
     _loadUsersFromDisk() {
         try {
+            // Clean up any legacy or duplicate keys where key !== val.id
+            for (const [key, val] of this.users.entries()) {
+                if (!val || !val.id || key !== val.id) {
+                    this.users.delete(key);
+                }
+            }
+
             if (fs.existsSync(USERS_FILE)) {
                 const data = fs.readFileSync(USERS_FILE, 'utf8');
                 const usersArr = JSON.parse(data);
@@ -212,7 +219,7 @@ class Smarty91ServerEngine {
                                 });
                             }
                             if (u.inviteCode) {
-                                this.referralCodes.set(u.inviteCode, u.id);
+                                this.referralCodes.set(u.inviteCode.toUpperCase(), u.id);
                             }
                         }
                     });
@@ -240,7 +247,14 @@ class Smarty91ServerEngine {
     _saveUsersToDisk() {
         try {
             this._ensureDataDir();
-            const usersArr = Array.from(this.users.values());
+            // Strict deduplication by user.id so users_store.json NEVER has duplicate user records
+            const uniqueMap = new Map();
+            for (const u of this.users.values()) {
+                if (u && u.id) {
+                    uniqueMap.set(u.id, u);
+                }
+            }
+            const usersArr = Array.from(uniqueMap.values());
             fs.writeFileSync(USERS_FILE, JSON.stringify(usersArr, null, 2), 'utf8');
         } catch (e) {
             console.warn('[Engine] saveUsersToDisk note:', e.message);

@@ -1277,17 +1277,33 @@ apiRouter.post('/admin/payout-rules', checkAdminAuth, (req, res) => {
 // GET /api/admin/users -> List all users
 apiRouter.get('/admin/users', checkAdminAuth, (req, res) => {
     serverEngine._loadUsersFromDisk();
-    const usersList = Array.from(serverEngine.users.values()).map(u => ({
-        id: u.id,
-        username: u.username,
-        phone: u.phone,
-        balance: Number(u.balance !== undefined ? u.balance : 0),
-        inviteCode: u.inviteCode,
-        referredBy: u.referredBy,
-        hasDeposited: !!u.hasDeposited,
-        isBlocked: !!u.isBlocked,
-        createdAt: u.createdAt
-    }));
+    
+    // Strict deduplication by canonical user id and phone
+    const seenIds = new Set();
+    const seenPhones = new Set();
+    const usersList = [];
+
+    for (const u of serverEngine.users.values()) {
+        if (!u || !u.id) continue;
+        if (seenIds.has(u.id)) continue;
+        if (u.phone && seenPhones.has(u.phone)) continue;
+
+        seenIds.add(u.id);
+        if (u.phone) seenPhones.add(u.phone);
+
+        usersList.push({
+            id: u.id,
+            username: u.username,
+            phone: u.phone,
+            balance: Number(u.balance !== undefined ? u.balance : 0),
+            inviteCode: u.inviteCode,
+            referredBy: u.referredBy,
+            hasDeposited: !!u.hasDeposited,
+            isBlocked: !!u.isBlocked,
+            createdAt: u.createdAt
+        });
+    }
+
     res.json({ success: true, users: usersList });
 });
 
@@ -1328,10 +1344,6 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
 
         user.balance = balanceAfter;
         serverEngine.users.set(user.id, user);
-        if (user.phone) {
-            serverEngine.users.set(user.phone, user);
-            serverEngine.users.set('usr_' + user.phone, user);
-        }
 
         const delta = Number((balanceAfter - balanceBefore).toFixed(2));
         const ledgerEntry = {
@@ -1571,10 +1583,6 @@ apiRouter.post('/developer/user/adjust-balance', async (req, res) => {
         const balanceBefore = Number(user.balance || 0);
         user.balance = Number(numAmount.toFixed(2));
         serverEngine.users.set(user.id, user);
-        if (user.phone) {
-            serverEngine.users.set(user.phone, user);
-            serverEngine.users.set('usr_' + user.phone, user);
-        }
         serverEngine._saveUsersToDisk();
 
         const auditDetail = `Developer adjusted balance of user ${user.phone || user.id} from ₹${balanceBefore} to ₹${user.balance}`;

@@ -224,10 +224,6 @@ class FirebaseSyncManager {
                     };
 
                     this.engine.users.set(uid, userData);
-                    if (phoneVal) {
-                        this.engine.users.set(phoneVal, userData);
-                        this.engine.users.set('usr_' + phoneVal, userData);
-                    }
                     if (userData.inviteCode) {
                         this.engine.referralCodes.set(userData.inviteCode.toUpperCase(), uid);
                     }
@@ -426,10 +422,6 @@ class FirebaseSyncManager {
                             };
 
                             this.engine.users.set(uid, updatedUser);
-                            if (updatedUser.phone) {
-                                this.engine.users.set(updatedUser.phone, updatedUser);
-                                this.engine.users.set('usr_' + updatedUser.phone, updatedUser);
-                            }
                             if (updatedUser.inviteCode) {
                                 this.engine.referralCodes.set(updatedUser.inviteCode.toUpperCase(), uid);
                             }
