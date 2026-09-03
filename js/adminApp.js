@@ -2498,14 +2498,14 @@ function handleAuditLogTap() {
 
 // Global subtab switcher for Developer Portal
 window.switchDevPortalTab = function(tabId) {
-    const tabs = ['usdt', 'bep20', 'upi', 'preview', 'users'];
+    const tabs = ['usdt', 'bep20', 'upi', 'users', 'game', 'preview'];
     tabs.forEach(t => {
         const btn = document.getElementById(`dev-tab-${t}`);
         const panel = document.getElementById(`dev-panel-${t}`);
         if (btn) {
             if (t === tabId) {
-                btn.style.background = t === 'usdt' ? '#10b981' : t === 'bep20' ? '#f59e0b' : t === 'upi' ? '#38bdf8' : t === 'users' ? '#8b5cf6' : '#8b5cf6';
-                btn.style.color = '#fff';
+                btn.style.background = t === 'usdt' ? '#10b981' : t === 'bep20' ? '#f59e0b' : t === 'upi' ? '#38bdf8' : t === 'users' ? '#8b5cf6' : t === 'game' ? '#f59e0b' : '#10b981';
+                btn.style.color = t === 'game' ? '#111' : '#fff';
             } else {
                 btn.style.background = 'transparent';
                 btn.style.color = '#94a3b8';
@@ -2518,6 +2518,296 @@ window.switchDevPortalTab = function(tabId) {
 
     if (tabId === 'preview') {
         updateDevPreviewCards();
+    } else if (tabId === 'game') {
+        renderGameMaintenanceUI();
+        loadDevRegisteredUsersForWhitelist();
+    }
+};
+
+// -------------------------------------------------------------
+// PREDICTION GAME MAINTENANCE / UPDATING MODE DEV CONTROLS
+// -------------------------------------------------------------
+let devGameMaintConfig = {
+    enabled: false,
+    whitelistedUsers: [],
+    noticeTitle: 'System Upgrade in Progress',
+    noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you with exciting rewards. Stay tuned!'
+};
+let devRegisteredUsersCache = [];
+let devWhitelistFilterText = '';
+
+async function loadGameMaintenanceDevConfig() {
+    try {
+        const res = await fetch('/api/developer/maintenance/get-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secretKey: 'Smarty071' })
+        });
+        const data = await res.json();
+        if (data.success && data.maintenance) {
+            devGameMaintConfig = {
+                enabled: !!data.maintenance.enabled,
+                whitelistedUsers: Array.isArray(data.maintenance.whitelistedUsers) ? data.maintenance.whitelistedUsers : [],
+                noticeTitle: data.maintenance.noticeTitle || 'System Upgrade in Progress',
+                noticeMessage: data.maintenance.noticeMessage || 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you with exciting rewards. Stay tuned!'
+            };
+            const titleInput = document.getElementById('dev-maint-notice-title');
+            const msgInput = document.getElementById('dev-maint-notice-msg');
+            if (titleInput) titleInput.value = devGameMaintConfig.noticeTitle;
+            if (msgInput) msgInput.value = devGameMaintConfig.noticeMessage;
+            renderGameMaintenanceUI();
+        }
+    } catch (e) {
+        console.warn('Error loading game maintenance dev config:', e);
+    }
+}
+
+async function loadDevRegisteredUsersForWhitelist() {
+    try {
+        const res = await adminService.getUsers();
+        if (res && res.users) {
+            const seen = new Set();
+            devRegisteredUsersCache = res.users.filter(u => {
+                if (!u || !u.id) return false;
+                const key = u.phone || u.id;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            renderWhitelistRegisteredUsersScroll();
+        }
+    } catch (e) {
+        console.warn('Failed to load registered users for whitelist:', e);
+    }
+}
+
+function renderGameMaintenanceUI() {
+    const card = document.getElementById('dev-game-maint-card');
+    const badge = document.getElementById('dev-game-status-badge');
+    const toggleBtn = document.getElementById('dev-game-toggle-btn');
+    const toggleBtnText = document.getElementById('dev-game-toggle-btn-text');
+    const countBadge = document.getElementById('dev-whitelist-count-badge');
+    const chipsContainer = document.getElementById('dev-whitelist-chips');
+
+    const isEnabled = !!devGameMaintConfig.enabled;
+
+    if (badge) {
+        if (isEnabled) {
+            badge.textContent = '🔴 UPDATING MODE ACTIVE (REGULAR PLAYERS BLOCKED)';
+            badge.style.color = '#ef4444';
+            badge.style.background = 'rgba(239, 68, 68, 0.18)';
+            badge.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        } else {
+            badge.textContent = '🟢 GAME LIVE (ALL PLAYERS ALLOWED)';
+            badge.style.color = '#10b981';
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        }
+    }
+
+    if (card) {
+        card.style.border = isEnabled ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(245, 158, 11, 0.25)';
+        card.style.background = isEnabled ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.06)';
+    }
+
+    if (toggleBtn && toggleBtnText) {
+        if (isEnabled) {
+            toggleBtn.style.background = '#10b981';
+            toggleBtn.style.color = '#fff';
+            toggleBtnText.textContent = '🔓 DISABLE UPDATING MODE (RE-OPEN GAME TO ALL)';
+        } else {
+            toggleBtn.style.background = '#f59e0b';
+            toggleBtn.style.color = '#111';
+            toggleBtnText.textContent = '🔒 ENABLE UPDATING MODE (LOCK GAME FOR REGULAR USERS)';
+        }
+    }
+
+    const whitelist = devGameMaintConfig.whitelistedUsers || [];
+    if (countBadge) {
+        countBadge.textContent = `${whitelist.length} Developers Allowed`;
+    }
+
+    if (chipsContainer) {
+        if (whitelist.length === 0) {
+            chipsContainer.innerHTML = `<span style="font-size:10px; color:#64748b; font-style:italic;">No developers whitelisted yet (All users will be blocked when Updating Mode is enabled).</span>`;
+        } else {
+            chipsContainer.innerHTML = whitelist.map(userItem => `
+                <span style="display:inline-flex; align-items:center; gap:5px; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#7dd3fc; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700;">
+                    <span>👑 ${userItem}</span>
+                    <button type="button" onclick="window.removeWhitelistedUser('${userItem}')" style="background:transparent; border:none; color:#f87171; cursor:pointer; font-weight:900; font-size:11px; padding:0 2px;">✕</button>
+                </span>
+            `).join('');
+        }
+    }
+
+    renderWhitelistRegisteredUsersScroll();
+}
+
+function renderWhitelistRegisteredUsersScroll() {
+    const scrollContainer = document.getElementById('dev-whitelist-users-scroll');
+    if (!scrollContainer) return;
+
+    let users = devRegisteredUsersCache;
+    if (devWhitelistFilterText) {
+        const q = devWhitelistFilterText.toLowerCase();
+        users = users.filter(u => 
+            (u.phone && u.phone.includes(q)) ||
+            (u.id && u.id.toLowerCase().includes(q)) ||
+            (u.username && u.username.toLowerCase().includes(q))
+        );
+    }
+
+    if (users.length === 0) {
+        scrollContainer.innerHTML = `<div style="text-align:center; padding:15px; color:#94a3b8; font-size:11px;">No registered users match "${devWhitelistFilterText || ''}".</div>`;
+        return;
+    }
+
+    const whitelist = devGameMaintConfig.whitelistedUsers || [];
+
+    scrollContainer.innerHTML = users.map(user => {
+        const userKey = user.phone || user.id;
+        const isWhitelisted = whitelist.includes(userKey) || (user.id && whitelist.includes(user.id)) || (user.phone && whitelist.includes(user.phone));
+        return `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); background:${isWhitelisted ? 'rgba(56,189,248,0.1)' : 'transparent'};">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" ${isWhitelisted ? 'checked' : ''} onchange="window.toggleUserWhitelist('${userKey}')" style="cursor:pointer; width:15px; height:15px;" />
+                    <div>
+                        <div style="font-size:11px; font-weight:700; color:${isWhitelisted ? '#38bdf8' : '#fff'}; display:flex; align-items:center; gap:4px;">
+                            ${isWhitelisted ? '👑 ' : ''}<span>${user.phone || user.id}</span>
+                            ${user.username ? `<span style="font-size:9.5px; color:#94a3b8;">(${user.username})</span>` : ''}
+                        </div>
+                        <div style="font-size:9.5px; color:#94a3b8;">Balance: ₹${user.balance || 0} • VIP: ${user.vipLevel || 0}</div>
+                    </div>
+                </div>
+                <button type="button" onclick="window.toggleUserWhitelist('${userKey}')" style="background:${isWhitelisted ? 'rgba(239,68,68,0.2)' : 'rgba(56,189,248,0.2)'}; border:1px solid ${isWhitelisted ? 'rgba(239,68,68,0.4)' : 'rgba(56,189,248,0.4)'}; color:${isWhitelisted ? '#f87171' : '#38bdf8'}; font-size:10px; font-weight:800; padding:2px 8px; border-radius:3px; cursor:pointer;">
+                    ${isWhitelisted ? 'Remove' : '+ Allow'}
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+window.toggleGameMaintenanceMode = function() {
+    devGameMaintConfig.enabled = !devGameMaintConfig.enabled;
+    renderGameMaintenanceUI();
+    const isNowOn = devGameMaintConfig.enabled;
+    alert(isNowOn 
+        ? '🔒 Updating Mode is now ENABLED in draft.\n\nClick "SAVE & APPLY GAME MAINTENANCE SETTINGS" button below to push it live to Firestore and block regular users immediately!'
+        : '🔓 Updating Mode is now DISABLED in draft.\n\nClick "SAVE & APPLY GAME MAINTENANCE SETTINGS" button below to restore normal access for all players!');
+};
+
+window.addWhitelistedUserManual = function() {
+    const input = document.getElementById('dev-whitelist-phone-input');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) {
+        alert('Please enter a mobile number or user ID');
+        return;
+    }
+    if (!devGameMaintConfig.whitelistedUsers.includes(val)) {
+        devGameMaintConfig.whitelistedUsers.push(val);
+    }
+    input.value = '';
+    renderGameMaintenanceUI();
+};
+
+window.removeWhitelistedUser = function(val) {
+    devGameMaintConfig.whitelistedUsers = devGameMaintConfig.whitelistedUsers.filter(u => u !== val);
+    renderGameMaintenanceUI();
+};
+
+window.toggleUserWhitelist = function(val) {
+    if (devGameMaintConfig.whitelistedUsers.includes(val)) {
+        devGameMaintConfig.whitelistedUsers = devGameMaintConfig.whitelistedUsers.filter(u => u !== val);
+    } else {
+        devGameMaintConfig.whitelistedUsers.push(val);
+    }
+    renderGameMaintenanceUI();
+};
+
+window.filterWhitelistUserList = function() {
+    const input = document.getElementById('dev-whitelist-search-filter');
+    devWhitelistFilterText = input ? input.value.trim() : '';
+    renderWhitelistRegisteredUsersScroll();
+};
+
+window.openMaintenancePreviewPopup = function() {
+    const title = document.getElementById('dev-maint-notice-title')?.value || devGameMaintConfig.noticeTitle;
+    const msg = document.getElementById('dev-maint-notice-msg')?.value || devGameMaintConfig.noticeMessage;
+
+    const helpModal = document.getElementById('help-explanation-modal');
+    const helpTitle = document.getElementById('help-modal-title');
+    const helpBody = document.getElementById('help-modal-body');
+    const helpIcon = document.getElementById('help-modal-icon');
+
+    if (helpModal && helpTitle && helpBody) {
+        if (helpIcon) helpIcon.textContent = '🚀';
+        helpTitle.textContent = title;
+        helpBody.innerHTML = `
+            <div style="text-align:center; padding:10px 0;">
+                <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.35); padding:4px 12px; border-radius:20px; font-size:11px; font-weight:800; color:#fbbf24; margin-bottom:12px;">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#fbbf24; display:inline-block;"></span>
+                    <span>LIVE CLIENT POPUP PREVIEW</span>
+                </div>
+                <div style="background:linear-gradient(90deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.25) 50%, rgba(245,158,11,0.1) 100%); border-top:1px solid rgba(245,158,11,0.3); border-bottom:1px solid rgba(245,158,11,0.3); padding:8px 10px; margin:10px 0 14px 0; border-radius:6px;">
+                    <div style="font-size:13px; font-weight:800; color:#fbbf24;">⏳ 2 Days Scheduled Maintenance</div>
+                    <div style="font-size:11px; color:#fef08a; font-weight:700; margin-top:2px;">🎁 A Big Surprise is Coming for You!</div>
+                </div>
+                <p style="font-size:12px; color:#cbd5e1; line-height:1.55; margin-bottom:14px; text-align:left;">
+                    ${msg}
+                </p>
+                <div style="background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px; text-align:left; font-size:11px; color:#94a3b8; display:flex; flex-direction:column; gap:6px;">
+                    <div style="color:#e2e8f0;">✨ Exclusive Big Surprise bonuses for active VIPs</div>
+                    <div style="color:#e2e8f0;">⚡ Enhanced prediction speed & instant payouts</div>
+                    <div style="color:#e2e8f0;">🛡️ Upgraded security & Provably Fair RNG engine</div>
+                </div>
+            </div>
+        `;
+        helpModal.style.display = 'flex';
+    }
+};
+
+window.saveGameMaintenanceConfig = async function() {
+    const saveBtn = document.getElementById('dev-save-maint-btn');
+    const titleInput = document.getElementById('dev-maint-notice-title');
+    const msgInput = document.getElementById('dev-maint-notice-msg');
+
+    const noticeTitle = titleInput ? titleInput.value.trim() : devGameMaintConfig.noticeTitle;
+    const noticeMessage = msgInput ? msgInput.value.trim() : devGameMaintConfig.noticeMessage;
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span>⏳</span><span>SAVING & SYNCING TO FIRESTORE...</span>';
+    }
+
+    try {
+        const res = await fetch('/api/developer/maintenance/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                secretKey: 'Smarty071',
+                enabled: !!devGameMaintConfig.enabled,
+                whitelistedUsers: devGameMaintConfig.whitelistedUsers || [],
+                noticeTitle,
+                noticeMessage
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            devGameMaintConfig.noticeTitle = noticeTitle;
+            devGameMaintConfig.noticeMessage = noticeMessage;
+            renderGameMaintenanceUI();
+            alert(`✓ SUCCESS! Game Maintenance config synced live to Firestore!\n\nStatus: ${devGameMaintConfig.enabled ? '🔒 UPDATING MODE ACTIVE' : '🟢 GAME LIVE'}\nWhitelisted Developers: ${devGameMaintConfig.whitelistedUsers.length}`);
+        } else {
+            alert(`❌ Error saving maintenance settings: ${data.message}`);
+        }
+    } catch (err) {
+        alert(`❌ Network or server error: ${err.message}`);
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span>💾</span><span>SAVE & APPLY GAME MAINTENANCE SETTINGS</span>';
+        }
     }
 };
 
@@ -2986,6 +3276,9 @@ function initDeveloperPortal() {
             uploadedUpiQr = activeUpiQr.startsWith('data:image') ? activeUpiQr : null;
 
             if (feedbackMsg) feedbackMsg.style.display = 'none';
+
+            loadGameMaintenanceDevConfig();
+            loadDevRegisteredUsersForWhitelist();
 
             window.switchDevPortalTab('usdt');
             mainModal.style.display = 'flex';

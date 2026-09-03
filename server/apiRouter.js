@@ -385,6 +385,27 @@ apiRouter.post('/bets/place', async (req, res) => {
         if (!authUser || !authUser.id) {
             return res.status(401).json({ success: false, message: 'Please log in to place bets.' });
         }
+
+        // Check if Prediction Game is currently under Maintenance / Updating
+        const maint = serverEngine.config.gameMaintenance;
+        if (maint && maint.enabled) {
+            const allowed = Array.isArray(maint.whitelistedUsers) ? maint.whitelistedUsers : [];
+            const isWhitelisted = allowed.some(u => {
+                const term = String(u).trim().toLowerCase();
+                return term && (
+                    String(authUser.id).toLowerCase() === term ||
+                    String(authUser.phone || '').toLowerCase() === term
+                );
+            });
+            if (!isWhitelisted) {
+                return res.status(403).json({
+                    success: false,
+                    isMaintenance: true,
+                    message: maint.noticeMessage || 'Prediction game is currently under 2-day scheduled upgrade maintenance. Big surprise coming soon!'
+                });
+            }
+        }
+
         const { mode, periodId, type, selection, unitAmount, multiplier, quantity } = req.body;
         const normMode = normalizeMode(mode);
         const result = await serverEngine.placeBet({
@@ -1395,8 +1416,118 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
 });
 
 // -------------------------------------------------------------
-// 5. DEVELOPER SECRET PORTAL APIs
+// 5. DEVELOPER SECRET PORTAL & GAME MAINTENANCE APIs
 // -------------------------------------------------------------
+
+// GET /api/game/maintenance-status -> Check prediction game maintenance state for current user
+apiRouter.get('/game/maintenance-status', async (req, res) => {
+    try {
+        const maint = serverEngine.config.gameMaintenance || {
+            enabled: false,
+            noticeTitle: 'System Upgrade in Progress',
+            noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+            whitelistedUsers: []
+        };
+
+        let isWhitelisted = false;
+        const authUser = await getAuthUserAsync(req);
+        if (authUser && authUser.id) {
+            const allowed = Array.isArray(maint.whitelistedUsers) ? maint.whitelistedUsers : [];
+            isWhitelisted = allowed.some(u => {
+                const term = String(u).trim().toLowerCase();
+                return term && (
+                    String(authUser.id).toLowerCase() === term ||
+                    String(authUser.phone || '').toLowerCase() === term
+                );
+            });
+        }
+
+        const canEnter = !maint.enabled || isWhitelisted;
+
+        res.json({
+            success: true,
+            maintenance: {
+                enabled: !!maint.enabled,
+                noticeTitle: maint.noticeTitle || 'System Upgrade in Progress',
+                noticeMessage: maint.noticeMessage || 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                whitelistedUsers: Array.isArray(maint.whitelistedUsers) ? maint.whitelistedUsers : [],
+                isWhitelisted,
+                canEnter
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/developer/maintenance/get-config -> Fetch maintenance configuration
+apiRouter.post('/developer/maintenance/get-config', (req, res) => {
+    const { pin, secretKey } = req.body;
+    const authKey = pin || secretKey;
+    if (authKey !== 'Smarty071' && authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+    const maint = serverEngine.config.gameMaintenance || {
+        enabled: false,
+        noticeTitle: 'System Upgrade in Progress',
+        noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+        whitelistedUsers: []
+    };
+    res.json({
+        success: true,
+        maintenance: maint
+    });
+});
+
+// POST /api/developer/maintenance/update -> Save maintenance mode toggle & whitelist
+apiRouter.post('/developer/maintenance/update', async (req, res) => {
+    const { pin, secretKey, enabled, whitelistedUsers, noticeTitle, noticeMessage } = req.body;
+    const authKey = pin || secretKey;
+    if (authKey !== 'Smarty071' && authKey !== '7117' && authKey !== 'Aamir@639900' && authKey !== serverEngine.masterPin && authKey !== '919191') {
+        return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+    }
+
+    if (!serverEngine.config.gameMaintenance) {
+        serverEngine.config.gameMaintenance = {
+            enabled: false,
+            noticeTitle: 'System Upgrade in Progress',
+            noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+            whitelistedUsers: []
+        };
+    }
+
+    if (enabled !== undefined) {
+        serverEngine.config.gameMaintenance.enabled = !!enabled;
+    }
+    if (Array.isArray(whitelistedUsers)) {
+        serverEngine.config.gameMaintenance.whitelistedUsers = Array.from(
+            new Set(whitelistedUsers.map(u => String(u).trim()).filter(Boolean))
+        );
+    }
+    if (noticeTitle !== undefined) {
+        serverEngine.config.gameMaintenance.noticeTitle = String(noticeTitle).trim() || 'System Upgrade in Progress';
+    }
+    if (noticeMessage !== undefined) {
+        serverEngine.config.gameMaintenance.noticeMessage = String(noticeMessage).trim() || 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!';
+    }
+
+    try {
+        await firebaseSync.saveSystemConfig(serverEngine.config);
+    } catch (e) {
+        console.warn('[Maintenance] Config sync warning:', e.message);
+    }
+
+    firebaseSync.logAdminAction(
+        'DEVELOPER_GAME_MAINTENANCE_UPDATE',
+        `Enabled: ${serverEngine.config.gameMaintenance.enabled}, Whitelisted: ${serverEngine.config.gameMaintenance.whitelistedUsers.join(', ') || 'None'}`
+    );
+
+    res.json({
+        success: true,
+        message: 'Game maintenance settings updated successfully!',
+        maintenance: serverEngine.config.gameMaintenance
+    });
+});
 
 // POST /api/developer/get-config -> Read USDT & Merchant Config
 apiRouter.post('/developer/get-config', (req, res) => {
@@ -1421,7 +1552,13 @@ apiRouter.post('/developer/get-config', (req, res) => {
         maxDeposit: serverEngine.config.maxDeposit || 100000,
         minWithdrawal: serverEngine.config.minWithdrawal || 200,
         maxWithdrawal: serverEngine.config.maxWithdrawal || 100000,
-        masterPin: serverEngine.masterPin || 'Smarty071'
+        masterPin: serverEngine.masterPin || 'Smarty071',
+        gameMaintenance: serverEngine.config.gameMaintenance || {
+            enabled: false,
+            noticeTitle: 'System Upgrade in Progress',
+            noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+            whitelistedUsers: []
+        }
     });
 });
 

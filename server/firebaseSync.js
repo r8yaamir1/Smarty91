@@ -282,6 +282,14 @@ class FirebaseSyncManager {
                 if (data.usdtRate !== undefined) this.engine.config.usdtRate = data.usdtRate;
                 if (data.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...data.riskEngine };
                 if (data.referralStars) this.engine.config.referralStars = data.referralStars;
+                if (data.gameMaintenance) {
+                    this.engine.config.gameMaintenance = {
+                        enabled: !!data.gameMaintenance.enabled,
+                        noticeTitle: data.gameMaintenance.noticeTitle || 'System Upgrade in Progress',
+                        noticeMessage: data.gameMaintenance.noticeMessage || 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                        whitelistedUsers: Array.isArray(data.gameMaintenance.whitelistedUsers) ? data.gameMaintenance.whitelistedUsers : []
+                    };
+                }
                 this.engine.config.universalSync = false;
                 this.engine.config.syncApiUrl = '';
             } else {
@@ -301,6 +309,12 @@ class FirebaseSyncManager {
                     usdtBep20QrImage: this.engine.config.usdtBep20QrImage || 'https://cdn.imageurlgenerator.com/uploads/cc15bb4b-e40a-403f-a63b-70b59d4e14ba.jpg',
                     usdtBep20Url: this.engine.config.usdtBep20Url || '',
                     usdtRate: this.engine.config.usdtRate || 102,
+                    gameMaintenance: this.engine.config.gameMaintenance || {
+                        enabled: false,
+                        noticeTitle: 'System Upgrade in Progress',
+                        noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                        whitelistedUsers: []
+                    },
                     universalSync: false,
                     syncApiUrl: '',
                     updatedAt: new Date().toISOString()
@@ -323,6 +337,14 @@ class FirebaseSyncManager {
                     if (d.usdtRate !== undefined) this.engine.config.usdtRate = d.usdtRate;
                     if (d.riskEngine) this.engine.config.riskEngine = { ...this.engine.config.riskEngine, ...d.riskEngine };
                     if (d.referralStars) this.engine.config.referralStars = d.referralStars;
+                    if (d.gameMaintenance) {
+                        this.engine.config.gameMaintenance = {
+                            enabled: !!d.gameMaintenance.enabled,
+                            noticeTitle: d.gameMaintenance.noticeTitle || 'System Upgrade in Progress',
+                            noticeMessage: d.gameMaintenance.noticeMessage || 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                            whitelistedUsers: Array.isArray(d.gameMaintenance.whitelistedUsers) ? d.gameMaintenance.whitelistedUsers : []
+                        };
+                    }
                     this.engine.config.universalSync = false;
                     this.engine.config.syncApiUrl = '';
                 }
@@ -1060,6 +1082,12 @@ class FirebaseSyncManager {
                 usdtBep20Url: config.usdtBep20Url || '',
                 usdtRate: config.usdtRate || 102,
                 referralStars: config.referralStars || null,
+                gameMaintenance: config.gameMaintenance || {
+                    enabled: false,
+                    noticeTitle: 'System Upgrade in Progress',
+                    noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                    whitelistedUsers: []
+                },
                 universalSync: false,
                 syncApiUrl: '',
                 updatedAt: new Date().toISOString()

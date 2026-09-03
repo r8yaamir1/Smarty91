@@ -154,8 +154,53 @@ export function switchView(viewName) {
     });
 }
 
+// Check Prediction Game Maintenance / Updating Status
+export async function checkGameMaintenance() {
+    try {
+        const token = localStorage.getItem('smarty91_auth_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/game/maintenance-status', { headers });
+        const data = await res.json();
+        if (data.success && data.maintenance) {
+            return data.maintenance;
+        }
+    } catch (e) {
+        console.warn('Game maintenance status check warning:', e);
+    }
+    return { enabled: false, canEnter: true };
+}
+
+// Show Updating / Maintenance Popup Modal
+export function showGameUpdatingModal(maintInfo) {
+    const modal = document.getElementById('game-updating-modal');
+    if (!modal) return;
+    const titleEl = document.getElementById('game-updating-modal-title');
+    const msgEl = document.getElementById('game-updating-modal-msg');
+    if (titleEl && maintInfo && maintInfo.noticeTitle) {
+        titleEl.textContent = maintInfo.noticeTitle;
+    }
+    if (msgEl && maintInfo && maintInfo.noticeMessage) {
+        msgEl.textContent = maintInfo.noticeMessage;
+    }
+    modal.style.display = 'flex';
+}
+
+// Close Updating / Maintenance Popup Modal
+export function closeGameUpdatingModal() {
+    const modal = document.getElementById('game-updating-modal');
+    if (modal) modal.style.display = 'none';
+}
+
 // VIP Game Opening with Sync Loader
 export async function openGameWithLoader(targetView = 'game') {
+    // 1. Prediction Game Maintenance Check (Updating / 2-Day Upgrade Lock)
+    const maint = await checkGameMaintenance();
+    if (maint && maint.enabled && !maint.canEnter) {
+        showGameUpdatingModal(maint);
+        return; // Block entry: Updating mode is active and user is not whitelisted!
+    }
+
     const isDeposited = await verifyDepositStatus();
     if (!isDeposited) {
         showDepositRequiredModal();
@@ -521,12 +566,19 @@ export function initHomeNavigation() {
     const tabParam = urlParams.get('tab');
 
     if (viewParam === 'game') {
-        verifyDepositStatus().then(hasDep => {
-            if (hasDep) {
-                switchView('game');
-            } else {
+        checkGameMaintenance().then(maint => {
+            if (maint && maint.enabled && !maint.canEnter) {
                 switchView('home');
-                showDepositRequiredModal();
+                showGameUpdatingModal(maint);
+            } else {
+                verifyDepositStatus().then(hasDep => {
+                    if (hasDep) {
+                        switchView('game');
+                    } else {
+                        switchView('home');
+                        showDepositRequiredModal();
+                    }
+                });
             }
         });
     } else {
@@ -538,6 +590,22 @@ export function initHomeNavigation() {
     } else if (tabParam === 'referral') {
         openReferralModal();
     }
+
+    // Check maintenance status on startup to update game card badge if updating
+    checkGameMaintenance().then(maint => {
+        if (maint && maint.enabled && !maint.canEnter) {
+            const liveTag = document.getElementById('cp-live-count-text');
+            const liveDot = document.querySelector('.cp-live-pulse-dot');
+            if (liveTag) {
+                liveTag.textContent = 'UPDATING (2 DAYS)';
+                liveTag.style.color = '#fef08a';
+            }
+            if (liveDot) {
+                liveDot.style.background = '#f59e0b';
+                liveDot.style.boxShadow = '0 0 8px #f59e0b';
+            }
+        }
+    });
 
     // Attach direct click and touch handlers for Colour Prediction game card
     const cpCard = document.getElementById('game-card-colour-prediction');
@@ -556,6 +624,9 @@ export function initHomeNavigation() {
     window.switchAppView = switchView;
     window.switchHomeWithLoader = switchHomeWithLoader;
     window.openGameWithLoader = openGameWithLoader;
+    window.showGameUpdatingModal = showGameUpdatingModal;
+    window.closeGameUpdatingModal = closeGameUpdatingModal;
+    window.checkGameMaintenance = checkGameMaintenance;
     window.openDailyCheckInModal = openDailyCheckInModal;
     window.closeDailyCheckInModal = closeDailyCheckInModal;
     window.openReferralModal = openReferralModal;

@@ -819,6 +819,9 @@
                     <button type="button" id="dev-tab-users" class="dev-subtab" onclick="switchDevPortalTab('users')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
                         👥 Users
                     </button>
+                    <button type="button" id="dev-tab-game" class="dev-subtab" onclick="switchDevPortalTab('game')" style="flex:1; min-width:95px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
+                        🎮 Game Updating
+                    </button>
                     <button type="button" id="dev-tab-preview" class="dev-subtab" onclick="switchDevPortalTab('preview')" style="flex:1; min-width:85px; padding:7px 4px; font-size:10.5px; font-weight:800; border-radius:4px; border:none; cursor:pointer; background:transparent; color:#94a3b8; transition:all 0.2s;">
                         👁️ Preview
                     </button>
@@ -1044,6 +1047,109 @@
                             <span>DELETE ALL ACCOUNTS (WIPE ENTIRE DATABASE)</span>
                         </button>
                     </div>
+                </div>
+
+                <!-- TAB 6: PREDICTION GAME UPDATING & WHITELIST ACCESS CONTROL -->
+                <div id="dev-panel-game" class="dev-subpanel" style="display: none;">
+                    <!-- Master Toggle Card -->
+                    <div id="dev-game-maint-card" style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.25); border-radius: 4px; padding: 14px; margin-bottom: 12px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                            <div style="font-size:12.5px; font-weight:800; color:#fbbf24; display:flex; align-items:center; gap:6px;">
+                                <span>🛠️</span>
+                                <span>Prediction Game Updating & Processing Mode</span>
+                            </div>
+                            <span id="dev-game-status-badge" style="font-size:10px; color:#10b981; background:rgba(16,185,129,0.15); padding:3px 8px; border-radius:4px; font-weight:800; border:1px solid rgba(16,185,129,0.3);">
+                                🟢 GAME LIVE (ALL PLAYERS ALLOWED)
+                            </span>
+                        </div>
+
+                        <p style="font-size:11px; color:#cbd5e1; margin:0 0 12px 0; line-height:1.45;">
+                            Jab ye <strong>ENABLE</strong> hoga, toh regular users Prediction game me enter nahi kar payenge. Unke screen par stylish <em>"2-Day Upgrade Maintenance & Big Surprise"</em> popup open hoga. Sirf niche select kiye gaye <strong>Developers / Whitelisted Users</strong> hi enter kar payenge. Is button ko <strong>DISABLE</strong> karne par sab pehle jaisa normal chalega.
+                        </p>
+
+                        <!-- Big Action Toggle Button -->
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button type="button" id="dev-game-toggle-btn" onclick="toggleGameMaintenanceMode()" style="flex:1; background:#f59e0b; color:#111; border:none; padding:10px 16px; border-radius:4px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 12px rgba(245,158,11,0.25); transition:all 0.2s;">
+                                <span>🔒</span>
+                                <span id="dev-game-toggle-btn-text">ENABLE UPDATING MODE (LOCK GAME)</span>
+                            </button>
+                            <button type="button" id="dev-game-preview-popup-btn" onclick="openMaintenancePreviewPopup()" style="background:rgba(255,255,255,0.08); color:#f8fafc; border:1px solid rgba(255,255,255,0.2); padding:10px 14px; border-radius:4px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s;">
+                                <span>👁️</span>
+                                <span>Preview Popup</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Developer / Whitelist Selection Section -->
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                            <div style="font-size:12px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+                                <span>👑</span>
+                                <span>Developers & Allowed Users (Bypass Whitelist)</span>
+                            </div>
+                            <span id="dev-whitelist-count-badge" style="font-size:10px; color:#38bdf8; background:rgba(56,189,248,0.15); padding:2px 8px; border-radius:4px; font-weight:700;">
+                                0 Allowed
+                            </span>
+                        </div>
+
+                        <p style="font-size:10.5px; color:#94a3b8; margin:0 0 10px 0;">
+                            Yeh users Updating Mode me bhi game open kar sakte hain aur test kar sakte hain. Baaki users ke liye game blocked rahega.
+                        </p>
+
+                        <!-- Quick Add Phone Input -->
+                        <div style="display:flex; gap:6px; margin-bottom:10px;">
+                            <input type="text" id="dev-whitelist-phone-input" class="form-input" placeholder="Enter Mobile Number or User ID (e.g. 9812862133)..." style="flex:1; font-size:11.5px; background:rgba(0,0,0,0.5); padding:7px 10px; border-radius:4px;" />
+                            <button type="button" id="dev-whitelist-add-btn" onclick="addWhitelistedUserManual()" style="background:#0284c7; color:#fff; border:none; padding:0 14px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">
+                                + Add User
+                            </button>
+                        </div>
+
+                        <!-- Active Whitelist Tags -->
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:10px; color:#94a3b8; font-weight:700; margin-bottom:5px; text-transform:uppercase;">Currently Allowed Developers / Users:</div>
+                            <div id="dev-whitelist-chips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:28px; background:rgba(0,0,0,0.25); padding:6px; border-radius:4px; border:1px dashed rgba(255,255,255,0.1);">
+                                <span style="font-size:10px; color:#64748b; font-style:italic;">No users in whitelist (All users blocked when enabled).</span>
+                            </div>
+                        </div>
+
+                        <!-- Select From Registered Users List -->
+                        <div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                                <span style="font-size:10.5px; color:#cbd5e1; font-weight:700;">SELECT USERS FROM REGISTERED ACCOUNTS:</span>
+                                <input type="text" id="dev-whitelist-search-filter" oninput="filterWhitelistUserList()" placeholder="Filter users..." style="font-size:10.5px; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 8px; border-radius:3px; width:140px;" />
+                            </div>
+
+                            <div id="dev-whitelist-users-scroll" style="max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.06); border-radius:4px; padding:4px;">
+                                <div style="text-align:center; padding:15px; color:#94a3b8; font-size:11px;">
+                                    Loading registered users list...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Popup Message Settings -->
+                    <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                        <div style="font-size:11.5px; font-weight:800; color:#cbd5e1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <span>💬</span>
+                            <span>Popup Announcement Content (English)</span>
+                        </div>
+
+                        <div style="margin-bottom:8px;">
+                            <label style="display:block; font-size:10.5px; color:#94a3b8; margin-bottom:4px; font-weight:700;">POPUP TITLE</label>
+                            <input type="text" id="dev-maint-notice-title" class="form-input" value="System Upgrade in Progress" placeholder="e.g. System Upgrade in Progress" style="width:100%; box-sizing:border-box; font-size:12px; background:rgba(0,0,0,0.4);" />
+                        </div>
+
+                        <div>
+                            <label style="display:block; font-size:10.5px; color:#94a3b8; margin-bottom:4px; font-weight:700;">POPUP MESSAGE (2 DAYS & BIG SURPRISE)</label>
+                            <textarea id="dev-maint-notice-msg" class="form-input" rows="3" style="width:100%; box-sizing:border-box; font-size:11.5px; background:rgba(0,0,0,0.4); resize:vertical;">We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you with exciting rewards. Stay tuned!</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Save Maintenance Config Button -->
+                    <button type="button" id="dev-save-maint-btn" onclick="saveGameMaintenanceConfig()" style="width:100%; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color:#111; border:none; padding:10px 14px; border-radius:4px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(245,158,11,0.3); transition:all 0.2s;">
+                        <span>💾</span>
+                        <span>SAVE & APPLY GAME MAINTENANCE SETTINGS</span>
+                    </button>
                 </div>
 
                 <!-- TAB 4: LIVE PREVIEW CARDS -->

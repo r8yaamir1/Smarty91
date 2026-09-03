@@ -95,6 +95,13 @@ class Smarty91ServerEngine {
                 rank2: { first2: '91', last2: '88', amount: '₹92,400' },
                 rank3: { first2: '88', last2: '45', amount: '₹64,200' }
             },
+            // Prediction Game Maintenance & Whitelist Access Control
+            gameMaintenance: {
+                enabled: false,
+                noticeTitle: 'System Upgrade in Progress',
+                noticeMessage: 'We are currently undergoing scheduled system maintenance and major game upgrades for the next 2 days! A big surprise awaits you. Stay tuned!',
+                whitelistedUsers: []
+            },
             // Smart Risk & House Profit Engine
             riskEngine: {
                 enabled: true,
