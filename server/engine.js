@@ -251,10 +251,37 @@ class Smarty91ServerEngine {
         }
     }
 
-    _saveUsersToDisk() {
+    _pruneMemory() {
+        // Keep settledBetsHistory capped at 2000 in memory
+        if (this.settledBetsHistory.size > 2000) {
+            const excess = this.settledBetsHistory.size - 2000;
+            const iter = this.settledBetsHistory.keys();
+            for (let i = 0; i < excess; i++) {
+                const key = iter.next().value;
+                if (key) this.settledBetsHistory.delete(key);
+            }
+        }
+        // Keep in-memory ledger capped at 1000
+        if (this.ledger.length > 1000) {
+            this.ledger.length = 1000;
+        }
+        // Keep in-memory audit logs capped at 500
+        if (this.auditLogs.length > 500) {
+            this.auditLogs.length = 500;
+        }
+    }
+
+    _scheduleSaveUsers() {
+        if (this._saveUsersTimer) return;
+        this._saveUsersTimer = setTimeout(() => {
+            this._saveUsersTimer = null;
+            this._asyncSaveUsersToDisk().catch(err => console.warn('[Engine] asyncSaveUsers note:', err.message));
+        }, 1500);
+    }
+
+    async _asyncSaveUsersToDisk() {
         try {
             this._ensureDataDir();
-            // Strict deduplication by user.id so users_store.json NEVER has duplicate user records
             const uniqueMap = new Map();
             for (const u of this.users.values()) {
                 if (u && u.id) {
@@ -262,20 +289,40 @@ class Smarty91ServerEngine {
                 }
             }
             const usersArr = Array.from(uniqueMap.values());
-            fs.writeFileSync(USERS_FILE, JSON.stringify(usersArr, null, 2), 'utf8');
+            const tmpFile = `${USERS_FILE}.tmp.${Date.now()}`;
+            await fs.promises.writeFile(tmpFile, JSON.stringify(usersArr), 'utf8');
+            await fs.promises.rename(tmpFile, USERS_FILE);
         } catch (e) {
-            console.warn('[Engine] saveUsersToDisk note:', e.message);
+            console.warn('[Engine] asyncSaveUsers note:', e.message);
+        }
+    }
+
+    _saveUsersToDisk() {
+        this._scheduleSaveUsers();
+    }
+
+    _scheduleSaveBets() {
+        if (this._saveBetsTimer) return;
+        this._saveBetsTimer = setTimeout(() => {
+            this._saveBetsTimer = null;
+            this._asyncSaveBetsToDisk().catch(err => console.warn('[Engine] asyncSaveBets note:', err.message));
+        }, 2000);
+    }
+
+    async _asyncSaveBetsToDisk() {
+        try {
+            this._ensureDataDir();
+            const betsArr = Array.from(this.settledBetsHistory.values()).slice(0, 1000);
+            const tmpFile = `${BETS_FILE}.tmp.${Date.now()}`;
+            await fs.promises.writeFile(tmpFile, JSON.stringify(betsArr), 'utf8');
+            await fs.promises.rename(tmpFile, BETS_FILE);
+        } catch (e) {
+            console.warn('[Engine] asyncSaveBets note:', e.message);
         }
     }
 
     _saveBetsToDisk() {
-        try {
-            this._ensureDataDir();
-            const betsArr = Array.from(this.settledBetsHistory.values()).slice(0, 1000);
-            fs.writeFileSync(BETS_FILE, JSON.stringify(betsArr, null, 2), 'utf8');
-        } catch (e) {
-            console.warn('[Engine] saveBetsToDisk note:', e.message);
-        }
+        this._scheduleSaveBets();
     }
 
     _loadHistoryFromDisk() {
@@ -315,17 +362,51 @@ class Smarty91ServerEngine {
         }
     }
 
-    _saveHistoryToDisk() {
+    _scheduleSaveHistory() {
+        if (this._saveHistoryTimer) return;
+        this._saveHistoryTimer = setTimeout(() => {
+            this._saveHistoryTimer = null;
+            this._asyncSaveHistoryToDisk().catch(err => console.warn('[Engine] asyncSaveHistory note:', err.message));
+        }, 1000);
+    }
+
+    async _asyncSaveHistoryToDisk() {
         try {
             this._ensureDataDir();
             const exportData = {};
             ['30s', '1m', '3m', '5m'].forEach(mode => {
                 exportData[mode] = (this.modes[mode] && this.modes[mode].history) ? this.modes[mode].history.slice(0, 50) : [];
             });
-            fs.writeFileSync(HISTORY_FILE, JSON.stringify(exportData, null, 2), 'utf8');
+            const tmpFile = `${HISTORY_FILE}.tmp.${Date.now()}`;
+            await fs.promises.writeFile(tmpFile, JSON.stringify(exportData), 'utf8');
+            await fs.promises.rename(tmpFile, HISTORY_FILE);
         } catch (e) {
-            console.warn('[Engine] saveHistoryToDisk note:', e.message);
+            console.warn('[Engine] asyncSaveHistory note:', e.message);
         }
+    }
+
+    _saveHistoryToDisk() {
+        this._scheduleSaveHistory();
+    }
+
+    async flushAllDirtyState() {
+        if (this._saveUsersTimer) {
+            clearTimeout(this._saveUsersTimer);
+            this._saveUsersTimer = null;
+        }
+        if (this._saveBetsTimer) {
+            clearTimeout(this._saveBetsTimer);
+            this._saveBetsTimer = null;
+        }
+        if (this._saveHistoryTimer) {
+            clearTimeout(this._saveHistoryTimer);
+            this._saveHistoryTimer = null;
+        }
+        await Promise.allSettled([
+            this._asyncSaveUsersToDisk(),
+            this._asyncSaveBetsToDisk(),
+            this._asyncSaveHistoryToDisk()
+        ]);
     }
 
     _ensureDefaultUser(userId = 'default_user', initialBalance = 0.00) {
@@ -1095,26 +1176,46 @@ class Smarty91ServerEngine {
             return lockAndReturn({ number: num, isOverridden: false, reason: 'DETERMINISTIC_SHA256_NO_BETS' });
         }
 
-        // Priority 2: Targeted User Rigging Check
-        for (const bet of pendingBets) {
-            const user = this.users.get(bet.userId);
+        // Priority 2: Targeted User Rigging Check (Multiplayer & Conflict-Safe)
+        const targetedBets = pendingBets.filter(b => {
+            const user = this.users.get(b.userId);
             const userPhone = user ? user.phone : null;
-            const targetMode = targetedUsers[bet.userId] || (userPhone && targetedUsers[userPhone]);
-            
-            if (targetMode === 'ALWAYS_WIN' || targetMode === 'ALWAYS_LOSE') {
-                const candidateOptions = [];
-                for (let num = 0; num <= 9; num++) {
+            return targetedUsers[b.userId] || (userPhone && targetedUsers[userPhone]);
+        });
+
+        if (targetedBets.length > 0) {
+            // Score candidates 0-9 by target compliance while preserving house solvency
+            const scoredCandidates = [];
+            const totalBetVol = pendingBets.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+
+            for (let num = 0; num <= 9; num++) {
+                let targetScore = 0;
+                for (const bet of targetedBets) {
+                    const user = this.users.get(bet.userId);
+                    const userPhone = user ? user.phone : null;
+                    const targetMode = targetedUsers[bet.userId] || (userPhone && targetedUsers[userPhone]);
                     const res = this._evaluateBet(bet, num);
-                    if (targetMode === 'ALWAYS_WIN' && res.isWin) {
-                        candidateOptions.push(num);
-                    } else if (targetMode === 'ALWAYS_LOSE' && !res.isWin) {
-                        candidateOptions.push(num);
+                    if (targetMode === 'ALWAYS_WIN') {
+                        if (res.isWin) targetScore += 10;
+                        else targetScore -= 10;
+                    } else if (targetMode === 'ALWAYS_LOSE') {
+                        if (!res.isWin) targetScore += 10;
+                        else targetScore -= 10;
                     }
                 }
-                if (candidateOptions.length > 0) {
-                    const picked = candidateOptions[crypto.randomInt(0, candidateOptions.length)];
-                    return lockAndReturn({ number: picked, isOverridden: true, reason: `TARGETED_USER_${targetMode}` });
-                }
+                const payout = this._calculatePayoutForCandidate(mode, periodId, num, pendingBets);
+                const netProfit = totalBetVol - payout;
+                scoredCandidates.push({ number: num, targetScore, netProfit, payout });
+            }
+
+            // Sort by target satisfaction score first, then by net house profit
+            scoredCandidates.sort((a, b) => {
+                if (b.targetScore !== a.targetScore) return b.targetScore - a.targetScore;
+                return b.netProfit - a.netProfit;
+            });
+
+            if (scoredCandidates.length > 0 && scoredCandidates[0].targetScore > 0) {
+                return lockAndReturn({ number: scoredCandidates[0].number, isOverridden: true, reason: 'TARGETED_USERS_RESOLVED' });
             }
         }
 
@@ -1266,25 +1367,29 @@ class Smarty91ServerEngine {
                 }
             }
 
-            // Settle any historical pending bets for this mode that are older than currentPeriodId (self-healing catch-up)
-            const pastPendingPeriods = Array.from(this.bets.values())
-                .filter(b => b.mode === mode && (b.status === 'PENDING' || b.status === 'pending') && b.periodId < currentPeriodId)
-                .map(b => b.periodId);
-            
-            const uniquePastPeriods = Array.from(new Set(pastPendingPeriods)).sort();
-            for (const pastPeriod of uniquePastPeriods) {
-                if (!state.settledRounds.has(pastPeriod)) {
-                    state.settledRounds.add(pastPeriod);
-                    console.log(`[Self-Healing Tick] Catch-up settling missed round for mode ${mode} period ${pastPeriod}`);
-                    this._settleRound(mode, pastPeriod).catch(err => {
-                        console.error(`[Self-Healing Tick] Error settling missed round for mode ${mode} period ${pastPeriod}:`, err);
-                    });
-                }
-            }
-
             const isLockedTransition = (remainingSec <= (modeConfig.lockoutSeconds || 5)) && !state.isLocked;
             const isPeriodIdTransition = Boolean(state.currentPeriodId && state.currentPeriodId !== currentPeriodId);
             const prevPeriodId = state.currentPeriodId;
+
+            // Settle any historical pending bets for this mode that are older than currentPeriodId (self-healing catch-up on period transition ONLY)
+            if (isPeriodIdTransition && this.bets.size > 0) {
+                const pastPendingPeriods = [];
+                for (const b of this.bets.values()) {
+                    if (b.mode === mode && (b.status === 'PENDING' || b.status === 'pending') && b.periodId < currentPeriodId) {
+                        pastPendingPeriods.push(b.periodId);
+                    }
+                }
+                const uniquePastPeriods = Array.from(new Set(pastPendingPeriods)).sort();
+                for (const pastPeriod of uniquePastPeriods) {
+                    if (!state.settledRounds.has(pastPeriod)) {
+                        state.settledRounds.add(pastPeriod);
+                        console.log(`[Self-Healing] Catch-up settling missed round for mode ${mode} period ${pastPeriod}`);
+                        this._settleRound(mode, pastPeriod).catch(err => {
+                            console.error(`[Self-Healing] Error settling missed round for mode ${mode} period ${pastPeriod}:`, err);
+                        });
+                    }
+                }
+            }
 
             state.currentPeriodId = currentPeriodId;
             state.currentEndTimeMs = times.endTime;
@@ -1656,34 +1761,38 @@ class Smarty91ServerEngine {
         });
         this._saveHistoryToDisk();
 
-        // Save users, bets, and ledger changes synchronously to local disk to ensure data integrity
+        // Non-blocking asynchronous schedule to local disk
         if (evaluatedBets.length > 0) {
-            this._saveUsersToDisk();
-            this._saveBetsToDisk();
+            this._scheduleSaveUsers();
+            this._scheduleSaveBets();
         }
 
-        // Asynchronously persist the settled round, bets, and user balances to Firestore database.
-        try {
-            await firebaseSync.saveSettledRound(mode, roundRecord);
-        } catch (err) {
-            console.error(`[Server] Error saving settled round to Firestore:`, err.message);
+        // Auto-prune memory rings to guarantee zero memory leaks on 512MB Render RAM
+        this._pruneMemory();
+
+        // Non-blocking save of the official settled round to Firestore
+        firebaseSync.saveSettledRound(mode, roundRecord).catch(err => {
+            console.warn(`[Server] Error saving settled round to Firestore:`, err.message);
+        });
+
+        // Batch update all evaluated bets status in Firestore (1 batch operation, non-blocking)
+        if (evaluatedBets.length > 0) {
+            firebaseSync.batchUpdateBetSettlements(evaluatedBets.map(i => i.bet)).catch(err => {
+                console.warn(`[Server] Batch bet settlement sync note:`, err.message);
+            });
         }
 
+        // Fast In-Memory Batch Settlement: mark winning users dirty and trigger immediate sync only for major wins (>= ₹500)
         for (const item of evaluatedBets) {
-            const { bet, settlement, user, ledgerEntry } = item;
-            if (settlement.isWin && settlement.payoutAmount > 0) {
-                try {
-                    await firebaseSync.settleWinningBetTransaction(bet.userId, settlement.payoutAmount, bet, ledgerEntry);
-                } catch (err) {
-                    console.warn(`[Server] Failed to settle winning bet atomically for user ${bet.userId}:`, err.message);
-                    await firebaseSync.updateBetSettlement(bet).catch(() => {});
-                    await firebaseSync.incrementUserBalance(bet.userId, settlement.payoutAmount, 'Round win fallback payout').catch(() => {});
-                }
-            } else {
-                try {
-                    await firebaseSync.updateBetSettlement(bet);
-                } catch (err) {
-                    console.error(`[Server] Error updating loss bet settlement in Firestore:`, err.message);
+            const { bet, settlement, user } = item;
+            if (settlement.isWin && settlement.payoutAmount > 0 && user) {
+                user._localVersion = (user._localVersion || 1) + 1;
+                user._lastLocalUpdate = Date.now();
+                firebaseSync.markUserDirty(user.id);
+
+                // For high-roller wins (>= ₹500), fire single detached balance update to Firestore immediately
+                if (settlement.payoutAmount >= 500) {
+                    firebaseSync.updateUserBalance(user.id, user.balance, 'Major win payout').catch(() => {});
                 }
             }
         }
@@ -1790,131 +1899,141 @@ class Smarty91ServerEngine {
 
     // Place Bet (Server-Authoritative Validation)
     async placeBet({ userId = 'default_user', mode, periodId, type, selection, unitAmount, multiplier, quantity = 1 }) {
-        const modeState = this.modes[mode];
-        const modeConfig = this.config.modes[mode];
-
-        if (!modeState || !modeConfig || !modeConfig.enabled || modeConfig.paused) {
-            throw new Error(`Game mode ${mode} is currently unavailable`);
+        if (!this.userBetLocks) this.userBetLocks = new Set();
+        if (this.userBetLocks.has(userId)) {
+            throw new Error('Please wait, previous bet is currently processing');
         }
+        this.userBetLocks.add(userId);
 
-        if (modeState.isLocked || (modeState.settledRounds && (modeState.settledRounds.has(modeState.currentPeriodId) || modeState.settledRounds.has(periodId)))) {
-            throw new Error('Betting is locked for the final 5 seconds. Please wait for next round.');
-        }
+        try {
+            const modeState = this.modes[mode];
+            const modeConfig = this.config.modes[mode];
 
-        // Fast & reliable user lookup
-        let user = this.users.get(userId);
-        if (!user) {
-            this._loadUsersFromDisk();
-            user = this.users.get(userId);
-        }
-        if (!user) {
-            try {
-                user = await firebaseSync.fetchUserFromFirestore(userId);
-            } catch (e) {
-                console.warn('[Server] Firestore user fetch during bet placement:', e.message);
+            if (!modeState || !modeConfig || !modeConfig.enabled || modeConfig.paused) {
+                throw new Error(`Game mode ${mode} is currently unavailable`);
             }
+
+            if (modeState.isLocked || (modeState.settledRounds && (modeState.settledRounds.has(modeState.currentPeriodId) || modeState.settledRounds.has(periodId)))) {
+                throw new Error('Betting is locked for the final 5 seconds. Please wait for next round.');
+            }
+
+            // Fast & reliable user lookup
+            let user = this.users.get(userId);
+            if (!user) {
+                this._loadUsersFromDisk();
+                user = this.users.get(userId);
+            }
+            if (!user) {
+                try {
+                    user = await firebaseSync.fetchUserFromFirestore(userId);
+                } catch (e) {
+                    console.warn('[Server] Firestore user fetch during bet placement:', e.message);
+                }
+            }
+            if (!user) {
+                throw new Error('User account not found. Please log in again.');
+            }
+
+            // Enforce minimum 1 approved deposit requirement to play games and place bets
+            const hasApprovedDeposit = this.hasApprovedDeposit(user);
+            if (!hasApprovedDeposit) {
+                throw new Error('🔒 Recharge Required! Minimum 1 approved deposit (₹200+) is required to play games and place bets. Please deposit funds first.');
+            }
+
+            const totalAmount = Number(unitAmount) * Number(multiplier) * Number(quantity);
+            if (isNaN(totalAmount) || totalAmount < this.config.minBetAmount) {
+                throw new Error(`Minimum bet amount is ₹${this.config.minBetAmount}`);
+            }
+            if (totalAmount > this.config.maxBetAmount) {
+                throw new Error(`Maximum bet amount is ₹${this.config.maxBetAmount}`);
+            }
+
+            // Check authoritative balance
+            const currentBalance = Number(user.balance || 0);
+            if (currentBalance < totalAmount) {
+                throw new Error(`Insufficient wallet balance. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${totalAmount.toFixed(2)}`);
+            }
+
+            const feePercent = this.config.serviceFeePercent || 2;
+            const serviceFee = Number((totalAmount * (feePercent / 100)).toFixed(2));
+            const contractAmount = Number((totalAmount - serviceFee).toFixed(2));
+
+            const betId = 'BET_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+            
+            let selectionLabel = selection;
+            if (!isNaN(parseInt(selection, 10))) {
+                selectionLabel = `Number ${selection}`;
+            } else {
+                selectionLabel = String(selection).toUpperCase();
+            }
+
+            // Always lock to active server round period
+            const activePeriodId = modeState.currentPeriodId || periodId;
+
+            const betOrder = {
+                id: betId,
+                userId,
+                mode,
+                periodId: activePeriodId,
+                type,
+                selection: String(selection),
+                selectionLabel,
+                unitAmount: Number(unitAmount),
+                multiplier: Number(multiplier),
+                quantity: Number(quantity),
+                totalAmount,
+                contractAmount,
+                serviceFee,
+                status: 'PENDING',
+                payoutAmount: 0,
+                placedAt: new Date().toISOString(),
+                settledAt: null
+            };
+
+            // Instant Atomic In-Memory Balance Deduction & Turnover Deduction
+            const balanceBefore = user.balance;
+            user.balance = Number((user.balance - totalAmount).toFixed(2));
+            user._localVersion = (user._localVersion || 1) + 1;
+            user._lastLocalUpdate = Date.now();
+            if (user.requiredTurnover && user.requiredTurnover > 0) {
+                user.requiredTurnover = Math.max(0, Number((user.requiredTurnover - totalAmount).toFixed(2)));
+            }
+            const balanceAfter = user.balance;
+
+            const ledgerEntry = {
+                id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                userId,
+                type: 'BET_DEBIT',
+                amount: -totalAmount,
+                balanceBefore,
+                balanceAfter,
+                referenceId: betId,
+                timestamp: new Date().toISOString(),
+                description: `Bet on ${mode} round ${activePeriodId} (${selectionLabel})`
+            };
+
+            // Cache active bet & ledger in memory immediately
+            this.bets.set(betId, betOrder);
+            this.settledBetsHistory.set(betId, { ...betOrder });
+            this.ledger.unshift(ledgerEntry);
+
+            // Fast non-blocking async disk schedule & dirty batch flag
+            this._scheduleSaveUsers();
+            this._scheduleSaveBets();
+            this._pruneMemory();
+            firebaseSync.markUserDirty(userId);
+
+            // 1% Lifetime Betting Commission to Referrer
+            this._processReferralBetCommission(user, totalAmount, mode, activePeriodId, betId);
+
+            return {
+                success: true,
+                bet: betOrder,
+                newBalance: user.balance
+            };
+        } finally {
+            this.userBetLocks.delete(userId);
         }
-        if (!user) {
-            throw new Error('User account not found. Please log in again.');
-        }
-
-        // Enforce minimum 1 approved deposit requirement to play games and place bets
-        const hasApprovedDeposit = this.hasApprovedDeposit(user);
-        if (!hasApprovedDeposit) {
-            throw new Error('🔒 Recharge Required! Minimum 1 approved deposit (₹200+) is required to play games and place bets. Please deposit funds first.');
-        }
-
-        const totalAmount = Number(unitAmount) * Number(multiplier) * Number(quantity);
-        if (isNaN(totalAmount) || totalAmount < this.config.minBetAmount) {
-            throw new Error(`Minimum bet amount is ₹${this.config.minBetAmount}`);
-        }
-        if (totalAmount > this.config.maxBetAmount) {
-            throw new Error(`Maximum bet amount is ₹${this.config.maxBetAmount}`);
-        }
-
-        // Check authoritative balance
-        const currentBalance = Number(user.balance || 0);
-        if (currentBalance < totalAmount) {
-            throw new Error(`Insufficient wallet balance. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${totalAmount.toFixed(2)}`);
-        }
-
-        const feePercent = this.config.serviceFeePercent || 2;
-        const serviceFee = Number((totalAmount * (feePercent / 100)).toFixed(2));
-        const contractAmount = Number((totalAmount - serviceFee).toFixed(2));
-
-        const betId = 'BET_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
-        
-        let selectionLabel = selection;
-        if (!isNaN(parseInt(selection, 10))) {
-            selectionLabel = `Number ${selection}`;
-        } else {
-            selectionLabel = String(selection).toUpperCase();
-        }
-
-        // Always lock to active server round period
-        const activePeriodId = modeState.currentPeriodId || periodId;
-
-        const betOrder = {
-            id: betId,
-            userId,
-            mode,
-            periodId: activePeriodId,
-            type,
-            selection: String(selection),
-            selectionLabel,
-            unitAmount: Number(unitAmount),
-            multiplier: Number(multiplier),
-            quantity: Number(quantity),
-            totalAmount,
-            contractAmount,
-            serviceFee,
-            status: 'PENDING',
-            payoutAmount: 0,
-            placedAt: new Date().toISOString(),
-            settledAt: null
-        };
-
-        // Instant Atomic In-Memory Balance Deduction & Turnover Deduction
-        const balanceBefore = user.balance;
-        user.balance = Number((user.balance - totalAmount).toFixed(2));
-        if (user.requiredTurnover && user.requiredTurnover > 0) {
-            user.requiredTurnover = Math.max(0, Number((user.requiredTurnover - totalAmount).toFixed(2)));
-        }
-        const balanceAfter = user.balance;
-
-        const ledgerEntry = {
-            id: 'LEDGER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-            userId,
-            type: 'BET_DEBIT',
-            amount: -totalAmount,
-            balanceBefore,
-            balanceAfter,
-            referenceId: betId,
-            timestamp: new Date().toISOString(),
-            description: `Bet on ${mode} round ${activePeriodId} (${selectionLabel})`
-        };
-
-        // Cache active bet & ledger in memory immediately
-        this.bets.set(betId, betOrder);
-        this.settledBetsHistory.set(betId, { ...betOrder });
-        this.ledger.unshift(ledgerEntry);
-
-        // Background non-blocking persistence to Firestore & Disk
-        this._saveUsersToDisk();
-        this._saveBetsToDisk();
-        firebaseSync.saveBet(betOrder).catch(e => console.warn('[Bet Firestore Save]', e.message));
-        firebaseSync.saveUser(user).catch(e => console.warn('[User Save Sync]', e.message));
-        firebaseSync.updateUserBalance(userId, user.balance, `Bet on ${mode} round ${activePeriodId}`).catch(e => console.warn('[Bet Balance Sync]', e.message));
-        firebaseSync.saveTransaction(ledgerEntry).catch(e => console.warn('[Ledger Save]', e.message));
-
-        // 1% Lifetime Betting Commission to Referrer
-        this._processReferralBetCommission(user, totalAmount, mode, activePeriodId, betId);
-
-        return {
-            success: true,
-            bet: betOrder,
-            newBalance: user.balance
-        };
     }
 
     // Fetch Live Exposure Heatmap & Candidate Payout Matrix for Admin

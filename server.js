@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { apiRouter } from './server/apiRouter.js';
+import { serverEngine } from './server/engine.js';
+import { firebaseSync } from './server/firebaseSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +12,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// 24/7 Keepalive Ping Route for Render.com free plan (UptimeRobot / Cron-Job)
+app.get(['/ping', '/api/ping', '/healthz'], (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        service: 'Smarty91-Engine',
+        timestamp: Date.now(),
+        uptime: Math.floor(process.uptime()),
+        memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+    });
+});
 
 // Prevent stale caching of app assets and HTML
 app.use((req, res, next) => {
@@ -60,6 +73,31 @@ app.use((req, res) => {
     });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Smarty91 Full-Stack Server running on port ${PORT}`);
 });
+
+// Graceful shutdown handling for Render.com restarts and redeployments
+const handleShutdown = async (signal) => {
+    console.log(`[Process] Received ${signal}. Executing emergency data flush...`);
+    try {
+        if (serverEngine && typeof serverEngine.flushAllDirtyState === 'function') {
+            await serverEngine.flushAllDirtyState();
+        }
+        if (firebaseSync && typeof firebaseSync.flushDirtyUsers === 'function') {
+            await firebaseSync.flushDirtyUsers();
+        }
+        console.log('[Process] All data flushed successfully. Exiting cleanly.');
+    } catch (e) {
+        console.warn('[Process] Error during shutdown flush:', e.message);
+    }
+    server.close(() => {
+        process.exit(0);
+    });
+    // Force exit if close takes too long
+    setTimeout(() => process.exit(0), 4000);
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+

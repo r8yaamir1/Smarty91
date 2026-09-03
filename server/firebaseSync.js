@@ -16,7 +16,8 @@ import {
     getDocs,
     increment,
     runTransaction,
-    deleteDoc
+    deleteDoc,
+    writeBatch
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -43,6 +44,53 @@ class FirebaseSyncManager {
         this.isInitialized = false;
         this.isQuotaExhausted = false;
         this.quotaResetTime = 0;
+        this.dirtyUsers = new Set();
+        this._batchSyncTimer = null;
+    }
+
+    markUserDirty(userId) {
+        if (!userId || userId === 'default_user') return;
+        this.dirtyUsers.add(userId);
+        // If accumulated more than 25 dirty users, trigger batch flush quickly
+        if (this.dirtyUsers.size >= 25) {
+            this.flushDirtyUsers().catch(() => {});
+        }
+    }
+
+    async flushDirtyUsers() {
+        if (this.dirtyUsers.size === 0 || !this._checkQuota()) return;
+        const uids = Array.from(this.dirtyUsers);
+        this.dirtyUsers.clear();
+
+        while (uids.length > 0) {
+            const chunk = uids.splice(0, 400);
+            try {
+                const batch = writeBatch(db);
+                let count = 0;
+                for (const uid of chunk) {
+                    const user = this.engine ? this.engine.users.get(uid) : null;
+                    if (user) {
+                        const canonicalId = (user.id && !user.id.startsWith('usr_') && !isNaN(Number(user.id)) && user.id !== 'default_user') ? 'usr_' + user.id : user.id;
+                        const userRef = doc(db, 'users', canonicalId);
+                        batch.set(userRef, {
+                            id: canonicalId,
+                            balance: Number(user.balance !== undefined ? user.balance : 0),
+                            bonusBalance: Number(user.bonusBalance !== undefined ? user.bonusBalance : 0),
+                            requiredTurnover: Number(user.requiredTurnover !== undefined ? user.requiredTurnover : 0),
+                            _serverVersion: user._localVersion || 1,
+                            lastBatchSync: new Date().toISOString()
+                        }, { merge: true });
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    await batch.commit();
+                }
+            } catch (err) {
+                this._handleQuotaError(err);
+                console.warn('[Firebase] Batch flush error:', err.message);
+            }
+        }
     }
 
     _checkQuota() {
@@ -99,6 +147,8 @@ class FirebaseSyncManager {
             await this._syncUserToFirestore(this.engine.users.get('default_user'));
 
             this.isInitialized = true;
+            if (this._batchSyncTimer) clearInterval(this._batchSyncTimer);
+            this._batchSyncTimer = setInterval(() => this.flushDirtyUsers().catch(() => {}), 45000);
             console.log('[Firebase] Firestore Server sync ready & live!');
         } catch (err) {
             this._handleQuotaError(err);
@@ -415,8 +465,31 @@ class FirebaseSyncManager {
                         const uid = (u && u.id) ? u.id : docId;
                         if (uid && uid !== 'default_user') {
                             const existing = this.engine.users.get(uid);
-                            // Live balance from Firestore is authoritative when user documents are modified
-                            const resolvedBalance = Number(u.balance !== undefined ? u.balance : (existing ? existing.balance : 0));
+                            
+                            // ECHO LOOP SHIELD: If user was modified locally within 15 seconds or has equal/newer local version, protect in-memory balance
+                            const isRecentLocalUpdate = existing && existing._lastLocalUpdate && (Date.now() - existing._lastLocalUpdate < 15000);
+                            const isRemoteAdminAction = u.lastUpdatedReason && (
+                                u.lastUpdatedReason.includes('Admin') || 
+                                u.lastUpdatedReason.includes('Deposit') || 
+                                u.lastUpdatedReason.includes('Manual') ||
+                                u.lastUpdatedReason.includes('Approved') ||
+                                u.lastUpdatedReason.includes('Bonus')
+                            );
+
+                            let resolvedBalance = 0;
+                            if (!existing) {
+                                resolvedBalance = Number(u.balance !== undefined ? u.balance : 0);
+                            } else if (isRemoteAdminAction) {
+                                resolvedBalance = Number(u.balance !== undefined ? u.balance : existing.balance);
+                                existing._localVersion = (existing._localVersion || 0) + 1;
+                            } else if (isRecentLocalUpdate) {
+                                resolvedBalance = existing.balance; // Keep fresh memory balance, drop echo
+                            } else if (u._serverVersion && existing._localVersion && u._serverVersion > existing._localVersion) {
+                                resolvedBalance = Number(u.balance !== undefined ? u.balance : existing.balance);
+                                existing._localVersion = u._serverVersion;
+                            } else {
+                                resolvedBalance = existing.balance !== undefined ? existing.balance : Number(u.balance || 0);
+                            }
 
                             const updatedUser = {
                                 ...(existing || {}),
@@ -427,6 +500,8 @@ class FirebaseSyncManager {
                                 passwordHash: u.passwordHash || (existing ? existing.passwordHash : ''),
                                 securityPin: u.securityPin || (existing ? existing.securityPin : (u.phone ? u.phone.slice(-4) : '1234')),
                                 balance: resolvedBalance,
+                                _localVersion: (existing && existing._localVersion) ? existing._localVersion : 1,
+                                _lastLocalUpdate: (existing && existing._lastLocalUpdate) ? existing._lastLocalUpdate : Date.now(),
                                 requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : (existing ? existing.requiredTurnover : 0)),
                                 inviteCode: u.inviteCode || (existing ? existing.inviteCode : ''),
                                 referredBy: u.referredBy !== undefined ? u.referredBy : (existing ? existing.referredBy : null),
@@ -766,6 +841,36 @@ class FirebaseSyncManager {
             }, { merge: true });
         } catch (e) {
             this._handleQuotaError(e);
+        }
+    }
+
+    async batchUpdateBetSettlements(bets) {
+        if (!Array.isArray(bets) || bets.length === 0 || !this._checkQuota()) return;
+        try {
+            const batch = writeBatch(db);
+            let count = 0;
+            for (const bet of bets.slice(0, 450)) {
+                if (bet && bet.id) {
+                    const betRef = doc(db, 'bets', bet.id);
+                    batch.set(betRef, {
+                        id: bet.id,
+                        status: bet.status,
+                        payoutAmount: Number(bet.payoutAmount || 0),
+                        resultNumber: bet.resultNumber,
+                        resultColor: bet.resultColor,
+                        resultSize: bet.resultSize,
+                        settledAt: bet.settledAt || new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                    count++;
+                }
+            }
+            if (count > 0) {
+                await batch.commit();
+            }
+        } catch (e) {
+            this._handleQuotaError(e);
+            console.warn('[Firebase] batchUpdateBetSettlements note:', e.message);
         }
     }
 

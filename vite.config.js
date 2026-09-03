@@ -12,7 +12,10 @@ function expressApiPlugin() {
             app.use('/api', apiRouter);
 
             server.middlewares.use((req, res, next) => {
-                if (req.url.startsWith('/api/') || req.url === '/api') {
+                if (req.url.startsWith('/api/') || req.url === '/api' || req.url === '/ping' || req.url === '/healthz') {
+                    if (req.url === '/ping' || req.url === '/healthz') {
+                        req.url = '/api' + req.url;
+                    }
                     return app(req, res, next);
                 }
                 next();

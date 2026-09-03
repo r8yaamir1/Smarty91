@@ -6,6 +6,17 @@ import { sendTelegramMessage, editTelegramMessage, answerCallbackQuery, TELEGRAM
 export const apiRouter = express.Router();
 apiRouter.use(express.json());
 
+// 24/7 Keepalive Ping Route for Render.com free plan (UptimeRobot / Cron-Job)
+apiRouter.get(['/ping', '/healthz'], (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        service: 'Smarty91-Engine',
+        timestamp: Date.now(),
+        uptime: Math.floor(process.uptime()),
+        memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+    });
+});
+
 // Admin Auth Middleware
 const checkAdminAuth = (req, res, next) => {
     const pin = req.headers['x-admin-pin'] || req.query.admin_pin || req.body.adminPin;
