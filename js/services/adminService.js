@@ -31,6 +31,10 @@ class AdminService {
         return await apiClient.post('/admin/users/adjust-balance', { userId, amount, action, remarks });
     }
 
+    async adjustUserTurnover(userId, turnover, remarks) {
+        return await apiClient.post('/admin/users/adjust-turnover', { userId, turnover, remarks });
+    }
+
     async processTransaction(txId, action, adminRemarks) {
         return await apiClient.post('/admin/transactions/process', { txId, action, adminRemarks });
     }

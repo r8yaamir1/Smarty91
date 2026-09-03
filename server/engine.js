@@ -2018,8 +2018,11 @@ class Smarty91ServerEngine {
             user.balance = Number((user.balance - totalAmount).toFixed(2));
             user._localVersion = (user._localVersion || 1) + 1;
             user._lastLocalUpdate = Date.now();
-            if (user.requiredTurnover && user.requiredTurnover > 0) {
-                user.requiredTurnover = Math.max(0, Number((user.requiredTurnover - totalAmount).toFixed(2)));
+            const currTurnover = isNaN(Number(user.requiredTurnover)) ? 0 : Math.max(0, Number(user.requiredTurnover));
+            if (currTurnover > 0) {
+                user.requiredTurnover = Math.max(0, Number((currTurnover - totalAmount).toFixed(2)));
+            } else {
+                user.requiredTurnover = 0;
             }
             const balanceAfter = user.balance;
 
@@ -2502,7 +2505,8 @@ class Smarty91ServerEngine {
             userObj.bonusBalance = Number(((userObj.bonusBalance || 0) + bonusAmount).toFixed(2));
             userObj.bonus = userObj.bonusBalance;
             // 2x Mandatory Deposit Turnover Rule
-            userObj.requiredTurnover = Number(((userObj.requiredTurnover || 0) + (numAmount * 2.0)).toFixed(2));
+            const currTurnover = isNaN(Number(userObj.requiredTurnover)) ? 0 : Math.max(0, Number(userObj.requiredTurnover));
+            userObj.requiredTurnover = Number((currTurnover + (numAmount * 2.0)).toFixed(2));
             const balanceAfter = userObj.balance;
 
             this.transactions.unshift(req);
@@ -2611,8 +2615,8 @@ class Smarty91ServerEngine {
         if (!user) throw new Error('User account not found');
 
         // 2x Mandatory Deposit Betting Turnover Rule check
-        const reqTurnover = Number(user.requiredTurnover || 0);
-        if (reqTurnover > 0) {
+        const reqTurnover = isNaN(Number(user.requiredTurnover)) ? 0 : Math.max(0, Number(user.requiredTurnover));
+        if (reqTurnover > 0 && !isReferralWithdrawal) {
             throw new Error(`🔒 Withdrawal Locked! You must complete mandatory 2x deposit betting turnover before withdrawing. Remaining required turnover to bet: ₹${reqTurnover.toFixed(2)}.`);
         }
 
@@ -2759,13 +2763,15 @@ class Smarty91ServerEngine {
             .filter(t => t.type === 'WITHDRAWAL' && t.status === 'PENDING')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+        const reqTurnover = isNaN(Number(user.requiredTurnover)) ? 0 : Math.max(0, Number(user.requiredTurnover));
+
         return {
             userId: user.id,
             phone: user.phone || '9876543210',
             balance: Number((user.balance || 0).toFixed(2)),
             bonusBalance: Number(((user.bonusBalance !== undefined ? user.bonusBalance : (user.bonus || 0))).toFixed(2)),
             bonus: Number(((user.bonusBalance !== undefined ? user.bonusBalance : (user.bonus || 0))).toFixed(2)),
-            requiredTurnover: Number((user.requiredTurnover || 0).toFixed(2)),
+            requiredTurnover: Number(reqTurnover.toFixed(2)),
             totalDeposited: Number(totalDeposited.toFixed(2)),
             totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
             pendingWithdrawals: Number(pendingWithdrawals.toFixed(2)),
@@ -2799,7 +2805,8 @@ class Smarty91ServerEngine {
                 const balanceBefore = Number(user.balance || 0);
                 user.balance = Number((balanceBefore + numAmount).toFixed(2));
                 // 2x Mandatory Deposit Turnover Rule
-                user.requiredTurnover = Number(((user.requiredTurnover || 0) + (numAmount * 2.0)).toFixed(2));
+                const currTurnover = isNaN(Number(user.requiredTurnover)) ? 0 : Math.max(0, Number(user.requiredTurnover));
+                user.requiredTurnover = Number((currTurnover + (numAmount * 2.0)).toFixed(2));
                 const balanceAfter = user.balance;
 
                 this.ledger.unshift({
@@ -2931,6 +2938,34 @@ class Smarty91ServerEngine {
             return { success: true, transaction: tx, userBalance: user.balance, message: logMsg };
         }
         throw new Error('Invalid transaction action');
+    }
+
+    // Adjust or Clear Player Required Turnover (Admin / Developer Action)
+    adjustUserTurnover(userId, newTurnover, remarks = '') {
+        const user = this.users.get(userId);
+        if (!user) throw new Error('User not found in active database');
+        const oldTurnover = isNaN(Number(user.requiredTurnover)) ? 0 : Math.max(0, Number(user.requiredTurnover));
+        const targetTurnover = Math.max(0, Number(Number(newTurnover).toFixed(2)));
+        user.requiredTurnover = targetTurnover;
+        user._localVersion = (user._localVersion || 1) + 1;
+        user._lastLocalUpdate = Date.now();
+        this._scheduleSaveUsers();
+        firebaseSync.markUserDirty(user.id);
+        const logMsg = `Adjusted required turnover for user ${user.phone || user.id} from ₹${oldTurnover.toFixed(2)} to ₹${targetTurnover.toFixed(2)}. Remarks: ${remarks || 'None'}`;
+        this.auditLogs.unshift({
+            id: 'AUDIT_' + Date.now(),
+            action: 'ADMIN_ADJUST_TURNOVER',
+            details: logMsg,
+            timestamp: new Date().toISOString()
+        });
+        return {
+            success: true,
+            userId: user.id,
+            phone: user.phone,
+            oldTurnover,
+            newTurnover: targetTurnover,
+            message: `Turnover successfully updated for ${user.phone || user.id}: ₹${targetTurnover.toFixed(2)}`
+        };
     }
 
     getTransactions(filter = {}) {

@@ -123,6 +123,7 @@ const handleUserMe = async (req, res) => {
             username: user.username,
             phone: user.phone,
             balance: user.balance,
+            requiredTurnover: Number(user.requiredTurnover !== undefined ? user.requiredTurnover : 0),
             inviteCode: user.inviteCode,
             referredBy: user.referredBy,
             hasDeposited: hasDep,
@@ -609,6 +610,7 @@ apiRouter.get('/wallet/balance', async (req, res) => {
             success: true,
             balance: Number(balance) || 0,
             bonusBalance: Number(bonusBalance) || 0,
+            requiredTurnover: Number(liveUser ? (liveUser.requiredTurnover || 0) : (authUser.requiredTurnover || 0)),
             currency: '₹'
         });
     } catch (err) {
@@ -1406,6 +1408,7 @@ apiRouter.get('/admin/users', checkAdminAuth, (req, res) => {
             username: u.username,
             phone: u.phone,
             balance: Number(u.balance !== undefined ? u.balance : 0),
+            requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0),
             inviteCode: u.inviteCode,
             referredBy: u.referredBy,
             hasDeposited: !!u.hasDeposited,
@@ -1453,6 +1456,11 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
         }
 
         user.balance = balanceAfter;
+        if (req.body.turnover !== undefined && !isNaN(Number(req.body.turnover))) {
+            user.requiredTurnover = Math.max(0, Number(Number(req.body.turnover).toFixed(2)));
+        } else if (req.body.resetTurnover === true) {
+            user.requiredTurnover = 0;
+        }
         serverEngine.users.set(user.id, user);
 
         const delta = Number((balanceAfter - balanceBefore).toFixed(2));
@@ -1482,7 +1490,7 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
 
         // 2. Realtime sync to Cloud Firestore
         try {
-            await firebaseSync.updateUserBalance(user.id, user.balance, auditDetail, user.bonusBalance);
+            await firebaseSync.updateUserBalance(user.id, user.balance, auditDetail, user.bonusBalance, user.requiredTurnover);
             await firebaseSync.saveUser(user);
             await firebaseSync.saveTransaction(ledgerEntry);
             firebaseSync.logAdminAction('ADMIN_ADJUST_BALANCE', auditDetail);
@@ -1496,10 +1504,39 @@ apiRouter.post('/admin/users/adjust-balance', checkAdminAuth, async (req, res) =
             userId: user.id,
             phone: user.phone,
             oldBalance: balanceBefore,
-            newBalance: user.balance
+            newBalance: user.balance,
+            requiredTurnover: user.requiredTurnover
         });
     } catch (err) {
         console.error('[Admin] Balance adjustment error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /api/admin/users/adjust-turnover -> Set or Clear Required Betting Turnover
+apiRouter.post('/admin/users/adjust-turnover', checkAdminAuth, async (req, res) => {
+    try {
+        const { userId, turnover, remarks = 'Admin turnover adjustment' } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'Player Account ID or Mobile number is required' });
+        }
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: `User not found for query "${userId}"` });
+        }
+        const numTurnover = Number(turnover);
+        if (isNaN(numTurnover) || numTurnover < 0) {
+            return res.status(400).json({ success: false, message: 'Turnover must be 0 or a positive number' });
+        }
+        const result = serverEngine.adjustUserTurnover(user.id, numTurnover, remarks);
+        try {
+            await firebaseSync.updateUserBalance(user.id, user.balance, `Admin adjusted turnover: ${remarks}`, user.bonusBalance, numTurnover);
+            await firebaseSync.saveUser(user);
+        } catch (e) {
+            console.warn('[Admin] Sync turnover note:', e.message);
+        }
+        res.json(result);
+    } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -1794,6 +1831,34 @@ apiRouter.post('/developer/user/adjust-balance', async (req, res) => {
             userId: user.id,
             newBalance: user.balance
         });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// 2b. Adjust Turnover (Developer Key)
+apiRouter.post('/developer/user/adjust-turnover', async (req, res) => {
+    try {
+        const { secretKey, userId, turnover } = req.body;
+        if (!validateDevKey(secretKey)) {
+            return res.status(401).json({ success: false, message: 'Invalid Developer Secret Key' });
+        }
+        const user = await serverEngine.findUserFlexible(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: `User not found for "${userId}"` });
+        }
+        const numTurnover = Number(turnover);
+        if (isNaN(numTurnover) || numTurnover < 0) {
+            return res.status(400).json({ success: false, message: 'Invalid turnover. Must be 0 or greater.' });
+        }
+        const result = serverEngine.adjustUserTurnover(user.id, numTurnover, 'Developer adjustment');
+        try {
+            await firebaseSync.updateUserBalance(user.id, user.balance, `Developer adjusted turnover to ₹${numTurnover}`, user.bonusBalance, numTurnover);
+            await firebaseSync.saveUser(user);
+        } catch (e) {
+            console.warn('[Developer] Sync turnover note:', e.message);
+        }
+        res.json(result);
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

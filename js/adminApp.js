@@ -1869,6 +1869,7 @@ function renderUsersTableContent(container) {
                     <th>Referral Code</th>
                     <th>Invited By</th>
                     <th>Real Balance</th>
+                    <th>Turnover</th>
                     <th>1st Deposit</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -1890,6 +1891,14 @@ function renderUsersTableContent(container) {
                         <td style="color: var(--accent-green); font-weight: 800; font-size: 13px;">
                             ₹${(u.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
+                        <td style="font-size: 12px;">
+                            <div style="font-weight: 800; color: ${Number(u.requiredTurnover || 0) > 0 ? '#f59e0b' : '#10b981'};">
+                                ₹${(Number(u.requiredTurnover) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </div>
+                            <span style="font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; ${Number(u.requiredTurnover || 0) > 0 ? 'background: rgba(245,158,11,0.2); color: #f59e0b;' : 'background: rgba(16,185,129,0.2); color: #10b981;'}">
+                                ${Number(u.requiredTurnover || 0) > 0 ? '🔒 LOCKED' : '✅ UNLOCKED'}
+                            </span>
+                        </td>
                         <td>
                             <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; ${u.hasDeposited ? 'background: rgba(16,185,129,0.2); color: var(--accent-green);' : 'background: rgba(255,255,255,0.06); color: var(--text-muted);'}">
                                 ${u.hasDeposited ? '✅ DEPOSITED' : '⏳ NO DEPOSIT'}
@@ -1901,9 +1910,12 @@ function renderUsersTableContent(container) {
                             </span>
                         </td>
                         <td>
-                            <div style="display: flex; gap: 4px; align-items: center;">
+                            <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
                                 <button class="btn-quick-bal-set" data-uid="${u.id}" data-phone="${u.phone || u.username}" data-bal="${u.balance || 0}" style="background: rgba(16,185,129,0.18); border: 1px solid #10b981; color: #10b981; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Directly set balance">
                                     ✏️ Set
+                                </button>
+                                <button class="btn-quick-turnover-set" data-uid="${u.id}" data-phone="${u.phone || u.username}" data-turnover="${u.requiredTurnover || 0}" style="background: rgba(245,158,11,0.18); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;" title="Set or Clear Required Turnover">
+                                    🎯 Turnover
                                 </button>
                                 <button class="btn-select-user" data-uid="${u.id}" data-phone="${u.phone || u.username}" data-bal="${u.balance || 0}" style="background: rgba(245,158,11,0.2); border: 1px solid #f59e0b; color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">
                                     ⚡ Select
@@ -1946,6 +1958,40 @@ function renderUsersTableContent(container) {
                 alert(err.message || 'Balance update failed');
                 b.disabled = false;
                 b.textContent = '✏️ Set';
+            }
+        });
+    });
+
+    // Bind Quick Turnover Set/Clear buttons
+    tableEl.querySelectorAll('.btn-quick-turnover-set').forEach(b => {
+        b.addEventListener('click', async () => {
+            const uid = b.dataset.uid;
+            const phone = b.dataset.phone;
+            const currentTurnover = Number(b.dataset.turnover || 0);
+
+            const input = prompt(`Set required betting turnover (₹) for ${phone}:\n(Current Turnover: ₹${currentTurnover.toFixed(2)})\n\n💡 Tip: Enter 0 to UNLOCK withdrawal immediately!`, currentTurnover);
+            if (input === null) return;
+            const newTurnover = Number(input.trim());
+            if (isNaN(newTurnover) || newTurnover < 0) {
+                alert('Please enter a valid turnover amount (0 or greater)');
+                return;
+            }
+
+            b.disabled = true;
+            b.textContent = '...';
+            try {
+                const res = await adminService.adjustUserTurnover(uid, newTurnover, 'Admin quick turnover update');
+                const matched = cachedAdminUsers.find(u => u.id === uid);
+                if (matched) {
+                    matched.requiredTurnover = (res && typeof res.newTurnover === 'number') ? res.newTurnover : newTurnover;
+                    renderUsersTableContent(container);
+                }
+                alert(`✓ Turnover updated for ${phone}: ₹${newTurnover.toFixed(2)}${newTurnover === 0 ? ' (Withdrawal Unlocked!)' : ''}`);
+                await refreshUsersData(container);
+            } catch (err) {
+                alert(err.message || 'Turnover update failed');
+                b.disabled = false;
+                b.textContent = '🎯 Turnover';
             }
         });
     });

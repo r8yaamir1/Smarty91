@@ -489,18 +489,27 @@ class FirebaseSyncManager {
                             );
 
                             let resolvedBalance = 0;
+                            let resolvedTurnover = 0;
                             if (!existing) {
                                 resolvedBalance = Number(u.balance !== undefined ? u.balance : 0);
+                                resolvedTurnover = Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0);
                             } else if (isRemoteAdminAction) {
                                 resolvedBalance = Number(u.balance !== undefined ? u.balance : existing.balance);
+                                resolvedTurnover = Number(u.requiredTurnover !== undefined ? u.requiredTurnover : (existing.requiredTurnover !== undefined ? existing.requiredTurnover : 0));
                                 existing._localVersion = (existing._localVersion || 0) + 1;
                             } else if (isRecentLocalUpdate) {
                                 resolvedBalance = existing.balance; // Keep fresh memory balance, drop echo
+                                resolvedTurnover = existing.requiredTurnover !== undefined ? existing.requiredTurnover : Number(u.requiredTurnover || 0);
                             } else if (u._serverVersion && existing._localVersion && u._serverVersion > existing._localVersion) {
                                 resolvedBalance = Number(u.balance !== undefined ? u.balance : existing.balance);
+                                resolvedTurnover = Number(u.requiredTurnover !== undefined ? u.requiredTurnover : (existing.requiredTurnover !== undefined ? existing.requiredTurnover : 0));
                                 existing._localVersion = u._serverVersion;
                             } else {
                                 resolvedBalance = existing.balance !== undefined ? existing.balance : Number(u.balance || 0);
+                                // If local bets reduced turnover, keep the lower, more fulfilled turnover
+                                const remoteT = Number(u.requiredTurnover !== undefined ? u.requiredTurnover : 0);
+                                const localT = Number(existing.requiredTurnover !== undefined ? existing.requiredTurnover : remoteT);
+                                resolvedTurnover = (existing.requiredTurnover !== undefined && localT <= remoteT) ? localT : remoteT;
                             }
 
                             const updatedUser = {
@@ -514,7 +523,7 @@ class FirebaseSyncManager {
                                 balance: resolvedBalance,
                                 _localVersion: (existing && existing._localVersion) ? existing._localVersion : 1,
                                 _lastLocalUpdate: (existing && existing._lastLocalUpdate) ? existing._lastLocalUpdate : Date.now(),
-                                requiredTurnover: Number(u.requiredTurnover !== undefined ? u.requiredTurnover : (existing ? existing.requiredTurnover : 0)),
+                                requiredTurnover: Number(Math.max(0, resolvedTurnover).toFixed(2)),
                                 inviteCode: u.inviteCode || (existing ? existing.inviteCode : ''),
                                 referredBy: u.referredBy !== undefined ? u.referredBy : (existing ? existing.referredBy : null),
                                 hasDeposited: u.hasDeposited !== undefined ? !!u.hasDeposited : (existing ? existing.hasDeposited : false),
@@ -1072,7 +1081,7 @@ class FirebaseSyncManager {
         return this.saveUser(user);
     }
 
-    async updateUserBalance(userId, newBalance, reason = '', bonusBalance = undefined) {
+    async updateUserBalance(userId, newBalance, reason = '', bonusBalance = undefined, requiredTurnover = undefined) {
         if (!this._checkQuota() || !userId) return;
         try {
             const canonicalId = (typeof userId === 'string' && !userId.startsWith('usr_') && !isNaN(Number(userId)) && userId !== 'default_user') ? 'usr_' + userId : userId;
@@ -1085,6 +1094,14 @@ class FirebaseSyncManager {
             };
             if (bonusBalance !== undefined) {
                 updatePayload.bonusBalance = Number(bonusBalance);
+            }
+            if (requiredTurnover !== undefined) {
+                updatePayload.requiredTurnover = Number(requiredTurnover);
+            } else if (this.engine) {
+                const memUser = this.engine.users.get(userId) || this.engine.users.get(canonicalId);
+                if (memUser && memUser.requiredTurnover !== undefined) {
+                    updatePayload.requiredTurnover = Number(memUser.requiredTurnover);
+                }
             }
             await setDoc(userRef, updatePayload, { merge: true });
         } catch (e) {

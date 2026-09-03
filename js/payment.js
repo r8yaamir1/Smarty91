@@ -125,10 +125,18 @@ function renderHeaderWalletInfo() {
     if (availBalEl) availBalEl.innerText = `₹${bal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     // Render 2x Turnover status
-    const reqTurnover = Number(currentWalletSummary.requiredTurnover || 0);
+    const reqTurnover = isNaN(Number(currentWalletSummary.requiredTurnover)) ? 0 : Math.max(0, Number(currentWalletSummary.requiredTurnover));
     const turnoverValEl = document.getElementById('turnover-remaining-val');
     const turnoverBadgeEl = document.getElementById('turnover-badge');
-    if (turnoverValEl) turnoverValEl.innerText = `₹${reqTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    if (turnoverValEl) {
+        if (reqTurnover > 0) {
+            turnoverValEl.innerText = `₹${reqTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            turnoverValEl.style.color = '#fbbf24';
+        } else {
+            turnoverValEl.innerText = '₹0.00 (Ready to Withdraw)';
+            turnoverValEl.style.color = '#34d399';
+        }
+    }
     if (turnoverBadgeEl) {
         if (reqTurnover > 0) {
             turnoverBadgeEl.innerText = '🔒 Locked';
@@ -180,6 +188,7 @@ window.switchCashierTab = function(tabName) {
         if (withdrawTabBtn) withdrawTabBtn.classList.add('active');
         if (mainTitle) mainTitle.innerText = 'Withdraw Funds';
         switchWithdrawMethod('USDT');
+        loadWalletData();
     } else if (tabName === 'history') {
         if (depositSec) depositSec.style.display = 'none';
         if (withdrawSec) withdrawSec.style.display = 'none';
